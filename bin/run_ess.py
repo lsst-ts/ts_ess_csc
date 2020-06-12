@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # This file is part of ts_ess.
 #
 # Developed for the LSST Data Management System.
@@ -16,12 +17,14 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+import asyncio
+import logging
 
-from .ess_csc import *
+from lsst.ts import ess
 
-try:
-    from .version import *
-except ModuleNotFoundError:
-    __version__ = "?"
+logging.basicConfig(
+    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.INFO,
+)
+
+
+asyncio.run(ess.EssCsc.amain(index=None))
