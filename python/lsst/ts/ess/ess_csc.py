@@ -27,7 +27,6 @@ class EssCsc(salobj.ConfigurableCsc):
         )
         self.config = None
         self._config_dir = config_dir
-        self.log = logging.getLogger("EssCsc")
         super().__init__(
             name="ESS",
             index=0,
@@ -36,6 +35,9 @@ class EssCsc(salobj.ConfigurableCsc):
             initial_state=initial_state,
             simulation_mode=simulation_mode,
         )
+
+        stream_handler = logging.StreamHandler()
+        self.log.addHandler(stream_handler)
         self.log.info("__init__")
 
     async def configure(self, config):
