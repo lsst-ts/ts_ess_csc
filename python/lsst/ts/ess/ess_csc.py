@@ -86,10 +86,10 @@ class EssCsc(salobj.ConfigurableCsc):
                     previous_tai = data.timestamp
                     telemetry = {}
                     telemetry["timestamp"] = data.timestamp
-                    telemetry["TemperatureC01"] = data.TemperatureC01
-                    telemetry["TemperatureC02"] = data.TemperatureC02
-                    telemetry["TemperatureC03"] = data.TemperatureC03
-                    telemetry["TemperatureC04"] = data.TemperatureC04
+                    telemetry["temperatureC01"] = data.TemperatureC01
+                    telemetry["temperatureC02"] = data.TemperatureC02
+                    telemetry["temperatureC03"] = data.TemperatureC03
+                    telemetry["temperatureC04"] = data.TemperatureC04
                     self.tel_temperature4Ch.set_put(**telemetry)
                 await asyncio.sleep(interval)
         except Exception:
