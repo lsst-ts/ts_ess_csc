@@ -19,21 +19,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asynctest
-
-from lsst.ts import salobj
-from lsst.ts import ess
+__all__ = ["EssTemperature4ChC"]
 
 
-class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
-    def basic_make_csc(self, initial_state, config_dir, simulation_mode, **kwargs):
-        return ess.EssCsc(
-            initial_state=initial_state, config_dir=config_dir, simulation_mode=simulation_mode,
-        )
+class EssTemperature4ChC:
+    """Mock class that contains the 4 channel temperature data.
+    """
 
-    async def test_standard_state_transitions(self):
-        async with self.make_csc(initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1):
-            await self.check_standard_state_transitions(enabled_commands=(),)
-
-    async def test_bin_script(self):
-        await self.check_bin_script(name="ESS", index=None, exe_name="run_ess.py")
+    def __init__(self):
+        self.timestamp = None
+        self.TemperatureC01 = None
+        self.TemperatureC02 = None
+        self.TemperatureC03 = None
+        self.TemperatureC04 = None
