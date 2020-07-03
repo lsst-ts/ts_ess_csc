@@ -4,7 +4,7 @@
 #   the "sconsUtils" package.
 setupRequired(sconsUtils)
 setupRequired(ts_salobj)
-setupRequired(ts_config_ess)
+setupRequired(ts_config_ocs)
 
 envPrepend(PATH, ${PRODUCT_DIR}/bin)
 envPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
