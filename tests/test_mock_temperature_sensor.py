@@ -45,7 +45,7 @@ class MockTestCase(asynctest.TestCase):
         await self._ess_sensor.readInstrument()
         data = self._ess_sensor.myData
         self.assertEqual(self._ess_sensor.current_tai, data.timestamp)
-        self.assertTrue(18 <= data.TemperatureC01 <= 22)
-        self.assertTrue(18 <= data.TemperatureC02 <= 22)
-        self.assertTrue(18 <= data.TemperatureC03 <= 22)
-        self.assertTrue(18 <= data.TemperatureC04 <= 22)
+        self.assertTrue(18 <= data.TemperatureC01 <= 22, f"temp = {data.TemperatureC01}")
+        self.assertTrue(18 <= data.TemperatureC02 <= 22, f"temp = {data.TemperatureC02}")
+        self.assertTrue(18 <= data.TemperatureC03 <= 22, f"temp = {data.TemperatureC03}")
+        self.assertTrue(18 <= data.TemperatureC04 <= 22, f"temp = {data.TemperatureC04}")

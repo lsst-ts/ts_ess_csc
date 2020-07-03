@@ -47,10 +47,10 @@ class MockTemperatureSensor:
         await self.determine_current_tai()
         if self.current_tai - self.previous_tai > 1.0:
             self.myData.timestamp = self.current_tai
-            self.myData.TemperatureC01 = random.gauss(20.0, 3)
-            self.myData.TemperatureC02 = random.gauss(20.0, 3)
-            self.myData.TemperatureC03 = random.gauss(20.0, 3)
-            self.myData.TemperatureC04 = random.gauss(20.0, 3)
+            self.myData.TemperatureC01 = random.randint(180, 220) / 10.0
+            self.myData.TemperatureC02 = random.randint(180, 220) / 10.0
+            self.myData.TemperatureC03 = random.randint(180, 220) / 10.0
+            self.myData.TemperatureC04 = random.randint(180, 220) / 10.0
             self.previous_tai = self.current_tai
 
     async def determine_current_tai(self):

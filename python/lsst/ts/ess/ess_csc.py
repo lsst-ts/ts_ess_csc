@@ -84,12 +84,7 @@ class EssCsc(salobj.ConfigurableCsc):
                 data = self._ess_sensor.myData
                 if data.timestamp - previous_tai > 1.0:
                     previous_tai = data.timestamp
-                    telemetry = {}
-                    telemetry["timestamp"] = data.timestamp
-                    telemetry["temperatureC01"] = data.TemperatureC01
-                    telemetry["temperatureC02"] = data.TemperatureC02
-                    telemetry["temperatureC03"] = data.TemperatureC03
-                    telemetry["temperatureC04"] = data.TemperatureC04
+                    telemetry = vars(data)
                     self.tel_temperature4Ch.set_put(**telemetry)
                 await asyncio.sleep(interval)
         except Exception:
