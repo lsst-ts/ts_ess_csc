@@ -1,4 +1,4 @@
-# This file is part of ts_Dome.
+# This file is part of ts_ess.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project

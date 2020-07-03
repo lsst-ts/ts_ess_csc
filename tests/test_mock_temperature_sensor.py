@@ -1,4 +1,4 @@
-# This file is part of ts_Dome.
+# This file is part of ts_ess.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -45,3 +45,7 @@ class MockTestCase(asynctest.TestCase):
         await self._ess_sensor.readInstrument()
         data = self._ess_sensor.myData
         self.assertEqual(self._ess_sensor.current_tai, data.timestamp)
+        self.assertTrue(18 <= data.TemperatureC01 <= 22)
+        self.assertTrue(18 <= data.TemperatureC02 <= 22)
+        self.assertTrue(18 <= data.TemperatureC03 <= 22)
+        self.assertTrue(18 <= data.TemperatureC04 <= 22)

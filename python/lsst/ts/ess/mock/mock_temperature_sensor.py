@@ -1,4 +1,4 @@
-# This file is part of ts_Dome.
+# This file is part of ts_ess.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -22,9 +22,10 @@
 __all__ = ["MockTemperatureSensor"]
 
 import logging
+import random
 
 from lsst.ts import salobj
-from lsst.ts.ess.mock.ess_temperature_4ch_c import EssTemperature4ChC
+from lsst.ts.ess.data.ess_temperature_4ch_c import EssTemperature4ChC
 
 
 class MockTemperatureSensor:
@@ -46,10 +47,10 @@ class MockTemperatureSensor:
         await self.determine_current_tai()
         if self.current_tai - self.previous_tai > 1.0:
             self.myData.timestamp = self.current_tai
-            self.myData.TemperatureC01 = 20.0
-            self.myData.TemperatureC02 = 20.1
-            self.myData.TemperatureC03 = 19.9
-            self.myData.TemperatureC04 = 20.2
+            self.myData.TemperatureC01 = random.gauss(20.0, 3)
+            self.myData.TemperatureC02 = random.gauss(20.0, 3)
+            self.myData.TemperatureC03 = random.gauss(20.0, 3)
+            self.myData.TemperatureC04 = random.gauss(20.0, 3)
             self.previous_tai = self.current_tai
 
     async def determine_current_tai(self):
