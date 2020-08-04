@@ -26,6 +26,7 @@ import pathlib
 
 from lsst.ts import salobj
 from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
+from lsst.ts.ess.ESS_temperature_4ch_reader import ESS_Temperature_4ch
 
 TEMPERATURE_POLLING_INTERVAL = 0.25
 
@@ -71,20 +72,19 @@ class EssCsc(salobj.ConfigurableCsc):
         ----------
         interval: `float`
             The interval (sec) at which to get the temperature.
-
-        Returns
-        -------
-
         """
         try:
-            previous_tai = 0
             while True:
                 self.log.debug("Getting the temperature from the sensor")
                 await self._ess_sensor.readInstrument()
-                data = self._ess_sensor.myData
-                if data.timestamp - previous_tai > 1.0:
-                    previous_tai = data.timestamp
-                    self.tel_temperature4Ch.set_put(**vars(data))
+                data = {}
+                data["timestamp"] = salobj.current_tai()
+                data["temperatureC01"] = self._ess_sensor.temperature_c00
+                data["temperatureC02"] = self._ess_sensor.temperature_c01
+                data["temperatureC03"] = self._ess_sensor.temperature_c02
+                data["temperatureC04"] = self._ess_sensor.temperature_c03
+                self.log.info(f"Sending telemetry {data}")
+                self.tel_temperature4Ch.set_put(**data)
                 await asyncio.sleep(interval)
         except Exception:
             self.log.exception("Method get_temperature() failed")
@@ -102,8 +102,15 @@ class EssCsc(salobj.ConfigurableCsc):
             raise RuntimeError("Already connected")
         if self.simulation_mode == 1:
             self._ess_sensor = MockTemperatureSensor()
+        else:
+            self.log.info("Connecting to the sensor.")
+            self._ess_sensor = ESS_Temperature_4ch(
+                self.config.uart, self.config.baudrate, self.config.connection_timeout
+            )
+            self._ess_sensor.serial_open()
+            self.log.info("Connection to the sensor established.")
 
-        # Periodic polling of the temperature sensor data
+        self.log.info("Start periodic polling of the sensor data.")
         self.temperature_task = asyncio.create_task(self.get_temperature(TEMPERATURE_POLLING_INTERVAL))
 
     async def disconnect(self):

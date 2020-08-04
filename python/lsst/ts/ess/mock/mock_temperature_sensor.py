@@ -24,39 +24,24 @@ __all__ = ["MockTemperatureSensor"]
 import logging
 import random
 
-from lsst.ts import salobj
-from lsst.ts.ess.data.ess_temperature_4ch_c import EssTemperature4ChC
-
 
 class MockTemperatureSensor:
     """Mock Temperature Sensor.
     """
 
     def __init__(self):
-        self.myData = EssTemperature4ChC()
-        # Time keeping
-        self.current_tai = 0
-        self.previous_tai = 0
+        # Instrument channel outputs
+        self.temperature_c00 = None
+        self.temperature_c01 = None
+        self.temperature_c02 = None
+        self.temperature_c03 = None
+
         self.log = logging.getLogger("MockTemperatureSensor")
         self.log.info("__init__")
 
     async def readInstrument(self):
         self.log.info("readInstrument")
-        # Mock the behavior that the temperature data are only updated by the
-        # real sensors every 1 second.
-        await self.determine_current_tai()
-        if self.current_tai - self.previous_tai > 1.0:
-            self.myData.timestamp = self.current_tai
-            self.myData.TemperatureC01 = random.randint(180, 220) / 10.0
-            self.myData.TemperatureC02 = random.randint(180, 220) / 10.0
-            self.myData.TemperatureC03 = random.randint(180, 220) / 10.0
-            self.myData.TemperatureC04 = random.randint(180, 220) / 10.0
-            self.previous_tai = self.current_tai
-
-    async def determine_current_tai(self):
-        """Determine the current TAI time.
-
-        This is done in a separate method so a mock method can replace it in
-        unit tests.
-        """
-        self.current_tai = salobj.current_tai()
+        self.temperature_c00 = random.randint(180, 220) / 10.0
+        self.temperature_c01 = random.randint(180, 220) / 10.0
+        self.temperature_c02 = random.randint(180, 220) / 10.0
+        self.temperature_c03 = random.randint(180, 220) / 10.0
