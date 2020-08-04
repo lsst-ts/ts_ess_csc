@@ -20,10 +20,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asynctest
-from asynctest.mock import CoroutineMock
 import logging
 
-from lsst.ts import salobj
 from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
 
 logging.basicConfig(format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.DEBUG)
@@ -33,19 +31,19 @@ class MockTestCase(asynctest.TestCase):
     async def setUp(self):
         self.log = logging.getLogger("MockTestCase")
         self._ess_sensor = MockTemperatureSensor()
-        # Replace the determine_current_tai method with a mock method so that
-        # the current_tai value on the mock_ctrl object can be set to make sure
-        # that the mock_ctrl object  behaves as if that amount of time has
-        # passed.
-        self._ess_sensor.determine_current_tai = CoroutineMock()
 
     async def test_read_instrument(self):
         # Set the TAI time in the mock controller for easier control
-        self._ess_sensor.current_tai = salobj.current_tai()
         await self._ess_sensor.readInstrument()
-        data = self._ess_sensor.myData
-        self.assertEqual(self._ess_sensor.current_tai, data.timestamp)
-        self.assertTrue(18 <= data.TemperatureC01 <= 22, f"temp = {data.TemperatureC01}")
-        self.assertTrue(18 <= data.TemperatureC02 <= 22, f"temp = {data.TemperatureC02}")
-        self.assertTrue(18 <= data.TemperatureC03 <= 22, f"temp = {data.TemperatureC03}")
-        self.assertTrue(18 <= data.TemperatureC04 <= 22, f"temp = {data.TemperatureC04}")
+        self.assertTrue(
+            18 <= self._ess_sensor.temperature_c00 <= 22, f"temp = {self._ess_sensor.temperature_c00}"
+        )
+        self.assertTrue(
+            18 <= self._ess_sensor.temperature_c01 <= 22, f"temp = {self._ess_sensor.temperature_c01}"
+        )
+        self.assertTrue(
+            18 <= self._ess_sensor.temperature_c02 <= 22, f"temp = {self._ess_sensor.temperature_c02}"
+        )
+        self.assertTrue(
+            18 <= self._ess_sensor.temperature_c03 <= 22, f"temp = {self._ess_sensor.temperature_c03}"
+        )
