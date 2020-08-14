@@ -44,6 +44,12 @@ async def main():
     logging.info(
         f"temp: {data.temperatureC01} {data.temperatureC02} {data.temperatureC03} " f"{data.temperatureC04}"
     )
+    logging.info("Calling set_summary_state")
+    await salobj.set_summary_state(remote=ess, state=salobj.State.DISABLED)
+    logging.info("Calling set_summary_state")
+    await salobj.set_summary_state(remote=ess, state=salobj.State.STANDBY)
+    logging.info("Calling set_summary_state")
+    await salobj.set_summary_state(remote=ess, state=salobj.State.OFFLINE)
 
 
 if __name__ == "__main__":
