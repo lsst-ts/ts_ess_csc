@@ -76,7 +76,7 @@ class EssCsc(salobj.ConfigurableCsc):
         try:
             while True:
                 self.log.debug("Getting the temperature from the sensor")
-                await self._ess_sensor.readInstrument()
+                self._ess_sensor.readInstrument()
                 data = {}
                 data["timestamp"] = salobj.current_tai()
                 data["temperatureC01"] = self._ess_sensor.temperature_c00
