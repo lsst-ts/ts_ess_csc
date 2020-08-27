@@ -18,10 +18,7 @@ data_files_path = tools_path.relative_to(base_prefix).parents[1]
 setuptools.setup(
     name="ts_ess",
     description="LSST Environment Sensors Support",
-    use_scm_version={
-        "write_to": "python/lsst/ts/ess/version.py",
-        "write_to_template": scm_version_template,
-    },
+    use_scm_version={"write_to": "python/lsst/ts/ess/version.py", "write_to_template": scm_version_template},
     setup_requires=["setuptools_scm", "pytest-runner"],
     install_requires=install_requires,
     package_dir={"": "python"},
