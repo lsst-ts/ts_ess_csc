@@ -26,7 +26,7 @@ import pathlib
 
 from lsst.ts import salobj
 from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
-from lsst.ts.ess.ESS_temperature_4ch_reader import ESS_Temperature_4ch
+from lsst.ts.ess.ess_temperature_reader import ESS_Temperature
 
 TEMPERATURE_POLLING_INTERVAL = 0.25
 
@@ -45,10 +45,14 @@ class EssCsc(salobj.ConfigurableCsc):
         Simulation mode (1) or not (0)
     """
 
+    valid_simulation_modes = (0, 1)
+
     def __init__(
         self, config_dir=None, initial_state=salobj.State.STANDBY, simulation_mode=0,
     ):
-        schema_path = pathlib.Path(__file__).resolve().parents[4].joinpath("schema", "ess.yaml")
+        schema_path = (
+            pathlib.Path(__file__).resolve().parents[4].joinpath("schema", "ess.yaml")
+        )
         self.config = None
         self._config_dir = config_dir
         super().__init__(
@@ -60,10 +64,10 @@ class EssCsc(salobj.ConfigurableCsc):
             simulation_mode=simulation_mode,
         )
 
-        self.log.info("__init__")
-
         self._ess_sensor = None
         self.temperature_task = None
+
+        self.log.info("ESS CSC created.")
 
     async def get_temperature(self, interval):
         """Get the temperature forever at the specified interval.
@@ -76,13 +80,14 @@ class EssCsc(salobj.ConfigurableCsc):
         try:
             while True:
                 self.log.debug("Getting the temperature from the sensor")
-                self._ess_sensor.readInstrument()
-                data = {}
-                data["timestamp"] = salobj.current_tai()
-                data["temperatureC01"] = self._ess_sensor.temperature_c00
-                data["temperatureC02"] = self._ess_sensor.temperature_c01
-                data["temperatureC03"] = self._ess_sensor.temperature_c02
-                data["temperatureC04"] = self._ess_sensor.temperature_c03
+                self._ess_sensor.read_instrument()
+                data = {
+                    "timestamp": self._ess_sensor.timestamp,
+                    "temperatureC01": self._ess_sensor.temperature[0],
+                    "temperatureC02": self._ess_sensor.temperature[1],
+                    "temperatureC03": self._ess_sensor.temperature[2],
+                    "temperatureC04": self._ess_sensor.temperature[3],
+                }
                 self.log.info(f"Sending telemetry {data}")
                 self.tel_temperature4Ch.set_put(**data)
                 await asyncio.sleep(interval)
@@ -101,17 +106,23 @@ class EssCsc(salobj.ConfigurableCsc):
         if self.connected:
             raise RuntimeError("Already connected")
         if self.simulation_mode == 1:
+            self.log.info("Connecting to the mock sensor.")
             self._ess_sensor = MockTemperatureSensor()
         else:
             self.log.info("Connecting to the sensor.")
-            self._ess_sensor = ESS_Temperature_4ch(
-                self.config.uart, self.config.baudrate, self.config.connection_timeout
+            self._ess_sensor = ESS_Temperature(
+                name=self.config.name,
+                channels=self.config.channels,
+                uart=self.config.uart,
+                baudrate=self.config.baudrate,
+                timeout=self.config.connection_timeout,
             )
-            self._ess_sensor.serial_open()
             self.log.info("Connection to the sensor established.")
 
         self.log.info("Start periodic polling of the sensor data.")
-        self.temperature_task = asyncio.create_task(self.get_temperature(TEMPERATURE_POLLING_INTERVAL))
+        self.temperature_task = asyncio.create_task(
+            self.get_temperature(TEMPERATURE_POLLING_INTERVAL)
+        )
 
     async def disconnect(self):
         """Disconnect from the ESS sensor, if connected, and stop the mock
@@ -136,10 +147,6 @@ class EssCsc(salobj.ConfigurableCsc):
     async def configure(self, config):
         self.config = config
 
-    async def implement_simulation_mode(self, simulation_mode):
-        if simulation_mode not in (0, 1):
-            raise salobj.ExpectedError(f"Simulation_mode={simulation_mode} must be 0 or 1")
-
     @property
     def connected(self):
         if self._ess_sensor is None:
@@ -149,13 +156,3 @@ class EssCsc(salobj.ConfigurableCsc):
     @staticmethod
     def get_config_pkg():
         return "ts_config_ocs"
-
-    @classmethod
-    def add_arguments(cls, parser):
-        super(EssCsc, cls).add_arguments(parser)
-        parser.add_argument("-s", "--simulate", action="store_true", help="Run in simuation mode?")
-
-    @classmethod
-    def add_kwargs_from_args(cls, args, kwargs):
-        super(EssCsc, cls).add_kwargs_from_args(args, kwargs)
-        kwargs["simulation_mode"] = 1 if args.simulate else 0

@@ -5,6 +5,14 @@ title: ESS v1
 description: Schema for ESS configuration files
 type: object
 properties:
+  name:
+    description: Name of the sensor
+    type: string
+    default: ESS_Temperature_4ch
+  channels:
+    description: Number of channels
+    type: integer
+    default: 4
   uart:
     description: Logical device to connect to
     type: string
