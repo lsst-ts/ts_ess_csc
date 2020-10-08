@@ -24,7 +24,9 @@ import logging
 
 from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
 
-logging.basicConfig(format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.DEBUG)
+logging.basicConfig(
+    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.DEBUG
+)
 
 
 class MockTestCase(asynctest.TestCase):
@@ -34,16 +36,20 @@ class MockTestCase(asynctest.TestCase):
 
     async def test_read_instrument(self):
         # Set the TAI time in the mock controller for easier control
-        await self._ess_sensor.readInstrument()
+        self._ess_sensor.read_instrument()
         self.assertTrue(
-            18 <= self._ess_sensor.temperature_c00 <= 22, f"temp = {self._ess_sensor.temperature_c00}"
+            18 <= self._ess_sensor.temperature[0] <= 22,
+            f"temp = {self._ess_sensor.temperature[0]}",
         )
         self.assertTrue(
-            18 <= self._ess_sensor.temperature_c01 <= 22, f"temp = {self._ess_sensor.temperature_c01}"
+            18 <= self._ess_sensor.temperature[1] <= 22,
+            f"temp = {self._ess_sensor.temperature[1]}",
         )
         self.assertTrue(
-            18 <= self._ess_sensor.temperature_c02 <= 22, f"temp = {self._ess_sensor.temperature_c02}"
+            18 <= self._ess_sensor.temperature[2] <= 22,
+            f"temp = {self._ess_sensor.temperature[2]}",
         )
         self.assertTrue(
-            18 <= self._ess_sensor.temperature_c03 <= 22, f"temp = {self._ess_sensor.temperature_c03}"
+            18 <= self._ess_sensor.temperature[3] <= 22,
+            f"temp = {self._ess_sensor.temperature[3]}",
         )

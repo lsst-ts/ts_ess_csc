@@ -36,7 +36,7 @@ test:
     - ts-dds
     - ts-idl
     - ts-salobj
-    - black
+    - black == 19.10b0
   source_files:
     - python
     - bin
@@ -44,7 +44,7 @@ test:
     - schema
     - setup.cfg
   commands:
-    - py.test --ignore-glob=**/ESS_*
+    - py.test --ignore-glob=**/ESS_* --ignore-glob=**/ess_temperature_reader.py
 
 requirements:
   host:
