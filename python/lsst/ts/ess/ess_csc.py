@@ -88,8 +88,15 @@ class EssCsc(salobj.ConfigurableCsc):
                     "temperatureC03": self._ess_sensor.temperature[2],
                     "temperatureC04": self._ess_sensor.temperature[3],
                 }
-                self.log.info(f"Sending telemetry {data}")
-                self.tel_temperature4Ch.set_put(**data)
+                self.log.info(f"Received temperatures {data}")
+                if not (
+                    self._ess_sensor.temperature[0] == "NaN"
+                    or self._ess_sensor.temperature[1] == "NaN"
+                    or self._ess_sensor.temperature[2] == "NaN"
+                    or self._ess_sensor.temperature[3] == "NaN"
+                ):
+                    self.log.info("Sending telemetry.")
+                    self.tel_temperature4Ch.set_put(**data)
                 await asyncio.sleep(interval)
         except Exception:
             self.log.exception("Method get_temperature() failed")
@@ -137,7 +144,7 @@ class EssCsc(salobj.ConfigurableCsc):
         """Override of the handle_summary_state function to connect or
         disconnect to the ESS sensor (or the mock_controller) when needed.
         """
-        self.log.info(f"handle_summary_state {salobj.State(self.summary_state).name}")
+        self.log.info(f"handle_summary_state {self.summary_state.name}")
         if self.disabled_or_enabled:
             if not self.connected:
                 await self.connect()

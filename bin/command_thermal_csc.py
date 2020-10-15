@@ -30,26 +30,29 @@ logging.basicConfig(
 
 async def main():
     domain = salobj.Domain()
-    ess = salobj.Remote(domain=domain, name="ESS")
-    logging.info(dir(ess))
+    thermal = salobj.Remote(domain=domain, name="ESS")
+    logging.info(dir(thermal))
 
     logging.info("Calling start_task")
-    await ess.start_task
-    logging.info("Calling cmd_start.set_start")
-    await ess.cmd_start.set_start(timeout=20)
-    logging.info("Calling set_summary_state")
-    await salobj.set_summary_state(remote=ess, state=salobj.State.ENABLED)
+    await thermal.start_task
+    logging.info(await thermal.evt_heartbeat.next(flush=True, timeout=500))
 
-    data = await ess.tel_temperature4Ch.next(flush=True)
+    logging.info("Calling cmd_start.set_start")
+    await thermal.cmd_start.set_start(timeout=20)
+    logging.info("Calling set_summary_state")
+    await salobj.set_summary_state(remote=thermal, state=salobj.State.ENABLED)
+
+    data = await thermal.tel_temperature4Ch.next(flush=True)
     logging.info(
-        f"temp: {data.temperatureC01} {data.temperatureC02} {data.temperatureC03} " f"{data.temperatureC04}"
+        f"temp: {data.temperatureC01} {data.temperatureC02} {data.temperatureC03} "
+        f"{data.temperatureC04}"
     )
     logging.info("Calling set_summary_state")
-    await salobj.set_summary_state(remote=ess, state=salobj.State.DISABLED)
+    await salobj.set_summary_state(remote=thermal, state=salobj.State.DISABLED)
     logging.info("Calling set_summary_state")
-    await salobj.set_summary_state(remote=ess, state=salobj.State.STANDBY)
+    await salobj.set_summary_state(remote=thermal, state=salobj.State.STANDBY)
     logging.info("Calling set_summary_state")
-    await salobj.set_summary_state(remote=ess, state=salobj.State.OFFLINE)
+    await salobj.set_summary_state(remote=thermal, state=salobj.State.OFFLINE)
 
 
 if __name__ == "__main__":
@@ -59,5 +62,5 @@ if __name__ == "__main__":
         logging.info("Calling main method")
         loop.run_until_complete(main())
     except Exception:
-        logging.exception("Excdeption!")
+        logging.exception("Exception!")
         pass
