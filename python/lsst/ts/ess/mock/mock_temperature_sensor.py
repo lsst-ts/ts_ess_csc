@@ -23,6 +23,7 @@ __all__ = ["MockTemperatureSensor"]
 
 import logging
 import random
+import time
 
 from lsst.ts import salobj
 
@@ -41,8 +42,9 @@ class MockTemperatureSensor:
 
     def read_instrument(self):
         self.log.info("read_instrument")
-        self.timestamp = salobj.current_tai
+        self.timestamp = salobj.current_tai()
         self.temperature[0] = random.randint(180, 220) / 10.0
         self.temperature[1] = random.randint(180, 220) / 10.0
         self.temperature[2] = random.randint(180, 220) / 10.0
         self.temperature[3] = random.randint(180, 220) / 10.0
+        time.sleep(1)

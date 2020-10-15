@@ -58,4 +58,3 @@ requirements:
     - setuptools
     - setuptools_scm
     - ts-salobj
-    - ts-simactuators
