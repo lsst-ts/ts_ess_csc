@@ -1,6 +1,6 @@
 {% set data= load_setup_py_data() %}
 package:
-  name: ts-ess
+  name: "ts-ess"
   version: {{ data.get('version') }}
 
 source:
@@ -26,6 +26,9 @@ test:
     - pyserial
     - pyftdi
     - pylibftdi
+    - ts-simactuators
+    - ts-dds
+    - black == 19.10b0
   source_files:
     - python
     - bin
