@@ -20,23 +20,12 @@ build:
 
 test:
   requires:
-    - pytest
-    - pytest-flake8
-    - pytest-cov
-    - asynctest
-    - pytest-tornasync
-    - numpy
-    - astropy
-    - jsonschema
-    - pyyaml
-    - boto3
-    - moto
+    - ts-conda-build
+    - ts-idl {{ idl_version }}
+    - ts-salobj {{ salobj_version }}
     - pyserial
-    - ts-simactuators
-    - ts-dds
-    - ts-idl
-    - ts-salobj
-    - black == 19.10b0
+    - pyftdi
+    - pylibftdi
   source_files:
     - python
     - bin
@@ -44,7 +33,7 @@ test:
     - schema
     - setup.cfg
   commands:
-    - py.test --ignore-glob=**/ESS_* --ignore-glob=**/ess_temperature_reader.py
+    - py.test
 
 requirements:
   host:
@@ -57,4 +46,5 @@ requirements:
     - python
     - setuptools
     - setuptools_scm
-    - ts-salobj
+    - ts-idl {{ idl_version }}
+    - ts-salobj {{ salobj_version }}
