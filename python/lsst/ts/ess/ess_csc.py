@@ -1,8 +1,8 @@
 # This file is part of ts_ess.
 #
-# Developed for the LSST Data Management System.
-# This product includes software developed by the LSST Project
-# (https://www.lsst.org).
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
+# This product includes software developed by the Vera C. Rubin Observatory
+# Project (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
 # for details of code ownership.
 #
@@ -26,7 +26,7 @@ import pathlib
 
 from lsst.ts import salobj
 from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
-from lsst.ts.ess.ess_temperature_reader import ESS_Temperature
+from lsst.ts.ess.ess_temperature_reader import EssTemperature
 
 TEMPERATURE_POLLING_INTERVAL = 0.25
 
@@ -117,7 +117,7 @@ class EssCsc(salobj.ConfigurableCsc):
             self._ess_sensor = MockTemperatureSensor()
         else:
             self.log.info("Connecting to the sensor.")
-            self._ess_sensor = ESS_Temperature(
+            self._ess_sensor = EssTemperature(
                 name=self.config.name,
                 channels=self.config.channels,
                 uart=self.config.uart,

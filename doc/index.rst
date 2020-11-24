@@ -24,28 +24,17 @@ Contributing
 ============
 
 ``lsst.ts.ess`` is developed at https://github.com/lsst-ts/ts_ess.
-You can find Jira issues for this module under the `ts_ess <https://jira.lsstcorp.org/issues/?jql=project%20%3D%20DM%20AND%20component%20%3D%20ts_ess>`_ component.
-
-.. If there are topics related to developing this module (rather than using it), link to this from a toctree placed here.
-
-.. .. toctree::
-..    :maxdepth: 1
-
-.. .. _lsst.ts.ess-scripts:
-
-.. Script reference
-.. ================
-
-.. .. TODO: Add an item to this toctree for each script reference topic in the scripts subdirectory.
-
-.. .. toctree::
-..    :maxdepth: 1
-
-.. .. _lsst.ts.ess-pyapi:
+You can find Jira issues for this module using `labels=ts_ess <https://jira.lsstcorp.org/issues/?jql=project%3DDM%20AND%20labels%3Dts_ess>`_.
 
 Python API reference
 ====================
 
 .. automodapi:: lsst.ts.ess
    :no-main-docstr:
-   :no-inheritance-diagram:
+
+Version History
+===============
+
+.. toctree::
+    version_history
+    :maxdepth: 1

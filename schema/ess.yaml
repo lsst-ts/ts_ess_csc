@@ -8,7 +8,7 @@ properties:
   name:
     description: Name of the sensor
     type: string
-    default: ESS_Temperature_4ch
+    default: EssTemperature4Ch
   channels:
     description: Number of channels
     type: integer
