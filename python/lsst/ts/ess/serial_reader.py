@@ -1,8 +1,8 @@
-# This file is part of ts_ess.
+# This file is part of lsst-ts.eas-rpi.
 #
-# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
-# This product includes software developed by the Vera C. Rubin Observatory
-# Project (https://www.lsst.org).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
 # for details of code ownership.
 #
@@ -22,7 +22,7 @@
 """Abstract class for ESS Instrument serial protocol converter.
 """
 
-__all__ = "SerialReader"
+__all__ = ('SerialReader')
 
 from abc import ABC, abstractmethod
 
@@ -37,7 +37,7 @@ class SerialReader(ABC):
     """
 
     @abstractmethod
-    def __init__(self):
+    def __init__(self, name: str, serial_class, serial_ch_id: str, channels: int):
         """Initialize and connect to the ESS instrument.
 
         Implementations should add any connection parameters here.
@@ -46,8 +46,9 @@ class SerialReader(ABC):
 
     @abstractmethod
     def read(self):
-        """Read ESS instrument.
+        """Read the ESS instrument.
 
-        Read ESS instrument, test data and populate output data list.
+        Implemetations must Read ESS instrument, test data and populate
+        output data list.
         """
         pass
