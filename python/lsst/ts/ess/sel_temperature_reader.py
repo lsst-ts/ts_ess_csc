@@ -1,8 +1,8 @@
-# This file is part of ts_ess.
+# This file is part of lsst-ts.eas-rpi.
 #
-# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
-# This product includes software developed by the Vera C. Rubin Observatory
-# Project (https://www.lsst.org).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
 # for details of code ownership.
 #
@@ -42,7 +42,7 @@ where:
     '\r\n'      2-character terminator.
 """
 
-__all__ = "SelTemperature"
+__all__ = ('SEL_Temperature')
 
 from typing import Any, Dict
 import logging
@@ -72,24 +72,23 @@ VALUE_SIZE: int = 9
 """Serial data temperature value size.
 """
 
-DELIMITER: str = ","
+DELIMITER: str = ','
 """Serial data channel delimiter.
 """
 
-TERMINATOR: str = "\r\n"
+TERMINATOR: str = '\r\n'
 """Serial data line terminator.
 """
 
-DEFAULT_VAL: float = "NaN"
+DEFAULT_VAL: float = 'NaN'
 """Default value for unread or errored temperature channels.
 """
 
 logging.basicConfig(
     # Configure logging used for printing debug messages.
-    format="%(asctime)s %(levelname)-8s %(message)s",
+    format='%(asctime)s %(levelname)-8s %(message)s',
     level=logging.DEBUG,
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+    datefmt='%Y-%m-%d %H:%M:%S')
 
 logger = logging.getLogger(__name__)
 
@@ -112,19 +111,15 @@ class SelTemperature(SerialReader):
     IndexError if attempted multiple use of serial device instance.
     """
 
-    _instances: Dict[str, "SelTemperature"] = {}
-    _devices: Dict[str, "SelTemperature"] = {}
+    _instances: Dict[str, 'SelTemperature'] = {}
+    _devices: Dict[str, 'SelTemperature'] = {}
 
-    def __init__(self, name: str, channels: int, uart_device):
+    def __init__(self, name: str, uart_device, channels: int):
         if name not in SelTemperature._instances:
             if uart_device not in SelTemperature._devices:
-                logger.debug(
-                    "SelTemperature:{}: First instantiation "
-                    'using serial device "{}".'.format(name, uart_device.name)
-                )
                 self.name: str = name
                 self._channels: int = channels
-                self.serial_port = uart_device
+                self.comport = uart_device
 
                 self.temperature: float = []
                 self.output = []
@@ -134,41 +129,36 @@ class SelTemperature(SerialReader):
                 for i in range(self._channels):
                     self._tmp_temperature.append(DEFAULT_VAL)
                     self.temperature.append(DEFAULT_VAL)
-                    self._preamble_str.append(f"C{i:02}=")
+                    self._preamble_str.append(f'C{i:02}=')
 
                 self._read_line_size: int = self._channels * (
-                    PREAMBLE_SIZE + VALUE_SIZE + len(DELIMITER)
-                ) - (len(DELIMITER)) + (len(TERMINATOR))
+                    PREAMBLE_SIZE + VALUE_SIZE + len(DELIMITER)) - (
+                    len(DELIMITER)) + (
+                    len(TERMINATOR))
 
-                self.serial_port.line_size = self._read_line_size
-                self.serial_port.terminator = TERMINATOR
-                self.serial_port.baudrate = BAUDRATE
-                self.serial_port.read_timeout = READ_TIMEOUT
+                self.comport.open()
+                self.comport.line_size = self._read_line_size
+                self.comport.terminator = TERMINATOR
+                self.comport.baudrate = BAUDRATE
+                self.comport.read_timeout = READ_TIMEOUT
 
                 SelTemperature._instances[name] = self
                 SelTemperature._devices[uart_device] = self
+                logger.debug('SelTemperature:{}: First instantiation '
+                             'using serial device "{}".'
+                             .format(name, uart_device.name))
             else:
-                logger.debug(
-                    "SelTemperature:{}: Error: "
-                    'Attempted multiple use of serial device instance "{}".'.format(
-                        name, uart_device
-                    )
-                )
-                raise IndexError(
-                    "SelTemperature:{}: "
-                    'Attempted multiple use of serial device instance "{}".'.format(
-                        name, uart_device
-                    )
-                )
+                logger.debug('SelTemperature:{}: Error: '
+                             'Attempted multiple use of serial device instance "{}".'
+                             .format(name, uart_device))
+                raise IndexError('SelTemperature:{}: '
+                                 'Attempted multiple use of serial device instance "{}".'
+                                 .format(name, uart_device))
         else:
-            logger.debug(
-                "SelTemperature: Error: "
-                'Attempted multiple instantiation of "{}".'.format(name)
-            )
-            raise IndexError(
-                "SelTemperature: Error: "
-                'Attempted multiple instantiation of "{}".'.format(name)
-            )
+            logger.debug('SelTemperature: Error: '
+                         'Attempted multiple instantiation of "{}".'.format(name))
+            raise IndexError('SelTemperature: Error: '
+                             'Attempted multiple instantiation of "{}".'.format(name))
 
     def _message(self, text: Any) -> None:
         # Print a message prefaced with the SEL_TEMPERATURE object info.
@@ -190,11 +180,7 @@ class SelTemperature(SerialReader):
         #   Return is True if sensor string is valid, False if not.
         if sensor_str[0:PREAMBLE_SIZE] == preamble:
             try:
-                float(
-                    sensor_str[
-                        PREAMBLE_SIZE : PREAMBLE_SIZE + VALUE_SIZE + len(DELIMITER) - 1
-                    ]
-                )
+                float(sensor_str[PREAMBLE_SIZE:PREAMBLE_SIZE + VALUE_SIZE + len(DELIMITER) - 1])
                 return True
             except ValueError:
                 return False
@@ -219,32 +205,29 @@ class SelTemperature(SerialReader):
         """
         for i in range(self._channels):
             self._tmp_temperature[i] = DEFAULT_VAL
-        self.line_error = False
-        ser_line = self.serial_port.readline()
-        line = ""
-        if (
-            ser_line[-len(TERMINATOR) :] == TERMINATOR
-            and len(ser_line) == self._read_line_size
-        ):
-            line = ser_line[: -len(TERMINATOR)]
-            temps = line.split(",", self._channels - 1)
-            for i in range(self._channels):
-                if self._test_val(self._preamble_str[i], temps[i]):
-                    try:
-                        self._tmp_temperature[i] = float(temps[i][PREAMBLE_SIZE:])
-                    except ValueError:
-                        self.line_error = True
-                        self._message(
-                            "Failed to convert temperature channel value to float."
-                        )
-                else:
-                    self.line_error = True
-                self.temperature[i] = self._tmp_temperature[i]
-        else:
-            self.line_error = True
+        err: str = ''
+        ser_line: str = ''
+        line: str = ''
+        err, ser_line = self.comport.readline()
+        if err == 'OK':
+            if ser_line[-len(TERMINATOR):] == TERMINATOR and len(ser_line) == self._read_line_size:
+                line = ser_line[:-len(TERMINATOR)]
+                temps = line.split(',', self._channels-1)
+                for i in range(self._channels):
+                    if self._test_val(self._preamble_str[i], temps[i]):
+                        try:
+                            self._tmp_temperature[i] = float(temps[i][PREAMBLE_SIZE:])
+                        except ValueError:
+                            err = 'Temperature data error. Could not convert value(s) to float.'
+                            self._message('Failed to convert temperature channel value to float.')
+                    else:
+                        err = 'Malformed response. Channel preamble or channel data incorrect.'
+                    self.temperature[i] = self._tmp_temperature[i]
+            else:
+                err = 'Malformed response. Terminator or line size incorrect.'
 
         self.output = []
         self.output.append(time.time())
-        self.output.append(self.line_error)
+        self.output.append(err)
         for i in range(self._channels):
             self.output.append(self.temperature[i])

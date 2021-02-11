@@ -1,8 +1,8 @@
-# This file is part of ts_ess.
+# This file is part of lsst-ts.eas-rpi.
 #
-# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
-# This product includes software developed by the Vera C. Rubin Observatory
-# Project (https://www.lsst.org).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
 # for details of code ownership.
 #
@@ -32,6 +32,9 @@ __all__ = "VcpFtdi"
 from typing import Any, Dict
 import logging
 import time
+from threading import RLock
+
+import pylibftdi
 from pylibftdi import Device
 
 logging.basicConfig(
@@ -78,33 +81,28 @@ class VcpFtdi:
         self,
         name: str,
         device_id: str,
-        baud: int = 9600,
-        read_timeout: float = 1.5,
-        terminator: str = "/r/n",
-        line_size: int = 0,
     ):
         if name not in VcpFtdi._instances:
             if device_id not in VcpFtdi._devices:
+                self.name: str = name
+                self._lock: RLock = RLock()
+                self._device_id: str = device_id
+                self._read_timeout = 1.0
+                self._terminator: str = '\r\n'
+                self._line_size: int = 0
+                self._vcp = Device(
+                    device_id,
+                    mode="t",
+                    encoding="ASCII",
+                    lazy_open=True,
+                    auto_detach=False,
+                )
+                VcpFtdi._instances[name] = self
+                VcpFtdi._devices[device_id] = self
                 logger.debug(
                     "VcpFtdi:{}: First instantiation "
                     'using device SN "{}".'.format(name, device_id)
                 )
-                self.name: str = name
-                self._device_id: str = device_id
-                self._baudrate: int = baud
-                self._read_timeout: float = read_timeout
-                self._terminator: str = terminator
-                self._line_size: int = line_size
-                self._vcp = Device(
-                    device_id,
-                    mode="t",
-                    encoding="utf-8",
-                    lazy_open=True,
-                    auto_detach=False,
-                )
-                self.open()
-                VcpFtdi._instances[name] = self
-                VcpFtdi._devices[device_id] = self
             else:
                 logger.debug(
                     "VcpFtdi:{}: Error: "
@@ -132,15 +130,14 @@ class VcpFtdi:
     def baudrate(self) -> int:
         """BAUD of the serial device ('int').
         """
-        self._vcp_baudrate = self._vcp.baudrate
-        self._message("Device BAUD rate read: {}.".format(self._baudrate))
-        return self._baudrate
+        baud: int = self._vcp.baudrate
+        self._message("Device BAUD rate read: {}.".format(baud))
+        return baud
 
     @baudrate.setter
     def baudrate(self, baud: int) -> None:
         self._vcp.baudrate = baud
-        self._baudrate = baud
-        self._message("Device BAUD rate set: {}.".format(self._baudrate))
+        self._message("Device BAUD rate set: {}.".format(baud))
 
     @property
     def line_size(self) -> int:
@@ -162,24 +159,23 @@ class VcpFtdi:
     def read_timeout(self) -> float:
         """Read timeout of serial data line in seconds ('float').
         """
-        self._read_timeout = self._vcp.timeout
+        timeout = self._read_timeout
         self._message(
-            "Device read timeout read: {} seconds.".format(self._read_timeout)
+            "Device read timeout read: {} seconds.".format(timeout)
         )
-        return self._read_timeout
+        return timeout
 
     @read_timeout.setter
     def read_timeout(self, timeout: float) -> None:
-        self._vcp.timeout = timeout
         self._read_timeout = timeout
-        self._message("Device read timeout set: {} seconds.".format(self._read_timeout))
+        self._message("Device read timeout set: {} seconds.".format(timeout))
 
     @property
     def terminator(self) -> str:
         """Serial data line terminator string ('str').
         """
         self._message(
-            "Serial data line terminator string read: {}.".format(self._read_timeout)
+            "Serial data line terminator string read: {}.".format(self._terminator)
         )
         return self._terminator
 
@@ -189,8 +185,8 @@ class VcpFtdi:
         self._message("Serial data line terminator string set.")
 
     def _message(self, text: Any) -> None:
-        # Print a message prefaced with the VcpFtdi object info ('Any').
-        logger.debug("VcpFtdi:{}: {}".format(self.name, text))
+        # Print a message prefaced with the VCP_FTDI object info ('Any').
+        logger.debug(f"VcpFtdi:{self.name}: {text}")
 
     def open(self) -> None:
         """Open VCP.
@@ -202,14 +198,14 @@ class VcpFtdi:
         ------
         IOError if virtual communications port fails to open.
         """
-        self._vcp.open()
-        if self._vcp._opened:
-            self._message("VCP open.")
-            self._vcp.baudrate = self._baudrate
-            self._vcp.flush()
-        else:
-            self._message("Failed to open VCP.")
-            raise IOError("VcpFtdi:{}: Failed to open VCP.")
+        with self._lock:
+            self._vcp.open()
+            if not self._vcp.closed:
+                self._message("VCP open.")
+                self._vcp.flush()
+            else:
+                self._message("Failed to open VCP.")
+                raise IOError(f"VcpFtdi:{self.name}: Failed to open VCP.")
 
     def close(self) -> None:
         """Close VCP.
@@ -218,19 +214,27 @@ class VcpFtdi:
         ------
         IOError if virtual communications port fails to close.
         """
-        self._vcp.close()
-        if not self._vcp._opened:
-            self._message("VCP closed.")
-        else:
-            self._message("VCP failed to close.")
-            raise IOError("VcpFtdi:{}: Failed to close VCP.")
+        with self._lock:
+            self._vcp.close()
+            if self._vcp.closed:
+                self._message("VCP closed.")
+            else:
+                self._message("VCP failed to close.")
+                raise IOError(f"VcpFtdi:{self.name}: Failed to close VCP.")
 
     def readline(self) -> str:
         r"""Read a line of ASCII string data from the VCP.
 
         Returns
         -------
-        text_line : 'str'
+        error, resp : 'tuple'
+        error : 'str'
+            Error string.
+            'OK' = No error
+            'Non-ASCII data in response.'
+            'Timed out with incomplete response.'
+        resp : 'str'
+            Response read from the VCP.
             Includes terminator string if there is one.
             May be returned empty if nothing was received, partial if the
             readline was started during device reception or partial if
@@ -244,23 +248,23 @@ class VcpFtdi:
         Tests for decode error, enforcing ASCII data only.
         Optionally implements ASCII line terminator string (Commonly '\r\n'),
         returning when terminator string is read.
-        Optionally implements line size, returning when line_size is met. It is
-        normally not necessary to use line size if a terminator is present, but
-        if a terminator is also specified, the line size must be at least equal
-        to the expected line size including the size of terminator string.
+        Optionally implements line size, returning when line_size is met if a
+        terminator string is empty.
         """
-        text_line: str = ""
+        err = "OK"
+        resp: str = ""
         expiry_time = time.perf_counter() + self._read_timeout
-        while time.perf_counter() < expiry_time:
-            try:
-                text_line += self._vcp.read(1)
-            except UnicodeDecodeError:
-                break
-            if (
-                len(self._terminator) > 0
-                and text_line[-len(self._terminator) :] == self._terminator
-            ):
-                break
-            if self._line_size > 0 and len(text_line) >= self._line_size:
-                break
-        return text_line
+        with self._lock:
+            while time.perf_counter() < expiry_time:
+                try:
+                    resp += self._vcp.read(1)
+                except pylibftdi.FtdiError as e:
+                    err = "FTDI error."
+                    raise RuntimeWarning(e)
+                if (len(self._terminator) > 0 and
+                        resp[-len(self._terminator):] == self._terminator):
+                    return err, resp
+                elif 0 < self._line_size <= len(resp):
+                    return err, resp
+            err = "Timed out with incomplete response."
+            return err, resp
