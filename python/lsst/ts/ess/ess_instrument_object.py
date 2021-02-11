@@ -1,8 +1,8 @@
-# This file is part of ts_ess.
+# This file is part of lsst-ts.eas-rpi.
 #
-# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
-# This product includes software developed by the Vera C. Rubin Observatory
-# Project (https://www.lsst.org).
+# Developed for the LSST Data Management System.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
 # for details of code ownership.
 #
@@ -25,10 +25,9 @@ from threading import Thread
 
 logging.basicConfig(
     # Configure logging used for printing debug messages.
-    format="%(asctime)s %(levelname)-8s %(message)s",
+    format='%(asctime)s %(levelname)-8s %(message)s',
     level=logging.DEBUG,
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+    datefmt='%Y-%m-%d %H:%M:%S')
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +38,10 @@ def _threaded(fn):
         thread = Thread(target=fn, args=args, kwargs=kwargs)
         thread.start()
         return thread
-
     return _wrapper
 
 
-class Instrument:
+class EssInstrument:
     """Instrument read-loop thread.
 
     Parameters
@@ -61,50 +59,42 @@ class Instrument:
     IndexError if attempted multiple use of serial device instance.
     """
 
-    _instances: Dict[str, "Instrument"] = {}
-    _devices: Dict[str, "Instrument"] = {}
+    _instances: Dict[str, 'EssInstrument'] = {}
+    _devices: Dict[str, 'EssInstrument'] = {}
 
     def __init__(self, name: str, reader, callback_func):
-        if name not in Instrument._instances:
-            if reader.serial_port not in Instrument._devices:
-                logger.debug(
-                    "Instrument:{}: First instantiation "
-                    'using serial reader "{}".'.format(name, reader.name)
-                )
-                self._reader = reader
+        if name not in EssInstrument._instances:
+            if reader.comport not in EssInstrument._devices:
+                try:
+                    self._reader = reader
+                except AttributeError:
+                    logger.debug('EssInstrument:{}: Failed to instantiate '
+                                 'using reader object "{}".'.format(name, reader.name))
                 self._enabled: bool = False
                 self.name: str = name
                 self._callback_func = callback_func
                 self.start()
 
-                Instrument._instances[name] = self
-                Instrument._devices[reader.serial_port] = self
+                EssInstrument._instances[name] = self
+                EssInstrument._devices[reader.comport] = self
+                logger.debug('EssInstrument:{}: First instantiation '
+                             'using reader object "{}".'.format(name, reader.name))
             else:
-                logger.debug(
-                    "Instrument:{}: Error: "
-                    'Attempted multiple use of reader serial device instance "{}".'.format(
-                        name, reader.serial_port
-                    )
-                )
-                raise IndexError(
-                    "Instrument:{}: "
-                    'Attempted multiple use of reader serial device instance "{}".'.format(
-                        name, reader.serial_port
-                    )
-                )
+                logger.debug('EssInstrument:{}: Error: '
+                             'Attempted multiple use of reader serial device instance "{}".'
+                             .format(name, reader.comport))
+                raise IndexError('EssInstrument:{}: '
+                                 'Attempted multiple use of reader serial device instance "{}".'
+                                 .format(name, reader.comport))
         else:
-            logger.debug(
-                "Instrument: Error: "
-                'Attempted multiple instantiation of "{}".'.format(name)
-            )
-            raise IndexError(
-                "Instrument: Error: "
-                'Attempted multiple instantiation of "{}".'.format(name)
-            )
+            logger.debug('EssInstrument: Error: '
+                         'Attempted multiple instantiation of "{}".'.format(name))
+            raise IndexError('EssInstrument: Error: '
+                             'Attempted multiple instantiation of "{}".'.format(name))
 
     def _message(self, text: Any) -> None:
         # Print a message prefaced with the InstrumentThread object info.
-        logger.debug("Instrument:{}: {}".format(self.name, text))
+        logger.debug("EssInstrument:{}: {}".format(self.name, text))
 
     def start(self):
         """Start the instrument read loop.
@@ -130,4 +120,4 @@ class Instrument:
         """
         while self._enabled:
             self._reader.read()
-            self._callback_func(self._reader.output)
+            self._callback_func(self, self._reader.output)
