@@ -1,8 +1,8 @@
-# This file is part of lsst-ts.eas-rpi.
+# This file is part of ts_ess.
 #
-# Developed for the LSST Data Management System.
-# This product includes software developed by the LSST Project
-# (https://www.lsst.org).
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
+# This product includes software developed by the Vera C. Rubin Observatory
+# Project (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
 # for details of code ownership.
 #
@@ -36,13 +36,6 @@ from threading import RLock
 
 import pylibftdi
 from pylibftdi import Device
-
-logging.basicConfig(
-    # Configure logging used for printing debug messages.
-    format="%(asctime)s %(levelname)-8s %(message)s",
-    level=logging.DEBUG,
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +71,7 @@ class VcpFtdi:
     _devices: Dict[str, "VcpFtdi"] = {}
 
     def __init__(
-        self,
-        name: str,
-        device_id: str,
+        self, name: str, device_id: str,
     ):
         if name not in VcpFtdi._instances:
             if device_id not in VcpFtdi._devices:
@@ -88,7 +79,7 @@ class VcpFtdi:
                 self._lock: RLock = RLock()
                 self._device_id: str = device_id
                 self._read_timeout = 1.0
-                self._terminator: str = '\r\n'
+                self._terminator: str = "\r\n"
                 self._line_size: int = 0
                 self._vcp = Device(
                     device_id,
@@ -160,9 +151,7 @@ class VcpFtdi:
         """Read timeout of serial data line in seconds ('float').
         """
         timeout = self._read_timeout
-        self._message(
-            "Device read timeout read: {} seconds.".format(timeout)
-        )
+        self._message("Device read timeout read: {} seconds.".format(timeout))
         return timeout
 
     @read_timeout.setter
@@ -261,8 +250,10 @@ class VcpFtdi:
                 except pylibftdi.FtdiError as e:
                     err = "FTDI error."
                     raise RuntimeWarning(e)
-                if (len(self._terminator) > 0 and
-                        resp[-len(self._terminator):] == self._terminator):
+                if (
+                    len(self._terminator) > 0
+                    and resp[-len(self._terminator) :] == self._terminator
+                ):
                     return err, resp
                 elif 0 < self._line_size <= len(resp):
                     return err, resp

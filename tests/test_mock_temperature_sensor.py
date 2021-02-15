@@ -32,24 +32,24 @@ logging.basicConfig(
 class MockTestCase(asynctest.TestCase):
     async def setUp(self):
         self.log = logging.getLogger("MockTestCase")
-        self._ess_sensor = MockTemperatureSensor()
+        self.ess_sensor = MockTemperatureSensor()
 
     async def test_read_instrument(self):
         # Set the TAI time in the mock controller for easier control
-        self._ess_sensor.read_instrument()
+        self.ess_sensor.read_instrument()
         self.assertTrue(
-            18 <= self._ess_sensor.temperature[0] <= 22,
-            f"temp = {self._ess_sensor.temperature[0]}",
+            18 <= self.ess_sensor.temperature[0] <= 22,
+            f"temp = {self.ess_sensor.temperature[0]}",
         )
         self.assertTrue(
-            18 <= self._ess_sensor.temperature[1] <= 22,
-            f"temp = {self._ess_sensor.temperature[1]}",
+            18 <= self.ess_sensor.temperature[1] <= 22,
+            f"temp = {self.ess_sensor.temperature[1]}",
         )
         self.assertTrue(
-            18 <= self._ess_sensor.temperature[2] <= 22,
-            f"temp = {self._ess_sensor.temperature[2]}",
+            18 <= self.ess_sensor.temperature[2] <= 22,
+            f"temp = {self.ess_sensor.temperature[2]}",
         )
         self.assertTrue(
-            18 <= self._ess_sensor.temperature[3] <= 22,
-            f"temp = {self._ess_sensor.temperature[3]}",
+            18 <= self.ess_sensor.temperature[3] <= 22,
+            f"temp = {self.ess_sensor.temperature[3]}",
         )

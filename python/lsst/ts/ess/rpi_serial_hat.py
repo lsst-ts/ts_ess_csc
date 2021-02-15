@@ -1,8 +1,8 @@
-# This file is part of lsst-ts.eas-rpi.
+# This file is part of ts_ess.
 #
-# Developed for the LSST Data Management System.
-# This product includes software developed by the LSST Project
-# (https://www.lsst.org).
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
+# This product includes software developed by the Vera C. Rubin Observatory
+# Project (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
 # for details of code ownership.
 #
@@ -22,7 +22,7 @@
 """Implementation of Raspberry Pi 4 serial communication hat.
 """
 
-__all__ = 'RpiSerialHat'
+__all__ = ["RpiSerialHat"]
 
 from typing import Any, Dict
 import logging
@@ -31,12 +31,6 @@ import serial
 import time
 from threading import RLock
 
-
-logging.basicConfig(
-    # Configure logging used for printing debug messages.
-    format='%(asctime)s %(levelname)-8s %(message)s',
-    level=logging.DEBUG,
-    datefmt='%Y-%m-%d %H:%M:%S')
 
 logger = logging.getLogger(__name__)
 
@@ -68,15 +62,15 @@ class RpiSerialHat:
     IndexError if attempted multiple use of instance name.
     """
 
-    _instances: Dict[str, 'RpiSerialHat'] = {}
-    _used_ports: Dict[str, 'RpiSerialHat'] = {}
+    _instances: Dict[str, "RpiSerialHat"] = {}
+    _used_ports: Dict[str, "RpiSerialHat"] = {}
 
     # Define serial hub unit port identifiers
-    SERIAL_CH_1: str = 'serial_ch_1'
-    SERIAL_CH_2: str = 'serial_ch_2'
-    SERIAL_CH_3: str = 'serial_ch_3'
-    SERIAL_CH_4: str = 'serial_ch_4'
-    SERIAL_CH_5: str = 'serial_ch_5'
+    SERIAL_CH_1: str = "serial_ch_1"
+    SERIAL_CH_2: str = "serial_ch_2"
+    SERIAL_CH_3: str = "serial_ch_3"
+    SERIAL_CH_4: str = "serial_ch_4"
+    SERIAL_CH_5: str = "serial_ch_5"
 
     # Define gpio channel numbers (Broadcomm mode)
     PIN_U4_ON: int = 17
@@ -98,40 +92,46 @@ class RpiSerialHat:
     STATE_DOUT_HI: bool = True
     STATE_DOUT_LO: bool = False
 
-    # Define serial transceiver module UART's and pins, then map to physical connectors.
-    # serial device, module ON pin, module DIN pin, module DOUT pin, module DIRN pin (RS-422).
-    u4_ser1_config = '/dev/ttyS0', PIN_U4_ON, None, PIN_U4_DOUT, PIN_U4_DIRN
-    u5_ser1_config = '/dev/ttyAMA2', PIN_U5_ON, PIN_U5_DIN, None, None
-    u5_ser2_config = '/dev/ttyAMA3', PIN_U5_ON, PIN_U5_DIN, None, None
-    u6_ser1_config = '/dev/ttyAMA1', PIN_U6_ON, PIN_U6_DIN, None, None
-    u6_ser2_config = '/dev/ttyAMA4', PIN_U6_ON, PIN_U6_DIN, None, None
+    # Define serial transceiver module UART's and pins, then map to physical
+    # connectors. serial device, module ON pin, module DIN pin, module DOUT
+    # pin, module DIRN pin (RS-422).
+    u4_ser1_config = "/dev/ttyS0", PIN_U4_ON, None, PIN_U4_DOUT, PIN_U4_DIRN
+    u5_ser1_config = "/dev/ttyAMA2", PIN_U5_ON, PIN_U5_DIN, None, None
+    u5_ser2_config = "/dev/ttyAMA3", PIN_U5_ON, PIN_U5_DIN, None, None
+    u6_ser1_config = "/dev/ttyAMA1", PIN_U6_ON, PIN_U6_DIN, None, None
+    u6_ser2_config = "/dev/ttyAMA4", PIN_U6_ON, PIN_U6_DIN, None, None
 
-    serial_ports = {SERIAL_CH_1: u4_ser1_config,
-                    SERIAL_CH_2: u6_ser1_config,
-                    SERIAL_CH_3: u5_ser1_config,
-                    SERIAL_CH_4: u5_ser2_config,
-                    SERIAL_CH_5: u6_ser2_config
-                    }
+    serial_ports = {
+        SERIAL_CH_1: u4_ser1_config,
+        SERIAL_CH_2: u6_ser1_config,
+        SERIAL_CH_3: u5_ser1_config,
+        SERIAL_CH_4: u5_ser2_config,
+        SERIAL_CH_5: u6_ser2_config,
+    }
 
-    def __init__(self,
-                 name: str,
-                 port_id: str,
-                 ):
+    def __init__(
+        self, name: str, port_id: str,
+    ):
         if name not in RpiSerialHat._instances:
             if port_id not in RpiSerialHat._used_ports:
                 self.name: str = name
                 self._port_id: str = port_id
                 self._lock: RLock = RLock()
-                self._terminator: str = '\r\n'
+                self._terminator: str = "\r\n"
                 self._line_size: int = 0
                 self._serial_timeout: float = 1
                 if self._port_id in RpiSerialHat.serial_ports:
-                    self._ser_port, self._pin_on, self._pin_din, self._pin_dout, self._pin_dirn = \
-                        RpiSerialHat.serial_ports[self._port_id]
+                    (
+                        self._ser_port,
+                        self._pin_on,
+                        self._pin_din,
+                        self._pin_dout,
+                        self._pin_dirn,
+                    ) = RpiSerialHat.serial_ports[self._port_id]
                     try:
                         self._ser = serial.Serial()
                         self._ser.port = self._ser_port
-                        print('Port:', self._ser.port)
+                        print("Port:", self._ser.port)
                     except serial.SerialException as e:
                         self._message(e)
                         # Unrecoverable error, so propagate error
@@ -143,34 +143,53 @@ class RpiSerialHat:
                         self._rpi_pin_setup(self._pin_din, gpio.IN)
                         self._rpi_pin_setup(self._pin_dirn, gpio.OUT)
 
-                        # Turn on transceiver module and default other pin states
+                        # Turn on transceiver module and default other pin
+                        # states
                         self._rpi_pin_state(self._pin_on, RpiSerialHat.STATE_TRX_ON)
                         self._rpi_pin_state(self._pin_dout, RpiSerialHat.STATE_DOUT_LO)
                         self._rpi_pin_state(self._pin_dirn, RpiSerialHat.STATE_DIRN_RX)
 
                         RpiSerialHat._instances[name] = self
                         RpiSerialHat._used_ports[port_id] = self
-                        logger.debug('RpiSerialHat:{}: First instantiation '
-                                     'using serial channel id: "{}".'.format(name, port_id))
+                        logger.debug(
+                            "RpiSerialHat:{}: First instantiation "
+                            'using serial channel id: "{}".'.format(name, port_id)
+                        )
                 else:
-                    logger.debug('RpiSerialHat:{}: Error: '
-                                 'A serial channel named "{}" does not exist.'
-                                 .format(name, port_id))
-                    raise IndexError('RpiSerialHat:{}: '
-                                     'A serial channel named "{}" does not exist.'
-                                     .format(name, port_id))
+                    logger.debug(
+                        "RpiSerialHat:{}: Error: "
+                        'A serial channel named "{}" does not exist.'.format(
+                            name, port_id
+                        )
+                    )
+                    raise IndexError(
+                        "RpiSerialHat:{}: "
+                        'A serial channel named "{}" does not exist.'.format(
+                            name, port_id
+                        )
+                    )
             else:
-                logger.debug('RpiSerialHat:{}: Error: '
-                             'Attempted multiple use of serial channel "{}".'
-                             .format(name, port_id))
-                raise IndexError('RpiSerialHat:{}: '
-                                 'Attempted multiple use of serial channel "{}".'
-                                 .format(name, port_id))
+                logger.debug(
+                    "RpiSerialHat:{}: Error: "
+                    'Attempted multiple use of serial channel "{}".'.format(
+                        name, port_id
+                    )
+                )
+                raise IndexError(
+                    "RpiSerialHat:{}: "
+                    'Attempted multiple use of serial channel "{}".'.format(
+                        name, port_id
+                    )
+                )
         else:
-            logger.debug('RpiSerialHat: Error: '
-                         'Attempted multiple instantiation of "{}".'.format(name))
-            raise IndexError('RpiSerialHat: Error: '
-                             'Attempted multiple instantiation of "{}".'.format(name))
+            logger.debug(
+                "RpiSerialHat: Error: "
+                'Attempted multiple instantiation of "{}".'.format(name)
+            )
+            raise IndexError(
+                "RpiSerialHat: Error: "
+                'Attempted multiple instantiation of "{}".'.format(name)
+            )
 
     def __del__(self):
         self._ser.close()
@@ -184,61 +203,60 @@ class RpiSerialHat:
         """BAUD of the serial device ('int').
         """
         baud: int = self._ser.baud
-        self._message('Serial port BAUD read: {}.'
-                      .format(baud))
+        self._message("Serial port BAUD read: {}.".format(baud))
         return baud
 
     @baudrate.setter
     def baudrate(self, baud: int) -> None:
         self._ser.baudrate = baud
-        self._message('Serial port BAUD set: {}.'
-                      .format(baud))
+        self._message("Serial port BAUD set: {}.".format(baud))
 
     @property
     def line_size(self) -> int:
         """Serial data line size ('int').
         """
-        self._message('Serial data line size read: {} characters.'
-                      .format(self._line_size))
+        self._message(
+            "Serial data line size read: {} characters.".format(self._line_size)
+        )
         return self._line_size
 
     @line_size.setter
     def line_size(self, line_size: int) -> None:
         self._line_size = line_size
-        self._message('Serial data line size set: {} characters.'
-                      .format(self._line_size))
+        self._message(
+            "Serial data line size set: {} characters.".format(self._line_size)
+        )
 
     @property
     def read_timeout(self) -> float:
         """Read timeout of serial data line in seconds ('float').
         """
         read_timeout: float = self._ser.timeout
-        self._message('Serial port read timeout read: {} seconds.'
-                      .format(read_timeout))
+        self._message("Serial port read timeout read: {} seconds.".format(read_timeout))
         return read_timeout
 
     @read_timeout.setter
     def read_timeout(self, timeout: float) -> None:
         self._ser.timeout = timeout
-        self._message('Serial port read timeout set: {} seconds.'
-                      .format(timeout))
+        self._message("Serial port read timeout set: {} seconds.".format(timeout))
 
     @property
     def terminator(self) -> str:
         """Serial data line terminator string ('str').
         """
-        self._message('Serial data line terminator string read: {}.'
-                      .format(self._read_timeout))
+        self._message(
+            "Serial data line terminator string read: {}.".format(self._read_timeout)
+        )
         return self._terminator
 
     @terminator.setter
     def terminator(self, terminator: str) -> None:
         self._terminator = terminator
-        self._message('Serial data line terminator string set.')
+        self._message("Serial data line terminator string set.")
 
     def _message(self, text: Any) -> None:
         # Print a message prefaced with the object info ('Any').
-        logger.debug('RpiSerialHat:{}: {}'.format(self.name, text))
+        logger.debug("RpiSerialHat:{}: {}".format(self.name, text))
 
     def _rpi_pin_cleanup(self, rpi_pin) -> None:
         # Clear RPi pin.
@@ -247,7 +265,7 @@ class RpiSerialHat:
             try:
                 gpio.cleanup(rpi_pin)
             except RuntimeError:
-                self._message('GPIO pin cleanup error.')
+                self._message("GPIO pin cleanup error.")
 
     def _rpi_pin_setup(self, rpi_pin: int, pin_type) -> None:
         # Setup RPi pin.
@@ -257,7 +275,7 @@ class RpiSerialHat:
             try:
                 gpio.setup(rpi_pin, pin_type)
             except RuntimeError:
-                self._message('Error setting up GPIO pin.')
+                self._message("Error setting up GPIO pin.")
 
     def _rpi_pin_state(self, rpi_pin: int, state: bool) -> None:
         # Output transceiver pin state.
@@ -267,7 +285,9 @@ class RpiSerialHat:
             try:
                 gpio.output(rpi_pin, state)
             except RuntimeError:
-                self._message('Error writing to GPIO output. GPIO channel has not been setup.')
+                self._message(
+                    "Error writing to GPIO output. GPIO channel has not been setup."
+                )
 
     def open(self) -> None:
         """Open and configure serial port.
@@ -281,7 +301,7 @@ class RpiSerialHat:
             try:
                 self._ser
             except NameError:
-                self._message('Cannot open. Serial port does not exist.')
+                self._message("Cannot open. Serial port does not exist.")
                 raise RuntimeWarning(
                     f"{self.name}: Could not open. Serial port does not exist."
                 )
@@ -289,12 +309,12 @@ class RpiSerialHat:
                 if not self._ser.is_open:
                     try:
                         self._ser.open()
-                        self._message('Serial port opened.')
+                        self._message("Serial port opened.")
                     except serial.SerialException as e:
-                        self._message('Serial port open failed.')
+                        self._message("Serial port open failed.")
                         raise e
                 else:
-                    self._message('Port already open!')
+                    self._message("Port already open!")
 
     def close(self) -> None:
         """Close serial communications port.
@@ -307,16 +327,14 @@ class RpiSerialHat:
             try:
                 self._ser
             except NameError:
-                self._message('Cannot close. Serial port does not exist.')
-                raise RuntimeWarning(
-                    f"{self.name}: Could not close the serial port!"
-                )
+                self._message("Cannot close. Serial port does not exist.")
+                raise RuntimeWarning(f"{self.name}: Could not close the serial port!")
             else:
                 if self._ser.is_open:
                     self._ser.close()
-                    self._message('Serial port closed.')
+                    self._message("Serial port closed.")
                 else:
-                    self._message('Serial port already closed.')
+                    self._message("Serial port already closed.")
 
     def readline(self) -> str:
         r"""Read a line of ASCII string data from the serial port.
@@ -355,7 +373,7 @@ class RpiSerialHat:
             expiry_time = time.perf_counter() + self._ser.timeout
             while time.perf_counter() < expiry_time:
                 try:
-                    resp += str(self._ser.read(1), 'ASCII')
+                    resp += str(self._ser.read(1), "ASCII")
                 except UnicodeError as e:
                     err = "Received non-ASCII data in response."
                     raise e
@@ -363,10 +381,12 @@ class RpiSerialHat:
                     err = "Serial exception. Serial port might be closed."
                     raise e
                 finally:
-                    if (len(self._terminator) > 0 and
-                            resp[-len(self._terminator):] == self._terminator):
+                    if (
+                        len(self._terminator) > 0
+                        and resp[-len(self._terminator) :] == self._terminator
+                    ):
                         return err, resp
                     elif 0 < self._line_size <= len(resp):
                         return err, resp
-            error = "Timed out with incomplete response."
+            err = "Timed out with incomplete response."
             return err, resp

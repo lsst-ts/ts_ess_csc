@@ -13,21 +13,33 @@ properties:
     description: Number of channels
     type: integer
     default: 4
-  uart:
-    description: Logical device to connect to
+  type:
+    description: Type of the device
     type: string
-    default: "/dev/ttyUSB0"
-  baudrate:
-    description: Baudrate of the serial connection
-    type: integer
-    default: 19200
-  connection_timeout:
-    description: Time limit for connecting to the logical device (sec)
-    type: number
-    exclusiveMinimum: 0
-    default: 1.5
+    enum:
+      - FTDI
+      - Serial
+    default: FTDI
 required:
-  - uart
-  - baudrate
-  - connection_timeout
-additionalProperties: false
+  - name
+  - channels
+  - type
+allOf:
+  - if:
+      properties:
+        type:
+          const: FTDI
+    then:
+      ftdi_id:
+        description: FTDI Serial ID to connect to.
+        type: string
+        default: "A601FT68"
+  - if:
+      properties:
+        type:
+          const: Serial
+    then:
+      port:
+        description: Serial port to connect to.
+        type: string
+        default: "serial_ch_1"
