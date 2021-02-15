@@ -22,11 +22,13 @@
 __all__ = ["EssCsc"]
 
 import asyncio
+import platform
 import pathlib
 
 from lsst.ts import salobj
 from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
-from lsst.ts.ess.ess_temperature_reader import EssTemperature
+from lsst.ts.ess.ess_instrument_object import EssInstrument
+from .sel_temperature_reader import SelTemperature
 
 TEMPERATURE_POLLING_INTERVAL = 0.25
 
@@ -64,7 +66,7 @@ class EssCsc(salobj.ConfigurableCsc):
             simulation_mode=simulation_mode,
         )
 
-        self._ess_sensor = None
+        self.ess_sensor = None
         self.temperature_task = None
 
         self.log.info("ESS CSC created.")
@@ -80,20 +82,20 @@ class EssCsc(salobj.ConfigurableCsc):
         try:
             while True:
                 self.log.debug("Getting the temperature from the sensor")
-                self._ess_sensor.read_instrument()
+                self.ess_sensor.read_instrument()
                 data = {
-                    "timestamp": self._ess_sensor.timestamp,
-                    "temperatureC01": self._ess_sensor.temperature[0],
-                    "temperatureC02": self._ess_sensor.temperature[1],
-                    "temperatureC03": self._ess_sensor.temperature[2],
-                    "temperatureC04": self._ess_sensor.temperature[3],
+                    "timestamp": self.ess_sensor.timestamp,
+                    "temperatureC01": self.ess_sensor.temperature[0],
+                    "temperatureC02": self.ess_sensor.temperature[1],
+                    "temperatureC03": self.ess_sensor.temperature[2],
+                    "temperatureC04": self.ess_sensor.temperature[3],
                 }
                 self.log.info(f"Received temperatures {data}")
                 if not (
-                    self._ess_sensor.temperature[0] == "NaN"
-                    or self._ess_sensor.temperature[1] == "NaN"
-                    or self._ess_sensor.temperature[2] == "NaN"
-                    or self._ess_sensor.temperature[3] == "NaN"
+                    self.ess_sensor.temperature[0] == "NaN"
+                    or self.ess_sensor.temperature[1] == "NaN"
+                    or self.ess_sensor.temperature[2] == "NaN"
+                    or self.ess_sensor.temperature[3] == "NaN"
                 ):
                     self.log.info("Sending telemetry.")
                     self.tel_temperature4Ch.set_put(**data)
@@ -114,16 +116,14 @@ class EssCsc(salobj.ConfigurableCsc):
             raise RuntimeError("Already connected")
         if self.simulation_mode == 1:
             self.log.info("Connecting to the mock sensor.")
-            self._ess_sensor = MockTemperatureSensor()
+            self.ess_sensor = MockTemperatureSensor()
         else:
             self.log.info("Connecting to the sensor.")
-            self._ess_sensor = EssTemperature(
-                name=self.config.name,
-                channels=self.config.channels,
-                uart=self.config.uart,
-                baudrate=self.config.baudrate,
-                timeout=self.config.connection_timeout,
+            device = self._get_device()
+            sel_temperature = SelTemperature(
+                self.config.name, device, self.config.channels
             )
+            self.ess_sensor = EssInstrument(self.config.name, sel_temperature, None)
             self.log.info("Connection to the sensor established.")
 
         self.log.info("Start periodic polling of the sensor data.")
@@ -138,7 +138,7 @@ class EssCsc(salobj.ConfigurableCsc):
         self.log.info("Disconnecting")
         if self.temperature_task:
             self.temperature_task.cancel()
-        self._ess_sensor = None
+        self.ess_sensor = None
 
     async def handle_summary_state(self):
         """Override of the handle_summary_state function to connect or
@@ -156,10 +156,43 @@ class EssCsc(salobj.ConfigurableCsc):
 
     @property
     def connected(self):
-        if self._ess_sensor is None:
+        if self.ess_sensor is None:
             return False
         return True
 
     @staticmethod
     def get_config_pkg():
         return "ts_config_ocs"
+
+    def _get_device(self):
+        """Get the device to connect to by using the configuration of the CSC
+        and by detecting whether the code is running on an aarch64 architecture
+        or not.
+
+        Returns
+        -------
+        device: `VcpFtdi` or `RpiSerialHat` or `None`
+
+
+        Raises
+        ------
+
+        """
+        device = None
+        if self.config.type == "FTDI":
+            from .vcp_ftdi import VcpFtdi
+
+            device = VcpFtdi(self.config.name, self.config.ftdi_id)
+        elif self.config.type == "Serial":
+            # make sure we are on a Raspberry Pi4
+            if "aarch64" in platform.platform():
+                from .rpi_serial_hat import RpiSerialHat
+
+                device = RpiSerialHat(self.config.name, self.config.port)
+
+        if device is None:
+            raise RuntimeError(
+                f"Could not get a {self.config.type!r} device on architecture {platform.platform()}. "
+                f"Please check the configuration."
+            )
+        return device
