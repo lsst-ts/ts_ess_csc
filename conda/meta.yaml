@@ -25,7 +25,6 @@ test:
     - ts-salobj {{ salobj_version }}
     - pyserial
     - pyftdi
-    - pylibftdi
     - ts-simactuators
     - ts-dds
     - black == 19.10b0

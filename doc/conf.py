@@ -3,12 +3,11 @@
 This configuration only affects single-package Sphinx documentation builds.
 """
 
-from documenteer.sphinxconfig.stackconf import build_package_configs
+from documenteer.conf.pipelinespkg import *
 import lsst.ts.ess
 
-_g = globals()
-_g.update(
-    build_package_configs(
-        project_name="ts_ess", version=lsst.ts.ess.version.__version__
-    )
-)
+project = "ts_ess"
+html_theme_options["logotext"] = project
+html_title = project
+html_short_title = project
+doxylink = {}

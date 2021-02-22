@@ -42,6 +42,16 @@ class CscTestCase(salobj.BaseCscTestCase, asynctest.TestCase):
         ):
             await self.check_standard_state_transitions(enabled_commands=(),)
 
+    async def test_version(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
+        ):
+            await self.assert_next_sample(
+                self.remote.evt_softwareVersions,
+                cscVersion=ess.__version__,
+                subsystemVersions="",
+            )
+
     async def test_bin_script(self):
         logging.info("test_bin_script")
         await self.check_bin_script(name="ESS", index=None, exe_name="run_ess.py")
