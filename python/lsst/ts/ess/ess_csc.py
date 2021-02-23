@@ -25,6 +25,7 @@ import asyncio
 import platform
 import pathlib
 
+from . import __version__
 from lsst.ts import salobj
 from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
 from lsst.ts.ess.ess_instrument_object import EssInstrument
@@ -48,6 +49,7 @@ class EssCsc(salobj.ConfigurableCsc):
     """
 
     valid_simulation_modes = (0, 1)
+    version = __version__
 
     def __init__(
         self, config_dir=None, initial_state=salobj.State.STANDBY, simulation_mode=0,
