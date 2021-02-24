@@ -1,8 +1,8 @@
 # This file is part of ts_ess.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
-# This product includes software developed by the Vera C. Rubin Observatory
-# Project (https://www.lsst.org).
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
 # for details of code ownership.
 #
@@ -15,16 +15,13 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 __all__ = ["EssCsc"]
 
 import asyncio
 import platform
-import pathlib
 
+from .config_schema import CONFIG_SCHEMA
 from . import __version__
 from lsst.ts import salobj
 from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
@@ -54,15 +51,12 @@ class EssCsc(salobj.ConfigurableCsc):
     def __init__(
         self, config_dir=None, initial_state=salobj.State.STANDBY, simulation_mode=0,
     ):
-        schema_path = (
-            pathlib.Path(__file__).resolve().parents[4].joinpath("schema", "ess.yaml")
-        )
         self.config = None
         self._config_dir = config_dir
         super().__init__(
             name="ESS",
             index=0,
-            schema_path=schema_path,
+            config_schema=CONFIG_SCHEMA,
             config_dir=config_dir,
             initial_state=initial_state,
             simulation_mode=simulation_mode,
