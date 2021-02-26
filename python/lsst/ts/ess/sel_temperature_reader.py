@@ -1,8 +1,8 @@
 # This file is part of ts_ess.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
-# This product includes software developed by the Vera C. Rubin Observatory
-# Project (https://www.lsst.org).
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
 # for details of code ownership.
 #
@@ -15,9 +15,6 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 r"""Implementation of SEL temperature instrument.
 
