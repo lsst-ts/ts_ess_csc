@@ -1,6 +1,6 @@
-.. py:currentmodule:: lsst.ts.MTDome
+.. py:currentmodule:: lsst.ts.ess
 
-.. _lsst.ts.MTDome.version_history:
+.. _lsst.ts.ess.version_history:
 
 ###############
 Version History
@@ -18,6 +18,6 @@ This version already includes many useful things:
 
 Requires:
 
-* ts_salobj 6.1
+* ts_salobj 6.3
 * ts_idl
 * IDL file for ESS from ts_xml 7.0
