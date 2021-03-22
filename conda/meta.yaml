@@ -25,6 +25,8 @@ test:
     - ts-idl {{ idl_version }}
     - ts-salobj {{ salobj_version }}
     - ts-dds
+    - pyserial
+    - pyftdi
     - black == 19.10b0
   source_files:
     - python
