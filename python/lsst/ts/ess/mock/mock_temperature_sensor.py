@@ -16,32 +16,55 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-__all__ = ["MockTemperatureSensor"]
+__all__ = ["MockTemperatureSensor", "MIN_TEMP", "MAX_TEMP"]
 
 import logging
 import random
 import time
 
-from lsst.ts import salobj
+import numpy as np
+
+from lsst.ts.ess.sel_temperature_reader import DELIMITER
+
+MIN_TEMP = 18.0
+MAX_TEMP = 22.0
 
 
 class MockTemperatureSensor:
     """Mock Temperature Sensor."""
 
-    def __init__(self):
-        # Timestamp
-        self.timestamp: float = None
-        # Instrument channel outputs
-        self.temperature: float = [0.0, 0.0, 0.0, 0.0]
+    def __init__(self, name: str, channels: int):
+        self.name = name
+        self.channels = channels
 
-        self.log = logging.getLogger("MockTemperatureSensor")
+        # Device parameters
+        self.line_size = None
+        self.terminator = None
+        self.baudrate = None
+        self.read_timeout = None
+
+        self.log = logging.getLogger(__name__)
         self.log.info("__init__")
 
-    def read_instrument(self):
-        self.log.info("read_instrument")
-        self.timestamp = salobj.current_tai()
-        self.temperature[0] = random.randint(180, 220) / 10.0
-        self.temperature[1] = random.randint(180, 220) / 10.0
-        self.temperature[2] = random.randint(180, 220) / 10.0
-        self.temperature[3] = random.randint(180, 220) / 10.0
-        time.sleep(1)
+    def open(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass
+
+    def format_temperature(self, i):
+        temp = random.uniform(MIN_TEMP, MAX_TEMP)
+        s = f"C{i:02d}={temp:09.4f}"
+        if i == self.channels - 1:
+            s += self.terminator
+        else:
+            s += DELIMITER
+        return s
+
+    def readline(self):
+        self.log.info("read")
+        err: str = "OK"
+        resp = ""
+        for i in range(0, self.channels):
+            resp += self.format_temperature(i)
+        return err, resp

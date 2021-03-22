@@ -40,7 +40,7 @@ where:
     '\r\n'      2-character terminator.
 """
 
-__all__ = ["SelTemperature"]
+__all__ = ["SelTemperature", "DELIMITER"]
 
 from typing import Any, Dict
 import logging
@@ -190,7 +190,8 @@ class SelTemperature(SerialReader):
                     ]
                 )
                 return True
-            except ValueError:
+            except ValueError as e:
+                logger.exception(e)
                 return False
                 pass
 

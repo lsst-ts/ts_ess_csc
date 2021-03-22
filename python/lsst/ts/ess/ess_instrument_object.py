@@ -20,21 +20,11 @@
 
 __all__ = ["EssInstrument"]
 
+import asyncio
 from typing import Any, Dict
 import logging
-from threading import Thread
 
 logger = logging.getLogger(__name__)
-
-
-def _threaded(fn):
-    # Thread wrapper used to decorate control methods
-    def _wrapper(*args, **kwargs):
-        thread = Thread(target=fn, args=args, kwargs=kwargs)
-        thread.start()
-        return thread
-
-    return _wrapper
 
 
 class EssInstrument:
@@ -71,7 +61,7 @@ class EssInstrument:
                 self._enabled: bool = False
                 self.name: str = name
                 self._callback_func = callback_func
-                # self.start()
+                self.telemetry_loop = None
 
                 EssInstrument._instances[name] = self
                 EssInstrument._devices[reader.comport] = self
@@ -109,20 +99,20 @@ class EssInstrument:
     def start(self):
         """Start the instrument read loop.
         """
-        msg = 'Starting read thread for "{}" instrument.'.format(self._reader.name)
+        msg = 'Starting read loop for "{}" instrument.'.format(self._reader.name)
         self._message(msg)
         self._enabled = True
-        self._run()
+        self.telemetry_loop = asyncio.ensure_future(self._run())
 
     def stop(self):
         """Terminate the instrument read loop.
         """
-        msg = 'Stopping read thread for "{}" instrument.'.format(self._reader.name)
+        msg = 'Stopping read loop for "{}" instrument.'.format(self._reader.name)
         self._message(msg)
+        self.telemetry_loop.cancel()
         self._enabled = False
 
-    @_threaded
-    def _run(self):
+    async def _run(self):
         """Run threaded instrument read loop.
 
         If enabled, loop and read the serial instrument and pass result to
@@ -130,4 +120,4 @@ class EssInstrument:
         """
         while self._enabled:
             self._reader.read()
-            self._callback_func(self, self._reader.output)
+            self._callback_func(self._reader.output)
