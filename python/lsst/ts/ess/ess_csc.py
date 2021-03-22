@@ -62,7 +62,7 @@ class EssCsc(salobj.ConfigurableCsc):
             simulation_mode=simulation_mode,
         )
 
-        self.ess_sensor = None
+        self.ess_instrument = None
         self.temperature_task = None
 
         self.log.info("ESS CSC created.")
@@ -78,20 +78,20 @@ class EssCsc(salobj.ConfigurableCsc):
         try:
             while True:
                 self.log.debug("Getting the temperature from the sensor")
-                self.ess_sensor.read_instrument()
+                self.ess_instrument.read_instrument()
                 data = {
-                    "timestamp": self.ess_sensor.timestamp,
-                    "temperatureC01": self.ess_sensor.temperature[0],
-                    "temperatureC02": self.ess_sensor.temperature[1],
-                    "temperatureC03": self.ess_sensor.temperature[2],
-                    "temperatureC04": self.ess_sensor.temperature[3],
+                    "timestamp": self.ess_instrument.timestamp,
+                    "temperatureC01": self.ess_instrument.temperature[0],
+                    "temperatureC02": self.ess_instrument.temperature[1],
+                    "temperatureC03": self.ess_instrument.temperature[2],
+                    "temperatureC04": self.ess_instrument.temperature[3],
                 }
                 self.log.info(f"Received temperatures {data}")
                 if not (
-                    self.ess_sensor.temperature[0] == "NaN"
-                    or self.ess_sensor.temperature[1] == "NaN"
-                    or self.ess_sensor.temperature[2] == "NaN"
-                    or self.ess_sensor.temperature[3] == "NaN"
+                    self.ess_instrument.temperature[0] == "NaN"
+                    or self.ess_instrument.temperature[1] == "NaN"
+                    or self.ess_instrument.temperature[2] == "NaN"
+                    or self.ess_instrument.temperature[3] == "NaN"
                 ):
                     self.log.info("Sending telemetry.")
                     self.tel_temperature4Ch.set_put(**data)
@@ -110,17 +110,13 @@ class EssCsc(salobj.ConfigurableCsc):
             raise RuntimeError("Not yet configured")
         if self.connected:
             raise RuntimeError("Already connected")
-        if self.simulation_mode == 1:
-            self.log.info("Connecting to the mock sensor.")
-            self.ess_sensor = MockTemperatureSensor()
-        else:
-            self.log.info("Connecting to the sensor.")
-            device = self._get_device()
-            sel_temperature = SelTemperature(
-                self.config.name, device, self.config.channels
-            )
-            self.ess_sensor = EssInstrument(self.config.name, sel_temperature, None)
-            self.log.info("Connection to the sensor established.")
+
+        self.log.info("Connecting to the sensor.")
+        device = self._get_device()
+        sel_temperature = SelTemperature(self.config.name, device, self.config.channels)
+        self.ess_instrument = EssInstrument(self.config.name, sel_temperature, None)
+        self.ess_instrument.start()
+        self.log.info("Connection to the sensor established.")
 
         self.log.info("Start periodic polling of the sensor data.")
         self.temperature_task = asyncio.create_task(
@@ -134,7 +130,9 @@ class EssCsc(salobj.ConfigurableCsc):
         self.log.info("Disconnecting")
         if self.temperature_task:
             self.temperature_task.cancel()
-        self.ess_sensor = None
+        if self.ess_instrument:
+            self.ess_instrument.stop()
+        self.ess_instrument = None
 
     async def handle_summary_state(self):
         """Override of the handle_summary_state function to connect or
@@ -152,7 +150,7 @@ class EssCsc(salobj.ConfigurableCsc):
 
     @property
     def connected(self):
-        if self.ess_sensor is None:
+        if self.ess_instrument is None:
             return False
         return True
 
@@ -175,7 +173,10 @@ class EssCsc(salobj.ConfigurableCsc):
 
         """
         device = None
-        if self.config.type == "FTDI":
+        if self.simulation_mode == 1:
+            self.log.info("Connecting to the mock sensor.")
+            device = MockTemperatureSensor("MockSensor", 4)
+        elif self.config.type == "FTDI":
             from .vcp_ftdi import VcpFtdi
 
             device = VcpFtdi(self.config.name, self.config.ftdi_id)

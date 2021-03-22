@@ -16,24 +16,35 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
+import logging
 import unittest
 
+from lsst.ts.ess.sel_temperature_reader import SelTemperature, DELIMITER
 from lsst.ts.ess.mock.mock_temperature_sensor import (
     MockTemperatureSensor,
     MIN_TEMP,
     MAX_TEMP,
 )
 
+logging.basicConfig(
+    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.INFO,
+)
 
-class MockTestCase(unittest.IsolatedAsyncioTestCase):
-    async def test_read_instrument(self):
-        self.ess_sensor = MockTemperatureSensor("MockSensor", 4)
-        self.ess_sensor.terminator = "\r\n"
-        # Set the TAI time in the mock controller for easier control
-        err, resp = self.ess_sensor.readline()
-        resp = resp.strip(self.ess_sensor.terminator)
-        data = resp.split(",")
+
+class SelTemperatureReaderTestCase(unittest.IsolatedAsyncioTestCase):
+    async def test_ess_instrument_object(self):
+        logging.info("test_ess_instrument_object")
+
+        # Reset SelTemperature
+        SelTemperature._instances = {}
+        SelTemperature._devices = {}
+
+        num_channels = 4
+        device = MockTemperatureSensor("MockSensor", num_channels)
+        sel_temperature = SelTemperature("MockSensor", device, num_channels)
+        sel_temperature.read()
+        data = sel_temperature.output
+        self.assertEqual(num_channels + 2, len(data))
         for i in range(0, 4):
-            data_item = data[i].split("=")
-            self.assertTrue(f"C{i:02d}", data_item[0])
-            self.assertTrue(MIN_TEMP <= float(data_item[1]) <= MAX_TEMP)
+            data_item = data[i + 2]
+            self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
