@@ -63,39 +63,30 @@ class EssCsc(salobj.ConfigurableCsc):
         )
 
         self.ess_instrument = None
-        self.temperature_task = None
 
         self.log.info("ESS CSC created.")
 
-    async def get_temperature(self, interval):
-        """Get the temperature forever at the specified interval.
+    def get_telemetry(self, output):
+        """Get the timestamp and temperatures from the data.
 
         Parameters
         ----------
-        interval: `float`
-            The interval (sec) at which to get the temperature.
+        output: array
+            An array containing the timestamp, error and temperatures as
+            measured by the sensors.
         """
         try:
-            while True:
-                self.log.debug("Getting the temperature from the sensor")
-                self.ess_instrument.read_instrument()
-                data = {
-                    "timestamp": self.ess_instrument.timestamp,
-                    "temperatureC01": self.ess_instrument.temperature[0],
-                    "temperatureC02": self.ess_instrument.temperature[1],
-                    "temperatureC03": self.ess_instrument.temperature[2],
-                    "temperatureC04": self.ess_instrument.temperature[3],
-                }
-                self.log.info(f"Received temperatures {data}")
-                if not (
-                    self.ess_instrument.temperature[0] == "NaN"
-                    or self.ess_instrument.temperature[1] == "NaN"
-                    or self.ess_instrument.temperature[2] == "NaN"
-                    or self.ess_instrument.temperature[3] == "NaN"
-                ):
-                    self.log.info("Sending telemetry.")
-                    self.tel_temperature4Ch.set_put(**data)
-                await asyncio.sleep(interval)
+            self.log.debug("Getting the temperature from the sensor")
+            data = {
+                "timestamp": output[0],
+                "temperatureC01": output[2],
+                "temperatureC02": output[3],
+                "temperatureC03": output[4],
+                "temperatureC04": output[5],
+            }
+            self.log.info(f"Received temperatures {data}")
+            self.log.info("Sending telemetry.")
+            self.tel_temperature4Ch.set_put(**data)
         except Exception:
             self.log.exception("Method get_temperature() failed")
 
@@ -114,22 +105,19 @@ class EssCsc(salobj.ConfigurableCsc):
         self.log.info("Connecting to the sensor.")
         device = self._get_device()
         sel_temperature = SelTemperature(self.config.name, device, self.config.channels)
-        self.ess_instrument = EssInstrument(self.config.name, sel_temperature, None)
+        self.ess_instrument = EssInstrument(
+            self.config.name, sel_temperature, self.get_telemetry
+        )
         self.ess_instrument.start()
         self.log.info("Connection to the sensor established.")
 
         self.log.info("Start periodic polling of the sensor data.")
-        self.temperature_task = asyncio.create_task(
-            self.get_temperature(TEMPERATURE_POLLING_INTERVAL)
-        )
 
     async def disconnect(self):
         """Disconnect from the ESS sensor, if connected, and stop the mock
         sensor, if running.
         """
         self.log.info("Disconnecting")
-        if self.temperature_task:
-            self.temperature_task.cancel()
         if self.ess_instrument:
             self.ess_instrument.stop()
         self.ess_instrument = None

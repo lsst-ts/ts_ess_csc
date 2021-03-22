@@ -57,7 +57,7 @@ CONFIG_SCHEMA = yaml.safe_load(
           ftdi_id:
             description: FTDI Serial ID to connect to.
             type: string
-            default: "A601FT68"
+            default: "AL05OBVR"
     - if:
         properties:
           type:
