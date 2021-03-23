@@ -118,11 +118,13 @@ class SelTemperature(SerialReader):
                 self.output = []
 
                 self._preamble_str: str = []
+                self._old_preamble_str: str = []
                 self._tmp_temperature: float = []
                 for i in range(self._channels):
                     self._tmp_temperature.append(DEFAULT_VAL)
                     self.temperature.append(DEFAULT_VAL)
                     self._preamble_str.append(f"C{i:02}=")
+                    self._old_preamble_str.append(f"C{i+1:02}=")
 
                 self._read_line_size: int = self._channels * (
                     PREAMBLE_SIZE + VALUE_SIZE + len(DELIMITER)
@@ -226,7 +228,9 @@ class SelTemperature(SerialReader):
                 line = ser_line[: -len(TERMINATOR)]
                 temps = line.split(",", self._channels - 1)
                 for i in range(self._channels):
-                    if self._test_val(self._preamble_str[i], temps[i]):
+                    if self._test_val(
+                        self._preamble_str[i], temps[i]
+                    ) or self._test_val(self._old_preamble_str[i], temps[i]):
                         try:
                             self._tmp_temperature[i] = float(temps[i][PREAMBLE_SIZE:])
                         except ValueError:

@@ -21,16 +21,31 @@ import unittest
 
 from lsst.ts import salobj
 from lsst.ts import ess
+from lsst.ts.ess.mock.mock_temperature_sensor import MIN_TEMP, MAX_TEMP
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
+    def get_telemetry(self, output):
+        """This function makes sure that the loop in ess_instrument gets
+        canceled as soon as the first data have arrived to avoid an endless
+        loop."""
+        print(output)
+        self.assertEqual(self.num_channels + 2, len(output))
+        self.ess_instrument._enabled = False
+        for i in range(0, 4):
+            data_item = output[i + 2]
+            self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
+
     def basic_make_csc(self, initial_state, config_dir, simulation_mode, **kwargs):
         logging.info("basic_make_csc")
-        return ess.EssCsc(
+        csc = ess.EssCsc(
             initial_state=initial_state,
             config_dir=config_dir,
             simulation_mode=simulation_mode,
         )
+        # shameless monkey patch
+        csc.get_telemetry = self.get_telemetry
+        return csc
 
     async def test_standard_state_transitions(self):
         logging.info("test_standard_state_transitions")
