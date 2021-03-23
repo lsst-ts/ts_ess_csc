@@ -37,3 +37,16 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
             data_item = data[i].split("=")
             self.assertTrue(f"C{i:02d}", data_item[0])
             self.assertTrue(MIN_TEMP <= float(data_item[1]) <= MAX_TEMP)
+
+    async def test_read_Old_instrument(self):
+        count_offset = 1
+        self.ess_sensor = MockTemperatureSensor("MockSensor", 4, count_offset)
+        self.ess_sensor.terminator = "\r\n"
+        # Set the TAI time in the mock controller for easier control
+        err, resp = self.ess_sensor.readline()
+        resp = resp.strip(self.ess_sensor.terminator)
+        data = resp.split(",")
+        for i in range(0, 4):
+            data_item = data[i].split("=")
+            self.assertTrue(f"C{i + count_offset:02d}", data_item[0])
+            self.assertTrue(MIN_TEMP <= float(data_item[1]) <= MAX_TEMP)

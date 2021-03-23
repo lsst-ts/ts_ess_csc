@@ -44,9 +44,32 @@ class EssInstrumentObjectTestCase(unittest.IsolatedAsyncioTestCase):
         # Reset SelTemperature
         SelTemperature._instances = {}
         SelTemperature._devices = {}
+        # Reset EssInstrument
+        EssInstrument._instances = {}
+        EssInstrument._devices = {}
 
         self.num_channels = 4
         device = MockTemperatureSensor("MockSensor", self.num_channels)
+        sel_temperature = SelTemperature("MockSensor", device, self.num_channels)
+        self.ess_instrument = EssInstrument(
+            "MockSensor", sel_temperature, callback_func=self._callback
+        )
+        self.ess_instrument._enabled = True
+        await self.ess_instrument._run()
+
+    async def test_old_ess_instrument_object(self):
+        logging.info("test_ess_instrument_object")
+
+        # Reset SelTemperature
+        SelTemperature._instances = {}
+        SelTemperature._devices = {}
+        # Reset EssInstrument
+        EssInstrument._instances = {}
+        EssInstrument._devices = {}
+
+        self.num_channels = 4
+        count_offset = 1
+        device = MockTemperatureSensor("MockSensor", self.num_channels, count_offset)
         sel_temperature = SelTemperature("MockSensor", device, self.num_channels)
         self.ess_instrument = EssInstrument(
             "MockSensor", sel_temperature, callback_func=self._callback

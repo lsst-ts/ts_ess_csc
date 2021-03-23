@@ -32,7 +32,7 @@ logging.basicConfig(
 
 
 class SelTemperatureReaderTestCase(unittest.IsolatedAsyncioTestCase):
-    async def test_ess_instrument_object(self):
+    async def test_sel_temperature_reader(self):
         logging.info("test_ess_instrument_object")
 
         # Reset SelTemperature
@@ -41,6 +41,24 @@ class SelTemperatureReaderTestCase(unittest.IsolatedAsyncioTestCase):
 
         num_channels = 4
         device = MockTemperatureSensor("MockSensor", num_channels)
+        sel_temperature = SelTemperature("MockSensor", device, num_channels)
+        sel_temperature.read()
+        data = sel_temperature.output
+        self.assertEqual(num_channels + 2, len(data))
+        for i in range(0, 4):
+            data_item = data[i + 2]
+            self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
+
+    async def test_old_sel_temperature_reader(self):
+        logging.info("test_ess_instrument_object")
+
+        # Reset SelTemperature
+        SelTemperature._instances = {}
+        SelTemperature._devices = {}
+
+        num_channels = 4
+        count_offset = 1
+        device = MockTemperatureSensor("MockSensor", num_channels, count_offset)
         sel_temperature = SelTemperature("MockSensor", device, num_channels)
         sel_temperature.read()
         data = sel_temperature.output
