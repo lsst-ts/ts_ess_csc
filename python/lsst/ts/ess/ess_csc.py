@@ -21,6 +21,8 @@ __all__ = ["EssCsc"]
 import asyncio
 import platform
 
+import numpy as np
+
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
 from lsst.ts import salobj
@@ -62,7 +64,14 @@ class EssCsc(salobj.ConfigurableCsc):
             simulation_mode=simulation_mode,
         )
 
+        self.device = None
         self.ess_instrument = None
+
+        # Unit tests should set this to True to avoid an infinite loop.
+        self.stop_telemetry_after_first_data = False
+        # Unit tests may set this to an integer value to simulate a
+        # disconnected or missing sensor.
+        self.nan_channel = None
 
         self.log.info("ESS CSC created.")
 
@@ -77,16 +86,25 @@ class EssCsc(salobj.ConfigurableCsc):
         """
         try:
             self.log.debug("Getting the temperature from the sensor")
-            data = {
-                "timestamp": output[0],
-                "temperatureC01": output[2],
-                "temperatureC02": output[3],
-                "temperatureC03": output[4],
-                "temperatureC04": output[5],
-            }
-            self.log.info(f"Received temperatures {data}")
-            self.log.info("Sending telemetry.")
-            self.tel_temperature4Ch.set_put(**data)
+            data = {"timestamp": output[0]}
+            error_code = output[1]
+            if error_code == "OK":
+                for i in range(2, 2 + self.config.channels):
+                    # The telemetry channels start counting at 1 and not 0.
+                    data[f"temperatureC{i-1:02d}"] = (
+                        float.nan if np.isnan(output[i]) else output[i]
+                    )
+                self.log.info(f"Received temperatures {data}")
+                self.log.info("Sending telemetry.")
+                telemetry_method = getattr(
+                    self, f"tel_temperature{self.config.channels}Ch"
+                )
+                telemetry_method.set_put(**data)
+
+            # Unit tests should set this to True but otherwise this should be
+            # set to False.
+            if self.stop_telemetry_after_first_data:
+                self.ess_instrument._enabled = False
         except Exception:
             self.log.exception("Method get_temperature() failed")
 
@@ -103,8 +121,10 @@ class EssCsc(salobj.ConfigurableCsc):
             raise RuntimeError("Already connected")
 
         self.log.info("Connecting to the sensor.")
-        device = self._get_device()
-        sel_temperature = SelTemperature(self.config.name, device, self.config.channels)
+        self._get_device()
+        sel_temperature = SelTemperature(
+            self.config.name, self.device, self.config.channels
+        )
         self.ess_instrument = EssInstrument(
             self.config.name, sel_temperature, self.get_telemetry
         )
@@ -160,24 +180,25 @@ class EssCsc(salobj.ConfigurableCsc):
         ------
 
         """
-        device = None
+        self.device = None
         if self.simulation_mode == 1:
             self.log.info("Connecting to the mock sensor.")
-            device = MockTemperatureSensor("MockSensor", 4)
+            self.device = MockTemperatureSensor(
+                "MockSensor", 4, nan_channel=self.nan_channel
+            )
         elif self.config.type == "FTDI":
             from .vcp_ftdi import VcpFtdi
 
-            device = VcpFtdi(self.config.name, self.config.ftdi_id)
+            self.device = VcpFtdi(self.config.name, self.config.ftdi_id)
         elif self.config.type == "Serial":
             # make sure we are on a Raspberry Pi4
             if "aarch64" in platform.platform():
                 from .rpi_serial_hat import RpiSerialHat
 
-                device = RpiSerialHat(self.config.name, self.config.port)
+                self.device = RpiSerialHat(self.config.name, self.config.port)
 
-        if device is None:
+        if self.device is None:
             raise RuntimeError(
-                f"Could not get a {self.config.type!r} device on architecture {platform.platform()}. "
-                f"Please check the configuration."
+                f"Could not get a {self.config.type!r} device on architecture "
+                f"{platform.platform()}. Please check the configuration."
             )
-        return device

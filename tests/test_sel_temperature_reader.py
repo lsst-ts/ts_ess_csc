@@ -16,7 +16,6 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import logging
 import unittest
 
 from lsst.ts.ess.sel_temperature_reader import SelTemperature, DELIMITER
@@ -26,19 +25,9 @@ from lsst.ts.ess.mock.mock_temperature_sensor import (
     MAX_TEMP,
 )
 
-logging.basicConfig(
-    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.INFO,
-)
-
 
 class SelTemperatureReaderTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_sel_temperature_reader(self):
-        logging.info("test_ess_instrument_object")
-
-        # Reset SelTemperature
-        SelTemperature._instances = {}
-        SelTemperature._devices = {}
-
         num_channels = 4
         device = MockTemperatureSensor("MockSensor", num_channels)
         sel_temperature = SelTemperature("MockSensor", device, num_channels)
@@ -50,12 +39,6 @@ class SelTemperatureReaderTestCase(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
 
     async def test_old_sel_temperature_reader(self):
-        logging.info("test_ess_instrument_object")
-
-        # Reset SelTemperature
-        SelTemperature._instances = {}
-        SelTemperature._devices = {}
-
         num_channels = 4
         count_offset = 1
         device = MockTemperatureSensor("MockSensor", num_channels, count_offset)
@@ -66,3 +49,21 @@ class SelTemperatureReaderTestCase(unittest.IsolatedAsyncioTestCase):
         for i in range(0, 4):
             data_item = data[i + 2]
             self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
+
+    async def test_nan_sel_temperature_reader(self):
+        num_channels = 4
+        count_offset = 1
+        nan_channel = 2
+        device = MockTemperatureSensor(
+            "MockSensor", num_channels, count_offset, nan_channel=nan_channel
+        )
+        sel_temperature = SelTemperature("MockSensor", device, num_channels)
+        sel_temperature.read()
+        data = sel_temperature.output
+        self.assertEqual(num_channels + 2, len(data))
+        for i in range(0, 4):
+            data_item = data[i + 2]
+            if i == nan_channel:
+                self.assertAlmostEqual(9999.999, float(data_item), 3)
+            else:
+                self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
