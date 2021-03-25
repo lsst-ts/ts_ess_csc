@@ -25,17 +25,6 @@ from lsst.ts.ess.mock.mock_temperature_sensor import MIN_TEMP, MAX_TEMP
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
-    def get_telemetry(self, output):
-        """This function makes sure that the loop in ess_instrument gets
-        canceled as soon as the first data have arrived to avoid an endless
-        loop."""
-        print(output)
-        self.assertEqual(self.num_channels + 2, len(output))
-        self.ess_instrument._enabled = False
-        for i in range(0, 4):
-            data_item = output[i + 2]
-            self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
-
     def basic_make_csc(self, initial_state, config_dir, simulation_mode, **kwargs):
         logging.info("basic_make_csc")
         csc = ess.EssCsc(
@@ -43,8 +32,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=config_dir,
             simulation_mode=simulation_mode,
         )
-        # shameless monkey patch
-        csc.get_telemetry = self.get_telemetry
+        csc.stop_telemetry_after_first_data = True
         return csc
 
     async def test_standard_state_transitions(self):
@@ -55,6 +43,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.check_standard_state_transitions(enabled_commands=(),)
 
     async def test_version(self):
+        logging.info("test_version")
         async with self.make_csc(
             initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
         ):
@@ -67,3 +56,42 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_bin_script(self):
         logging.info("test_bin_script")
         await self.check_bin_script(name="ESS", index=None, exe_name="run_ess.py")
+
+    async def test_receive_telemetry(self):
+        logging.info("test_receive_telemetry")
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
+        ):
+            await salobj.set_summary_state(
+                remote=self.remote, state=salobj.State.ENABLED
+            )
+            telemetry_topic = getattr(
+                self.remote, f"tel_temperature{self.csc.config.channels}Ch"
+            )
+            data = await telemetry_topic.next(flush=False)
+            print(data)
+            for i in range(1, self.csc.config.channels + 1):
+                temp_telemetry = getattr(data, f"temperatureC{i:02d}")
+                self.assertTrue(MIN_TEMP <= temp_telemetry <= MAX_TEMP)
+
+    async def test_receive_telemetry_with_nan(self):
+        logging.info("test_receive_telemetry")
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY, config_dir=None, simulation_mode=1
+        ):
+            nan_channel = 1
+            self.csc.nan_channel = nan_channel
+            await salobj.set_summary_state(
+                remote=self.remote, state=salobj.State.ENABLED
+            )
+            telemetry_topic = getattr(
+                self.remote, f"tel_temperature{self.csc.config.channels}Ch"
+            )
+            data = await telemetry_topic.next(flush=False)
+            print(data)
+            for i in range(1, self.csc.config.channels + 1):
+                temp_telemetry = getattr(data, f"temperatureC{i:02d}")
+                if i == nan_channel + 1:
+                    self.assertAlmostEqual(9999.999, temp_telemetry, 3)
+                else:
+                    self.assertTrue(MIN_TEMP <= temp_telemetry <= MAX_TEMP)

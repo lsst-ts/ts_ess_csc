@@ -45,61 +45,56 @@ class EssInstrument:
     IndexError if attempted multiple use of serial device instance.
     """
 
-    _instances: Dict[str, "EssInstrument"] = {}
-    _devices: Dict[str, "EssInstrument"] = {}
-
     def __init__(self, name: str, reader, callback_func):
-        if name not in EssInstrument._instances:
-            if reader.comport not in EssInstrument._devices:
+        self._instances: Dict[str, "EssInstrument"] = {}
+        self._devices: Dict[str, "EssInstrument"] = {}
+        if name not in self._instances:
+            if reader.comport not in self._devices:
                 try:
                     self._reader = reader
                 except AttributeError:
                     logger.debug(
-                        "EssInstrument:{}: Failed to instantiate "
-                        'using reader object "{}".'.format(name, reader.name)
+                        f"EssInstrument:{name}: Failed to instantiate "
+                        f"using reader object {reader.name!r}."
                     )
                 self._enabled: bool = False
                 self.name: str = name
                 self._callback_func = callback_func
                 self.telemetry_loop = None
 
-                EssInstrument._instances[name] = self
-                EssInstrument._devices[reader.comport] = self
+                self._instances[name] = self
+                self._devices[reader.comport] = self
                 logger.debug(
-                    "EssInstrument:{}: First instantiation "
-                    'using reader object "{}".'.format(name, reader.name)
+                    f"EssInstrument:{name}: First instantiation "
+                    f"using reader object {reader.name!r}."
                 )
             else:
                 logger.debug(
-                    "EssInstrument:{}: Error: "
-                    'Attempted multiple use of reader serial device instance "{}".'.format(
-                        name, reader.comport
-                    )
+                    f"EssInstrument:{name}: Error: "
+                    f"Attempted multiple use of reader serial device instance {reader.comport}."
                 )
                 raise IndexError(
-                    "EssInstrument:{}: "
-                    'Attempted multiple use of reader serial device instance "{}".'.format(
-                        name, reader.comport
-                    )
+                    f"EssInstrument:{name}: "
+                    f"Attempted multiple use of reader serial device instance {reader.comport}."
                 )
         else:
             logger.debug(
                 "EssInstrument: Error: "
-                'Attempted multiple instantiation of "{}".'.format(name)
+                f"Attempted multiple instantiation of {name!r}."
             )
             raise IndexError(
                 "EssInstrument: Error: "
-                'Attempted multiple instantiation of "{}".'.format(name)
+                f"Attempted multiple instantiation of {name!r}."
             )
 
     def _message(self, text: Any) -> None:
         # Print a message prefaced with the InstrumentThread object info.
-        logger.debug("EssInstrument:{}: {}".format(self.name, text))
+        logger.debug(f"EssInstrument:{self.name}: {text}")
 
     def start(self):
         """Start the instrument read loop.
         """
-        msg = 'Starting read loop for "{}" instrument.'.format(self._reader.name)
+        msg = f"Starting read loop for {self._reader.name!r} instrument."
         self._message(msg)
         self._enabled = True
         self.telemetry_loop = asyncio.ensure_future(self._run())
@@ -107,7 +102,7 @@ class EssInstrument:
     def stop(self):
         """Terminate the instrument read loop.
         """
-        msg = 'Stopping read loop for "{}" instrument.'.format(self._reader.name)
+        msg = f"Stopping read loop for {self._reader.name!r} instrument."
         self._message(msg)
         self.telemetry_loop.cancel()
         self._enabled = False

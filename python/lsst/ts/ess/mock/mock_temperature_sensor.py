@@ -33,10 +33,11 @@ MAX_TEMP = 30.0
 class MockTemperatureSensor:
     """Mock Temperature Sensor."""
 
-    def __init__(self, name: str, channels: int, count_offset=0):
+    def __init__(self, name: str, channels: int, count_offset=0, nan_channel=None):
         self.name = name
         self.channels = channels
         self.count_offset = count_offset
+        self.nan_channel = nan_channel
 
         # Device parameters
         self.line_size = None
@@ -56,6 +57,8 @@ class MockTemperatureSensor:
     def format_temperature(self, i):
         temp = random.uniform(MIN_TEMP, MAX_TEMP)
         s = f"C{i + self.count_offset:02d}={temp:09.4f}"
+        if i == self.nan_channel:
+            s = f"C{i + self.count_offset:02d}=9999.9990"
         if i == self.channels - 1:
             s += self.terminator
         else:

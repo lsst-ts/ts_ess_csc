@@ -16,7 +16,6 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import logging
 import unittest
 import asyncio
 
@@ -34,21 +33,16 @@ class EssInstrumentObjectTestCase(unittest.IsolatedAsyncioTestCase):
         print(data)
         self.assertEqual(self.num_channels + 2, len(data))
         self.ess_instrument._enabled = False
-        for i in range(0, 4):
+        for i in range(0, self.num_channels):
             data_item = data[i + 2]
-            self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
+            if self.nan_channel and i == self.nan_channel:
+                self.assertAlmostEqual(9999.999, float(data_item), 3)
+            else:
+                self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
 
     async def test_ess_instrument_object(self):
-        logging.info("test_ess_instrument_object")
-
-        # Reset SelTemperature
-        SelTemperature._instances = {}
-        SelTemperature._devices = {}
-        # Reset EssInstrument
-        EssInstrument._instances = {}
-        EssInstrument._devices = {}
-
         self.num_channels = 4
+        self.nan_channel = None
         device = MockTemperatureSensor("MockSensor", self.num_channels)
         sel_temperature = SelTemperature("MockSensor", device, self.num_channels)
         self.ess_instrument = EssInstrument(
@@ -58,18 +52,24 @@ class EssInstrumentObjectTestCase(unittest.IsolatedAsyncioTestCase):
         await self.ess_instrument._run()
 
     async def test_old_ess_instrument_object(self):
-        logging.info("test_ess_instrument_object")
-
-        # Reset SelTemperature
-        SelTemperature._instances = {}
-        SelTemperature._devices = {}
-        # Reset EssInstrument
-        EssInstrument._instances = {}
-        EssInstrument._devices = {}
-
         self.num_channels = 4
         count_offset = 1
+        self.nan_channel = None
         device = MockTemperatureSensor("MockSensor", self.num_channels, count_offset)
+        sel_temperature = SelTemperature("MockSensor", device, self.num_channels)
+        self.ess_instrument = EssInstrument(
+            "MockSensor", sel_temperature, callback_func=self._callback
+        )
+        self.ess_instrument._enabled = True
+        await self.ess_instrument._run()
+
+    async def test_nan_ess_instrument_object(self):
+        self.num_channels = 4
+        count_offset = 1
+        self.nan_channel = 2
+        device = MockTemperatureSensor(
+            "MockSensor", self.num_channels, count_offset, self.nan_channel
+        )
         sel_temperature = SelTemperature("MockSensor", device, self.num_channels)
         self.ess_instrument = EssInstrument(
             "MockSensor", sel_temperature, callback_func=self._callback
