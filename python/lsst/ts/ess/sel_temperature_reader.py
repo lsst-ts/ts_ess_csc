@@ -126,9 +126,11 @@ class SelTemperature(SerialReader):
                     self._preamble_str.append(f"C{i:02}=")
                     self._old_preamble_str.append(f"C{i+1:02}=")
 
-                self._read_line_size: int = self._channels * (
-                    PREAMBLE_SIZE + VALUE_SIZE + len(DELIMITER)
-                ) - (len(DELIMITER)) + (len(TERMINATOR))
+                self._read_line_size: int = (
+                    self._channels * (PREAMBLE_SIZE + VALUE_SIZE + len(DELIMITER))
+                    - (len(DELIMITER))
+                    + (len(TERMINATOR))
+                )
 
                 self.comport.open()
                 self.comport.line_size = self._read_line_size

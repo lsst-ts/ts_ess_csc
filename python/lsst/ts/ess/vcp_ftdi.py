@@ -68,7 +68,9 @@ class VcpFtdi:
     _devices: Dict[str, "VcpFtdi"] = {}
 
     def __init__(
-        self, name: str, device_id: str,
+        self,
+        name: str,
+        device_id: str,
     ):
         if name not in VcpFtdi._instances:
             if device_id not in VcpFtdi._devices:
@@ -116,8 +118,7 @@ class VcpFtdi:
 
     @property
     def baudrate(self) -> int:
-        """BAUD of the serial device ('int').
-        """
+        """BAUD of the serial device ('int')."""
         baud: int = self._vcp.baudrate
         self._message("Device BAUD rate read: {}.".format(baud))
         return baud
@@ -129,8 +130,7 @@ class VcpFtdi:
 
     @property
     def line_size(self) -> int:
-        """Serial data line size ('int').
-        """
+        """Serial data line size ('int')."""
         self._message(
             "Serial data line size read: {} characters.".format(self._baudrate)
         )
@@ -145,8 +145,7 @@ class VcpFtdi:
 
     @property
     def read_timeout(self) -> float:
-        """Read timeout of serial data line in seconds ('float').
-        """
+        """Read timeout of serial data line in seconds ('float')."""
         timeout = self._read_timeout
         self._message("Device read timeout read: {} seconds.".format(timeout))
         return timeout
@@ -158,8 +157,7 @@ class VcpFtdi:
 
     @property
     def terminator(self) -> str:
-        """Serial data line terminator string ('str').
-        """
+        """Serial data line terminator string ('str')."""
         self._message(
             "Serial data line terminator string read: {}.".format(self._terminator)
         )
