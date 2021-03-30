@@ -27,7 +27,6 @@ test:
     - ts-dds
     - pyserial
     - pyftdi
-    - black
   source_files:
     - python
     - bin
