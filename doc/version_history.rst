@@ -6,6 +6,20 @@
 Version History
 ###############
 
+v0.2.0
+======
+
+The sensors code, and with that the CSC, was completely rewitten.
+Black version upgraded to 20.8b1
+ts-conda-build version upgraded to 0.3
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 8.0
+
+
 v0.1.0
 ======
 

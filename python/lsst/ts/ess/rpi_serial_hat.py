@@ -107,7 +107,9 @@ class RpiSerialHat:
     }
 
     def __init__(
-        self, name: str, port_id: str,
+        self,
+        name: str,
+        port_id: str,
     ):
         if name not in RpiSerialHat._instances:
             if port_id not in RpiSerialHat._used_ports:
@@ -197,8 +199,7 @@ class RpiSerialHat:
 
     @property
     def baudrate(self) -> int:
-        """BAUD of the serial device ('int').
-        """
+        """BAUD of the serial device ('int')."""
         baud: int = self._ser.baud
         self._message("Serial port BAUD read: {}.".format(baud))
         return baud
@@ -210,8 +211,7 @@ class RpiSerialHat:
 
     @property
     def line_size(self) -> int:
-        """Serial data line size ('int').
-        """
+        """Serial data line size ('int')."""
         self._message(
             "Serial data line size read: {} characters.".format(self._line_size)
         )
@@ -226,8 +226,7 @@ class RpiSerialHat:
 
     @property
     def read_timeout(self) -> float:
-        """Read timeout of serial data line in seconds ('float').
-        """
+        """Read timeout of serial data line in seconds ('float')."""
         read_timeout: float = self._ser.timeout
         self._message("Serial port read timeout read: {} seconds.".format(read_timeout))
         return read_timeout
@@ -239,8 +238,7 @@ class RpiSerialHat:
 
     @property
     def terminator(self) -> str:
-        """Serial data line terminator string ('str').
-        """
+        """Serial data line terminator string ('str')."""
         self._message(
             "Serial data line terminator string read: {}.".format(self._read_timeout)
         )

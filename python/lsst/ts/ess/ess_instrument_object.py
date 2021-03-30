@@ -92,16 +92,14 @@ class EssInstrument:
         logger.debug(f"EssInstrument:{self.name}: {text}")
 
     def start(self):
-        """Start the instrument read loop.
-        """
+        """Start the instrument read loop."""
         msg = f"Starting read loop for {self._reader.name!r} instrument."
         self._message(msg)
         self._enabled = True
         self.telemetry_loop = asyncio.ensure_future(self._run())
 
     def stop(self):
-        """Terminate the instrument read loop.
-        """
+        """Terminate the instrument read loop."""
         msg = f"Stopping read loop for {self._reader.name!r} instrument."
         self._message(msg)
         self.telemetry_loop.cancel()
