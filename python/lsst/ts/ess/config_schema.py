@@ -44,28 +44,26 @@ CONFIG_SCHEMA = yaml.safe_load(
         description: Type of the device
         type: string
         enum:
-          - FTDI
-          - Serial
+        - FTDI
+        - Serial
         default: FTDI
-    required:
-      - name
-      - channels
-      - type
-    allOf:
-      - if:
-          properties:
-            type:
-              const: FTDI
-        then:
+    anyOf:
+    - if:
+        properties:
+          type:
+            const: FTDI
+      then:
+        properties:
           ftdi_id:
             description: FTDI Serial ID to connect to.
             type: string
-            default: "A601FT68"
-      - if:
-          properties:
-            type:
-              const: Serial
-        then:
+            default: "AL05OBVR"
+    - if:
+        properties:
+          type:
+            const: Serial
+      then:
+        properties:
           port:
             description: Serial port to connect to.
             type: string

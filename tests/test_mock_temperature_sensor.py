@@ -16,37 +16,59 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-import asynctest
-import logging
+import unittest
 
-from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
-
-logging.basicConfig(
-    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.DEBUG
+from lsst.ts.ess.mock.mock_temperature_sensor import (
+    MockTemperatureSensor,
+    MIN_TEMP,
+    MAX_TEMP,
 )
 
 
-class MockTestCase(asynctest.TestCase):
-    async def setUp(self):
-        self.log = logging.getLogger("MockTestCase")
-        self.ess_sensor = MockTemperatureSensor()
-
+class MockTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_read_instrument(self):
+        num_channels = 4
+        ess_sensor = MockTemperatureSensor("MockSensor", num_channels)
+        ess_sensor.terminator = "\r\n"
         # Set the TAI time in the mock controller for easier control
-        self.ess_sensor.read_instrument()
-        self.assertTrue(
-            18 <= self.ess_sensor.temperature[0] <= 22,
-            f"temp = {self.ess_sensor.temperature[0]}",
+        err, resp = ess_sensor.readline()
+        resp = resp.strip(ess_sensor.terminator)
+        data = resp.split(",")
+        for i in range(0, num_channels):
+            data_item = data[i].split("=")
+            self.assertTrue(f"C{i:02d}", data_item[0])
+            self.assertTrue(MIN_TEMP <= float(data_item[1]) <= MAX_TEMP)
+
+    async def test_read_old_instrument(self):
+        num_channels = 4
+        count_offset = 1
+        ess_sensor = MockTemperatureSensor("MockSensor", num_channels, count_offset)
+        ess_sensor.terminator = "\r\n"
+        # Set the TAI time in the mock controller for easier control
+        err, resp = ess_sensor.readline()
+        resp = resp.strip(ess_sensor.terminator)
+        data = resp.split(",")
+        for i in range(0, num_channels):
+            data_item = data[i].split("=")
+            self.assertTrue(f"C{i + count_offset:02d}", data_item[0])
+            self.assertTrue(MIN_TEMP <= float(data_item[1]) <= MAX_TEMP)
+
+    async def test_read_nan(self):
+        num_channels = 4
+        count_offset = 1
+        nan_channel = 2
+        ess_sensor = MockTemperatureSensor(
+            "MockSensor", num_channels, count_offset, nan_channel
         )
-        self.assertTrue(
-            18 <= self.ess_sensor.temperature[1] <= 22,
-            f"temp = {self.ess_sensor.temperature[1]}",
-        )
-        self.assertTrue(
-            18 <= self.ess_sensor.temperature[2] <= 22,
-            f"temp = {self.ess_sensor.temperature[2]}",
-        )
-        self.assertTrue(
-            18 <= self.ess_sensor.temperature[3] <= 22,
-            f"temp = {self.ess_sensor.temperature[3]}",
-        )
+        ess_sensor.terminator = "\r\n"
+        # Set the TAI time in the mock controller for easier control
+        err, resp = ess_sensor.readline()
+        resp = resp.strip(ess_sensor.terminator)
+        data = resp.split(",")
+        for i in range(0, num_channels):
+            data_item = data[i].split("=")
+            self.assertTrue(f"C{i + count_offset:02d}", data_item[0])
+            if i == nan_channel:
+                self.assertTrue(data_item[1] == "9999.9990")
+            else:
+                self.assertTrue(MIN_TEMP <= float(data_item[1]) <= MAX_TEMP)
