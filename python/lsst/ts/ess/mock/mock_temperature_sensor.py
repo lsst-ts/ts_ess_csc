@@ -18,6 +18,7 @@
 
 __all__ = ["MockTemperatureSensor", "MIN_TEMP", "MAX_TEMP"]
 
+import asyncio
 import logging
 import random
 import time
@@ -33,7 +34,9 @@ MAX_TEMP = 30.0
 class MockTemperatureSensor:
     """Mock Temperature Sensor."""
 
-    def __init__(self, name: str, channels: int, count_offset=0, nan_channel=None):
+    def __init__(
+        self, name: str, channels: int, count_offset=0, nan_channel=None, log=None
+    ):
         self.name = name
         self.channels = channels
         self.count_offset = count_offset
@@ -45,13 +48,17 @@ class MockTemperatureSensor:
         self.baudrate = None
         self.read_timeout = None
 
-        self.log = logging.getLogger(__name__)
+        if log is None:
+            self.log = logging.getLogger(type(self).__name__)
+        else:
+            self.log = log.getChild(type(self).__name__)
+
         self.log.info("__init__")
 
-    def open(self) -> None:
+    async def open(self) -> None:
         pass
 
-    def close(self) -> None:
+    async def close(self) -> None:
         pass
 
     def format_temperature(self, i):
@@ -67,6 +74,7 @@ class MockTemperatureSensor:
 
     def readline(self):
         self.log.info("read")
+        time.sleep(1)
         err: str = "OK"
         resp = ""
         for i in range(0, self.channels):

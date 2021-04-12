@@ -31,8 +31,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=initial_state,
             config_dir=config_dir,
             simulation_mode=simulation_mode,
+            index=1,
         )
-        csc.stop_telemetry_after_first_data = True
         return csc
 
     async def test_standard_state_transitions(self):

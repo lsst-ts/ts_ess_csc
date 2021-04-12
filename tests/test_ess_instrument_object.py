@@ -29,22 +29,23 @@ from lsst.ts.ess.mock.mock_temperature_sensor import (
 
 
 class EssInstrumentObjectTestCase(unittest.IsolatedAsyncioTestCase):
-    def _callback(self, data):
+    async def _callback(self, data):
         print(data)
         self.assertEqual(self.num_channels + 2, len(data))
-        self.ess_instrument._enabled = False
         for i in range(0, self.num_channels):
             data_item = data[i + 2]
             if self.nan_channel and i == self.nan_channel:
                 self.assertAlmostEqual(9999.999, float(data_item), 3)
             else:
                 self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
+        self.ess_instrument._enabled = False
 
     async def test_ess_instrument_object(self):
         self.num_channels = 4
         self.nan_channel = None
         device = MockTemperatureSensor("MockSensor", self.num_channels)
         sel_temperature = SelTemperature("MockSensor", device, self.num_channels)
+        await sel_temperature.start()
         self.ess_instrument = EssInstrument(
             "MockSensor", sel_temperature, callback_func=self._callback
         )
@@ -57,6 +58,7 @@ class EssInstrumentObjectTestCase(unittest.IsolatedAsyncioTestCase):
         self.nan_channel = None
         device = MockTemperatureSensor("MockSensor", self.num_channels, count_offset)
         sel_temperature = SelTemperature("MockSensor", device, self.num_channels)
+        await sel_temperature.start()
         self.ess_instrument = EssInstrument(
             "MockSensor", sel_temperature, callback_func=self._callback
         )
@@ -71,6 +73,7 @@ class EssInstrumentObjectTestCase(unittest.IsolatedAsyncioTestCase):
             "MockSensor", self.num_channels, count_offset, self.nan_channel
         )
         sel_temperature = SelTemperature("MockSensor", device, self.num_channels)
+        await sel_temperature.start()
         self.ess_instrument = EssInstrument(
             "MockSensor", sel_temperature, callback_func=self._callback
         )
