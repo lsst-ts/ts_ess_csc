@@ -6,6 +6,18 @@
 Version History
 ###############
 
+v0.3.0
+======
+
+Code reworked to use asyncio properly.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 8.0
+
+
 v0.2.0
 ======
 
