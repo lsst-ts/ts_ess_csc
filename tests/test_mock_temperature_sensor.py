@@ -16,6 +16,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
+import asyncio
 import unittest
 
 from lsst.ts.ess.mock.mock_temperature_sensor import (
@@ -30,8 +31,8 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
         num_channels = 4
         ess_sensor = MockTemperatureSensor("MockSensor", num_channels)
         ess_sensor.terminator = "\r\n"
-        # Set the TAI time in the mock controller for easier control
-        err, resp = ess_sensor.readline()
+        loop = asyncio.get_event_loop()
+        err, resp = await loop.run_in_executor(None, ess_sensor.readline)
         resp = resp.strip(ess_sensor.terminator)
         data = resp.split(",")
         for i in range(0, num_channels):
@@ -44,8 +45,8 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
         count_offset = 1
         ess_sensor = MockTemperatureSensor("MockSensor", num_channels, count_offset)
         ess_sensor.terminator = "\r\n"
-        # Set the TAI time in the mock controller for easier control
-        err, resp = ess_sensor.readline()
+        loop = asyncio.get_event_loop()
+        err, resp = await loop.run_in_executor(None, ess_sensor.readline)
         resp = resp.strip(ess_sensor.terminator)
         data = resp.split(",")
         for i in range(0, num_channels):
@@ -61,8 +62,8 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
             "MockSensor", num_channels, count_offset, nan_channel
         )
         ess_sensor.terminator = "\r\n"
-        # Set the TAI time in the mock controller for easier control
-        err, resp = ess_sensor.readline()
+        loop = asyncio.get_event_loop()
+        err, resp = await loop.run_in_executor(None, ess_sensor.readline)
         resp = resp.strip(ess_sensor.terminator)
         data = resp.split(",")
         for i in range(0, num_channels):

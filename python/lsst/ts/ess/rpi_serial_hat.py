@@ -29,9 +29,6 @@ import time
 from threading import RLock
 
 
-logger = logging.getLogger(__name__)
-
-
 class RpiSerialHat:
     r"""LSST Serial port using RPi4 serial hat.
 
@@ -106,11 +103,11 @@ class RpiSerialHat:
         SERIAL_CH_5: u6_ser2_config,
     }
 
-    def __init__(
-        self,
-        name: str,
-        port_id: str,
-    ):
+    def __init__(self, name: str, port_id: str, log=None):
+        if log is None:
+            self.log = logging.getLogger(type(self).__name__)
+        else:
+            self.log = log.getChild(type(self).__name__)
         if name not in RpiSerialHat._instances:
             if port_id not in RpiSerialHat._used_ports:
                 self.name: str = name
@@ -132,7 +129,7 @@ class RpiSerialHat:
                         self._ser.port = self._ser_port
                         print("Port:", self._ser.port)
                     except serial.SerialException as e:
-                        self._message(e)
+                        self.log.exception(e)
                         # Unrecoverable error, so propagate error
                         raise e
                     else:
@@ -150,12 +147,12 @@ class RpiSerialHat:
 
                         RpiSerialHat._instances[name] = self
                         RpiSerialHat._used_ports[port_id] = self
-                        logger.debug(
+                        self.log.debug(
                             "RpiSerialHat:{}: First instantiation "
                             'using serial channel id: "{}".'.format(name, port_id)
                         )
                 else:
-                    logger.debug(
+                    self.log.debug(
                         "RpiSerialHat:{}: Error: "
                         'A serial channel named "{}" does not exist.'.format(
                             name, port_id
@@ -168,7 +165,7 @@ class RpiSerialHat:
                         )
                     )
             else:
-                logger.debug(
+                self.log.debug(
                     "RpiSerialHat:{}: Error: "
                     'Attempted multiple use of serial channel "{}".'.format(
                         name, port_id
@@ -181,7 +178,7 @@ class RpiSerialHat:
                     )
                 )
         else:
-            logger.debug(
+            self.log.debug(
                 "RpiSerialHat: Error: "
                 'Attempted multiple instantiation of "{}".'.format(name)
             )
@@ -251,9 +248,9 @@ class RpiSerialHat:
 
     def _message(self, text: Any) -> None:
         # Print a message prefaced with the object info ('Any').
-        logger.debug("RpiSerialHat:{}: {}".format(self.name, text))
+        self.log.debug("RpiSerialHat:{}: {}".format(self.name, text))
 
-    def _rpi_pin_cleanup(self, rpi_pin) -> None:
+    async def _rpi_pin_cleanup(self, rpi_pin) -> None:
         # Clear RPi pin.
         # Ignored if pin number is None.
         if rpi_pin is not None:
@@ -262,7 +259,7 @@ class RpiSerialHat:
             except RuntimeError:
                 self._message("GPIO pin cleanup error.")
 
-    def _rpi_pin_setup(self, rpi_pin: int, pin_type) -> None:
+    async def _rpi_pin_setup(self, rpi_pin: int, pin_type) -> None:
         # Setup RPi pin.
         # True = Input, False = Output.
         # ignored if pin number is None.
@@ -272,7 +269,7 @@ class RpiSerialHat:
             except RuntimeError:
                 self._message("Error setting up GPIO pin.")
 
-    def _rpi_pin_state(self, rpi_pin: int, state: bool) -> None:
+    async def _rpi_pin_state(self, rpi_pin: int, state: bool) -> None:
         # Output transceiver pin state.
         # high = True, low = False.
         # ignored if pin number is None.
@@ -284,7 +281,7 @@ class RpiSerialHat:
                     "Error writing to GPIO output. GPIO channel has not been setup."
                 )
 
-    def open(self) -> None:
+    async def open(self) -> None:
         """Open and configure serial port.
         Opens the serial communications port, sets BAUD and read timeout.
 
@@ -303,7 +300,7 @@ class RpiSerialHat:
             else:
                 if not self._ser.is_open:
                     try:
-                        self._ser.open()
+                        await self._ser.open()
                         self._message("Serial port opened.")
                     except serial.SerialException as e:
                         self._message("Serial port open failed.")
@@ -311,7 +308,7 @@ class RpiSerialHat:
                 else:
                     self._message("Port already open!")
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """Close serial communications port.
 
         Raises
@@ -326,7 +323,7 @@ class RpiSerialHat:
                 raise RuntimeWarning(f"{self.name}: Could not close the serial port!")
             else:
                 if self._ser.is_open:
-                    self._ser.close()
+                    await self._ser.close()
                     self._message("Serial port closed.")
                 else:
                     self._message("Serial port already closed.")
@@ -363,10 +360,9 @@ class RpiSerialHat:
 
         resp: str = ""
         err: str = "OK"
-        self._rpi_pin_state(self._pin_dirn, RpiSerialHat.STATE_DIRN_RX)
+        await self._rpi_pin_state(self._pin_dirn, RpiSerialHat.STATE_DIRN_RX)
         with self._lock:
-            expiry_time = time.perf_counter() + self._ser.timeout
-            while time.perf_counter() < expiry_time:
+            while not resp.endswith("\r\n"):
                 try:
                     resp += str(self._ser.read(1), "ASCII")
                 except UnicodeError as e:
@@ -383,5 +379,3 @@ class RpiSerialHat:
                         return err, resp
                     elif 0 < self._line_size <= len(resp):
                         return err, resp
-            err = "Timed out with incomplete response."
-            return err, resp

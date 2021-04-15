@@ -39,6 +39,8 @@ class EssCsc(salobj.ConfigurableCsc):
 
     Parameters
     ----------
+    index: `int`
+        The index of the CSC
     config_dir : `string`
         The configuration directory
     initial_state : `salobj.State`
@@ -52,6 +54,7 @@ class EssCsc(salobj.ConfigurableCsc):
 
     def __init__(
         self,
+        index,
         config_dir=None,
         initial_state=salobj.State.STANDBY,
         simulation_mode=0,
@@ -60,7 +63,7 @@ class EssCsc(salobj.ConfigurableCsc):
         self._config_dir = config_dir
         super().__init__(
             name="ESS",
-            index=0,
+            index=index,
             config_schema=CONFIG_SCHEMA,
             config_dir=config_dir,
             initial_state=initial_state,
@@ -70,15 +73,13 @@ class EssCsc(salobj.ConfigurableCsc):
         self.device = None
         self.ess_instrument = None
 
-        # Unit tests should set this to True to avoid an infinite loop.
-        self.stop_telemetry_after_first_data = False
         # Unit tests may set this to an integer value to simulate a
         # disconnected or missing sensor.
         self.nan_channel = None
 
         self.log.info("ESS CSC created.")
 
-    def get_telemetry(self, output):
+    async def get_telemetry(self, output):
         """Get the timestamp and temperatures from the data.
 
         Parameters
@@ -103,11 +104,6 @@ class EssCsc(salobj.ConfigurableCsc):
                     self, f"tel_temperature{self.config.channels}Ch"
                 )
                 telemetry_method.set_put(**data)
-
-            # Unit tests should set this to True but otherwise this should be
-            # set to False.
-            if self.stop_telemetry_after_first_data:
-                self.ess_instrument._enabled = False
         except Exception:
             self.log.exception("Method get_temperature() failed")
 
@@ -126,35 +122,71 @@ class EssCsc(salobj.ConfigurableCsc):
         self.log.info("Connecting to the sensor.")
         self._get_device()
         sel_temperature = SelTemperature(
-            self.config.name, self.device, self.config.channels
+            self.config.name, self.device, self.config.channels, self.log
         )
         self.ess_instrument = EssInstrument(
-            self.config.name, sel_temperature, self.get_telemetry
+            self.config.name, sel_temperature, self.get_telemetry, self.log
         )
-        self.ess_instrument.start()
         self.log.info("Connection to the sensor established.")
 
+    async def begin_enable(self, id_data):
+        """Begin do_enable; called before state changes.
+
+        This method sends a CMD_INPROGRESS signal.
+
+        Parameters
+        ----------
+        id_data : `CommandIdData`
+            Command ID and data
+
+        """
+        await super().begin_enable(id_data)
+        self.cmd_enable.ack_in_progress(id_data, timeout=60)
+
+    async def end_enable(self, id_data):
+        """End do_enable; called after state changes but before command
+        acknowledged.
+
+        This method connects to the ESS Instrument and starts it.
+
+        Parameters
+        ----------
+        id_data : `CommandIdData`
+            Command ID and data
+        """
+        if not self.connected:
+            await self.connect()
+
         self.log.info("Start periodic polling of the sensor data.")
+        await self.ess_instrument.start()
+        await super().end_enable(id_data)
+
+    async def begin_disable(self, id_data):
+        """Begin do_disable; called before state changes.
+
+        This method will try to gracefully stop the ESS Instrument and then
+        disconnect from it.
+
+        Parameters
+        ----------
+        id_data : `CommandIdData`
+            Command ID and data
+        """
+        self.cmd_disable.ack_in_progress(id_data, timeout=60)
+        try:
+            await self.ess_instrument.stop()
+        except Exception:
+            self.log.exception("Error in begin_disable. Continuing...")
+
+        await self.disconnect()
+        await super().begin_disable(id_data)
 
     async def disconnect(self):
         """Disconnect from the ESS sensor, if connected, and stop the mock
         sensor, if running.
         """
         self.log.info("Disconnecting")
-        if self.ess_instrument:
-            self.ess_instrument.stop()
         self.ess_instrument = None
-
-    async def handle_summary_state(self):
-        """Override of the handle_summary_state function to connect or
-        disconnect to the ESS sensor (or the mock_controller) when needed.
-        """
-        self.log.info(f"handle_summary_state {self.summary_state.name}")
-        if self.disabled_or_enabled:
-            if not self.connected:
-                await self.connect()
-        else:
-            await self.disconnect()
 
     async def configure(self, config):
         self.config = config
@@ -192,13 +224,13 @@ class EssCsc(salobj.ConfigurableCsc):
         elif self.config.type == "FTDI":
             from .vcp_ftdi import VcpFtdi
 
-            self.device = VcpFtdi(self.config.name, self.config.ftdi_id)
+            self.device = VcpFtdi(self.config.name, self.config.ftdi_id, self.log)
         elif self.config.type == "Serial":
             # make sure we are on a Raspberry Pi4
             if "aarch64" in platform.platform():
                 from .rpi_serial_hat import RpiSerialHat
 
-                self.device = RpiSerialHat(self.config.name, self.config.port)
+                self.device = RpiSerialHat(self.config.name, self.config.port, self.log)
 
         if self.device is None:
             raise RuntimeError(

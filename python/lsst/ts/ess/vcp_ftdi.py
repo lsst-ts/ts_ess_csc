@@ -26,15 +26,14 @@ a connected serial device.
 
 __all__ = "VcpFtdi"
 
-from typing import Any, Dict
+import asyncio
 import logging
 import time
+from typing import Any, Dict
 from threading import RLock
 
 import pylibftdi
 from pylibftdi import Device
-
-logger = logging.getLogger(__name__)
 
 
 class VcpFtdi:
@@ -50,7 +49,7 @@ class VcpFtdi:
         Serial BAUD rate. Defaults to 9600.
     read_timeout : 'float', optional
         Timeout for serial reads in seconds.
-        Default is 1.5 seconds.
+        Default is 1.0 seconds.
     terminator : 'str', optional
         Terminator string for serial data lines.
         Default is '\r\n'.
@@ -67,11 +66,11 @@ class VcpFtdi:
     _instances: Dict[str, "VcpFtdi"] = {}
     _devices: Dict[str, "VcpFtdi"] = {}
 
-    def __init__(
-        self,
-        name: str,
-        device_id: str,
-    ):
+    def __init__(self, name: str, device_id: str, log=None):
+        if log is None:
+            self.log = logging.getLogger(type(self).__name__)
+        else:
+            self.log = log.getChild(type(self).__name__)
         if name not in VcpFtdi._instances:
             if device_id not in VcpFtdi._devices:
                 self.name: str = name
@@ -89,12 +88,12 @@ class VcpFtdi:
                 )
                 VcpFtdi._instances[name] = self
                 VcpFtdi._devices[device_id] = self
-                logger.debug(
+                self.log.debug(
                     "VcpFtdi:{}: First instantiation "
                     'using device SN "{}".'.format(name, device_id)
                 )
             else:
-                logger.debug(
+                self.log.debug(
                     "VcpFtdi:{}: Error: "
                     'Attempted multiple use of FTDI device "{}".'.format(
                         name, device_id
@@ -107,7 +106,7 @@ class VcpFtdi:
                     )
                 )
         else:
-            logger.debug(
+            self.log.debug(
                 "VcpFtdi: Error: "
                 'Attempted multiple instantiation of "{}".'.format(name)
             )
@@ -170,9 +169,9 @@ class VcpFtdi:
 
     def _message(self, text: Any) -> None:
         # Print a message prefaced with the VCP_FTDI object info ('Any').
-        logger.debug(f"VcpFtdi:{self.name}: {text}")
+        self.log.debug(f"VcpFtdi:{self.name}: {text}")
 
-    def open(self) -> None:
+    async def open(self) -> None:
         """Open VCP.
 
         Opens the virtual communications port, sets BAUD and flushes the device
@@ -191,7 +190,7 @@ class VcpFtdi:
                 self._message("Failed to open VCP.")
                 raise IOError(f"VcpFtdi:{self.name}: Failed to open VCP.")
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """Close VCP.
 
         Raises
@@ -237,9 +236,8 @@ class VcpFtdi:
         """
         err = "OK"
         resp: str = ""
-        expiry_time = time.perf_counter() + self._read_timeout
         with self._lock:
-            while time.perf_counter() < expiry_time:
+            while not resp.endswith("\r\n"):
                 try:
                     resp += self._vcp.read(1)
                 except pylibftdi.FtdiError as e:
@@ -252,5 +250,3 @@ class VcpFtdi:
                     return err, resp
                 elif 0 < self._line_size <= len(resp):
                     return err, resp
-            err = "Timed out with incomplete response."
-            return err, resp

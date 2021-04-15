@@ -32,7 +32,7 @@ logging.basicConfig(
 
 async def main():
     domain = salobj.Domain()
-    thermal = salobj.Remote(domain=domain, name="ESS")
+    thermal = salobj.Remote(domain=domain, name="ESS", index=1)
     logging.info(dir(thermal))
 
     logging.info("Calling start_task")
@@ -41,7 +41,7 @@ async def main():
 
     logging.info("Calling cmd_start.set_start")
     await thermal.cmd_start.set_start(timeout=20)
-    logging.info("Calling set_summary_state")
+    logging.info("Calling set_summary_state ENABLED")
     await salobj.set_summary_state(remote=thermal, state=salobj.State.ENABLED)
 
     data = await thermal.tel_temperature4Ch.next(flush=True)
@@ -49,20 +49,14 @@ async def main():
         f"temp: {data.temperatureC01} {data.temperatureC02} {data.temperatureC03} "
         f"{data.temperatureC04}"
     )
-    logging.info("Calling set_summary_state")
+    logging.info("Calling set_summary_state DISABLED")
     await salobj.set_summary_state(remote=thermal, state=salobj.State.DISABLED)
-    logging.info("Calling set_summary_state")
+    logging.info("Calling set_summary_state STANDBY")
     await salobj.set_summary_state(remote=thermal, state=salobj.State.STANDBY)
-    logging.info("Calling set_summary_state")
+    logging.info("Calling set_summary_state OFFLINE")
     await salobj.set_summary_state(remote=thermal, state=salobj.State.OFFLINE)
 
 
 if __name__ == "__main__":
     logging.info("main")
-    loop = asyncio.get_event_loop()
-    try:
-        logging.info("Calling main method")
-        loop.run_until_complete(main())
-    except Exception:
-        logging.exception("Exception!")
-        pass
+    asyncio.run(main())

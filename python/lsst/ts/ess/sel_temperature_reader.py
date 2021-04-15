@@ -42,9 +42,11 @@ where:
 
 __all__ = ["SelTemperature", "DELIMITER"]
 
-from typing import Any, Dict
+import asyncio
 import logging
 import time
+from typing import Any, Dict
+
 from .serial_reader import SerialReader
 
 # Instrument serial parameters ....
@@ -82,8 +84,6 @@ DEFAULT_VAL: float = "NaN"
 """Default value for unread or errored temperature channels.
 """
 
-logger = logging.getLogger(__name__)
-
 
 class SelTemperature(SerialReader):
     """SEL temperature instrument protocol converter object.
@@ -103,8 +103,12 @@ class SelTemperature(SerialReader):
     IndexError if attempted multiple use of serial device instance.
     """
 
-    def __init__(self, name: str, uart_device, channels: int):
-        super().__init__(name, uart_device, channels)
+    def __init__(self, name: str, uart_device, channels: int, log=None):
+        super().__init__(name, uart_device, channels, log)
+        if log is None:
+            self.log = logging.getLogger(type(self).__name__)
+        else:
+            self.log = log.getChild(type(self).__name__)
         self._instances: Dict[str, "SelTemperature"] = {}
         self._devices: Dict[str, "SelTemperature"] = {}
 
@@ -132,20 +136,14 @@ class SelTemperature(SerialReader):
                     + (len(TERMINATOR))
                 )
 
-                self.comport.open()
-                self.comport.line_size = self._read_line_size
-                self.comport.terminator = TERMINATOR
-                self.comport.baudrate = BAUDRATE
-                self.comport.read_timeout = READ_TIMEOUT
-
                 self._instances[name] = self
                 self._devices[uart_device] = self
-                logger.debug(
+                self.log.debug(
                     f"SelTemperature:{name}: First instantiation "
                     f"using serial device {uart_device.name!r}."
                 )
             else:
-                logger.debug(
+                self.log.debug(
                     f"SelTemperature:{name}: Error: "
                     f"Attempted multiple use of serial device instance {uart_device!r}."
                 )
@@ -154,7 +152,7 @@ class SelTemperature(SerialReader):
                     f"Attempted multiple use of serial device instance {uart_device!r}."
                 )
         else:
-            logger.debug(
+            self.log.debug(
                 "SelTemperature: Error: "
                 f"Attempted multiple instantiation of {name!r}."
             )
@@ -163,9 +161,21 @@ class SelTemperature(SerialReader):
                 f"Attempted multiple instantiation of {name!r}."
             )
 
-    def _message(self, text: Any) -> None:
+    async def start(self):
+        """Open the comport and set the connection parameters."""
+        await self.comport.open()
+        self.comport.line_size = self._read_line_size
+        self.comport.terminator = TERMINATOR
+        self.comport.baudrate = BAUDRATE
+        self.comport.read_timeout = READ_TIMEOUT
+
+    async def stop(self):
+        """Close the comport."""
+        await self.comport.close()
+
+    async def _message(self, text: Any) -> None:
         # Print a message prefaced with the SEL_TEMPERATURE object info.
-        logger.debug(f"SelTemperature:{self.name}: {text}")
+        self.log.debug(f"SelTemperature:{self.name}: {text}")
 
     def _test_val(self, preamble, sensor_str):
         """Test temperature channel data string.
@@ -191,11 +201,11 @@ class SelTemperature(SerialReader):
                 )
                 return True
             except ValueError as e:
-                logger.exception(e)
+                self.log.exception(e)
                 return False
                 pass
 
-    def read(self) -> []:
+    async def read(self) -> []:
         """Read temperature instrument.
 
         Read SEL instrument, test data and populate temperature channel data.
@@ -217,7 +227,13 @@ class SelTemperature(SerialReader):
         err: str = ""
         ser_line: str = ""
         line: str = ""
-        err, ser_line = self.comport.readline()
+        await self._message("Reading line from comport.")
+
+        # Set up loop variable for async calls
+        loop = asyncio.get_event_loop()
+
+        err, ser_line = await loop.run_in_executor(None, self.comport.readline)
+        await self._message("Done.")
         if err == "OK":
             if (
                 ser_line[-len(TERMINATOR) :] == TERMINATOR
@@ -233,7 +249,7 @@ class SelTemperature(SerialReader):
                             self._tmp_temperature[i] = float(temps[i][PREAMBLE_SIZE:])
                         except ValueError:
                             err = f"Temperature data error. Could not convert value(s) to float: {ser_line}"
-                            self._message(
+                            await self._message(
                                 f"Failed to convert temperature channel value to float: {ser_line}"
                             )
                     else:
