@@ -30,7 +30,6 @@ from lsst.ts.ess.mock.mock_temperature_sensor import (
 
 class EssInstrumentObjectTestCase(unittest.IsolatedAsyncioTestCase):
     async def _callback(self, data):
-        print(data)
         self.assertEqual(self.num_channels + 2, len(data))
         for i in range(0, self.num_channels):
             data_item = data[i + 2]

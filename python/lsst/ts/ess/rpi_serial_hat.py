@@ -23,10 +23,9 @@ __all__ = ["RpiSerialHat"]
 
 from typing import Any, Dict
 import logging
+import time
 import RPi.GPIO as gpio
 import serial
-import time
-from threading import RLock
 
 
 class RpiSerialHat:
@@ -112,10 +111,9 @@ class RpiSerialHat:
             if port_id not in RpiSerialHat._used_ports:
                 self.name: str = name
                 self._port_id: str = port_id
-                self._lock: RLock = RLock()
                 self._terminator: str = "\r\n"
                 self._line_size: int = 0
-                self._serial_timeout: float = 1
+                self._read_timeout: float = 1
                 if self._port_id in RpiSerialHat.serial_ports:
                     (
                         self._ser_port,
@@ -127,7 +125,6 @@ class RpiSerialHat:
                     try:
                         self._ser = serial.Serial()
                         self._ser.port = self._ser_port
-                        print("Port:", self._ser.port)
                     except serial.SerialException as e:
                         self.log.exception(e)
                         # Unrecoverable error, so propagate error
@@ -223,34 +220,36 @@ class RpiSerialHat:
 
     @property
     def read_timeout(self) -> float:
-        """Read timeout of serial data line in seconds ('float')."""
-        read_timeout: float = self._ser.timeout
-        self._message("Serial port read timeout read: {} seconds.".format(read_timeout))
-        return read_timeout
+        """Read timeout for serial data line in seconds ('float')."""
+        self._message("Serial port read timeout read: {} seconds.".format(self._read_timeout))
+        return self._read_timeout
 
     @read_timeout.setter
     def read_timeout(self, timeout: float) -> None:
+        self._read_timeout = timeout
         self._ser.timeout = timeout
-        self._message("Serial port read timeout set: {} seconds.".format(timeout))
+        self._message("Serial data read timeout set: {} seconds.".format(timeout))
 
     @property
     def terminator(self) -> str:
         """Serial data line terminator string ('str')."""
         self._message(
-            "Serial data line terminator string read: {}.".format(self._read_timeout)
+            "Serial data line terminator string read: {}.".format(self._terminator)
         )
         return self._terminator
 
     @terminator.setter
     def terminator(self, terminator: str) -> None:
         self._terminator = terminator
-        self._message("Serial data line terminator string set.")
+        self._message(
+            "Serial data line terminator string set: {}.".format(self._terminator)
+        )
 
     def _message(self, text: Any) -> None:
         # Print a message prefaced with the object info ('Any').
         self.log.debug("RpiSerialHat:{}: {}".format(self.name, text))
 
-    async def _rpi_pin_cleanup(self, rpi_pin) -> None:
+    def _rpi_pin_cleanup(self, rpi_pin) -> None:
         # Clear RPi pin.
         # Ignored if pin number is None.
         if rpi_pin is not None:
@@ -259,7 +258,7 @@ class RpiSerialHat:
             except RuntimeError:
                 self._message("GPIO pin cleanup error.")
 
-    async def _rpi_pin_setup(self, rpi_pin: int, pin_type) -> None:
+    def _rpi_pin_setup(self, rpi_pin: int, pin_type) -> None:
         # Setup RPi pin.
         # True = Input, False = Output.
         # ignored if pin number is None.
@@ -269,7 +268,7 @@ class RpiSerialHat:
             except RuntimeError:
                 self._message("Error setting up GPIO pin.")
 
-    async def _rpi_pin_state(self, rpi_pin: int, state: bool) -> None:
+    def _rpi_pin_state(self, rpi_pin: int, state: bool) -> None:
         # Output transceiver pin state.
         # high = True, low = False.
         # ignored if pin number is None.
@@ -289,24 +288,25 @@ class RpiSerialHat:
         ------
         IOError if serial communications port fails to open.
         """
-        with self._lock:
-            try:
-                self._ser
-            except NameError:
-                self._message("Cannot open. Serial port does not exist.")
-                raise RuntimeWarning(
-                    f"{self.name}: Could not open. Serial port does not exist."
-                )
+        #with self._lock:
+        try:
+            self._ser
+        except NameError:
+            self._message("Cannot open. Serial port does not exist.")
+            raise RuntimeWarning(
+                f"{self.name}: Could not open. Serial port does not exist."
+            )
+        else:
+            if not self._ser.is_open:
+                try:
+                    self._ser.open()
+                    self._rpi_pin_state(self._pin_dirn, RpiSerialHat.STATE_DIRN_RX)
+                    self._message("Serial port opened.")
+                except serial.SerialException as e:
+                    self._message("Serial port open failed.")
+                    raise e
             else:
-                if not self._ser.is_open:
-                    try:
-                        await self._ser.open()
-                        self._message("Serial port opened.")
-                    except serial.SerialException as e:
-                        self._message("Serial port open failed.")
-                        raise e
-                else:
-                    self._message("Port already open!")
+                self._message("Port already open!")
 
     async def close(self) -> None:
         """Close serial communications port.
@@ -315,18 +315,18 @@ class RpiSerialHat:
         ------
         IOError if serial communications port fails to close.
         """
-        with self._lock:
-            try:
-                self._ser
-            except NameError:
-                self._message("Cannot close. Serial port does not exist.")
-                raise RuntimeWarning(f"{self.name}: Could not close the serial port!")
+        #with self._lock:
+        try:
+            self._ser
+        except NameError:
+            self._message("Cannot close. Serial port does not exist.")
+            raise RuntimeWarning(f"{self.name}: Could not close the serial port!")
+        else:
+            if self._ser.is_open:
+                self._ser.close()
+                self._message("Serial port closed.")
             else:
-                if self._ser.is_open:
-                    await self._ser.close()
-                    self._message("Serial port closed.")
-                else:
-                    self._message("Serial port already closed.")
+                self._message("Serial port already closed.")
 
     def readline(self) -> str:
         r"""Read a line of ASCII string data from the serial port.
@@ -360,22 +360,23 @@ class RpiSerialHat:
 
         resp: str = ""
         err: str = "OK"
-        await self._rpi_pin_state(self._pin_dirn, RpiSerialHat.STATE_DIRN_RX)
-        with self._lock:
-            while not resp.endswith("\r\n"):
-                try:
-                    resp += str(self._ser.read(1), "ASCII")
-                except UnicodeError as e:
-                    err = "Received non-ASCII data in response."
-                    raise e
-                except serial.SerialException as e:
-                    err = "Serial exception. Serial port might be closed."
-                    raise e
-                finally:
-                    if (
-                        len(self._terminator) > 0
-                        and resp[-len(self._terminator) :] == self._terminator
-                    ):
-                        return err, resp
-                    elif 0 < self._line_size <= len(resp):
-                        return err, resp
+        expiry_time = time.perf_counter() + self._read_timeout
+        while time.perf_counter() < expiry_time:
+            try:
+                resp += str(self._ser.read(1))
+            except UnicodeError as e:
+                err = "Received non-ASCII data in response."
+                raise e
+            except serial.SerialException as e:
+                err = "Serial exception. Serial port might be closed."
+                raise e
+            finally:
+                if (
+                    len(self._terminator) > 0
+                    and resp.endswith(self._terminator)
+                ):
+                    return err, resp
+                elif 0 < self._line_size <= len(resp):
+                    return err, resp
+        err = "Timed out with incomplete response."
+        return err, resp

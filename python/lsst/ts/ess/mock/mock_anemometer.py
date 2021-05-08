@@ -16,39 +16,40 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-__all__ = ["MockTemperatureSensor", "MIN_TEMP", "MAX_TEMP"]
+__all__ = ["MockAnemometer", "MIN_DIRN", "MAX_DIRN", "MIN_SPEED", "MAX_SPEED", "LOW_WIND_SPEED"]
 
 import asyncio
 import logging
 import random
 import time
 
-import numpy as np
 
-from lsst.ts.ess.sel_temperature_reader import DELIMITER
+MIN_DIRN = 0
+MAX_DIRN = 359
+MIN_SPEED = 0.0
+MAX_SPEED = 60.0
+LOW_WIND_SPEED = 0.05
 
-MIN_TEMP = 18.0
-MAX_TEMP = 30.0
-CH_ACQ_TIME = 0.167
-"""Channel sample/output period for each channel in seconds. 
-"""
+TIMEOUT = 1
 
-class MockTemperatureSensor:
-    """Mock Temperature Sensor."""
+
+class MockAnemometer:
+    """Mock Windsonic Anemometer.
+
+    GILL Windsonic Option 1.
+    Default format. Polar, Continuous.
+    """
 
     def __init__(
-        self, name: str, channels: int, count_offset=0, nan_channel=None, log=None
+        self, name: str, no_wind: bool, log=None
     ):
         self.name = name
-        self.channels = channels
-        self.count_offset = count_offset
-        self.nan_channel = nan_channel
 
         # Device parameters
         self.line_size = None
-        self.terminator = None
         self.baudrate = None
         self.read_timeout = None
+        self.no_wind = no_wind
 
         if log is None:
             self.log = logging.getLogger(type(self).__name__)
@@ -63,22 +64,24 @@ class MockTemperatureSensor:
     async def close(self) -> None:
         pass
 
-    def format_temperature(self, i):
-        temp = random.uniform(MIN_TEMP, MAX_TEMP)
-        s = f"C{i + self.count_offset:02d}={temp:09.4f}"
-        if i == self.nan_channel:
-            s = f"C{i + self.count_offset:02d}=9999.9990"
-        if i == self.channels - 1:
-            s += self.terminator
+    def format_anemometer(self):
+        if self.no_wind:
+            temp_speed: float = random.uniform(MIN_SPEED, LOW_WIND_SPEED - 0.001)
+            s = f"Q,,{temp_speed:06.2f},M,00,"
         else:
-            s += DELIMITER
-        return s
+            temp_speed: float = random.uniform(MIN_SPEED + LOW_WIND_SPEED, MAX_SPEED)
+            temp_dirn: int = random.uniform(MIN_DIRN, MAX_DIRN)
+            s = f"Q,{temp_dirn:03.0f},{temp_speed:06.2f},M,00,"
+        checksum = 0
+        for i in s:
+            checksum ^= ord(i)
+        c = '%0.2X' % checksum
+        output = f"\x02{s}\x03{c}\r\n"
+        return output
 
     def readline(self):
         self.log.info("read")
         err: str = "OK"
         resp = ""
-        for i in range(0, self.channels):
-            time.sleep(CH_ACQ_TIME)
-            resp += self.format_temperature(i)
+        resp += self.format_anemometer()
         return err, resp

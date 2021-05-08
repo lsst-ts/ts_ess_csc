@@ -20,17 +20,23 @@
 
 Read and perform protocol conversion for Straight Engineering Limited (SEL)
 temperature measurement instrument.
-SEL temperature instruments output serial data in lines terminated by '\r\n'.
+SEL temperature instruments output serial data in ASCII lines terminated by '\r\n'.
 There are multiple SEL temperature instruments with different numbers of
 channels. The number of channels must be specified at instantiation.
+The serial data is output by the SEL instrument one channel at a time with
+a gap of 0.167 seconds between each channel. The final channel is appended
+with '\r\n' to terminate the line.
 The format of a 4-channel instruments output line is:
 
-    'C00=snnn.nnnn,C01=snnn.nnnn,C02=snnn.nnnn,C03=snnn.nnnn\r\n'
+    'C01=snnn.nnnn,C02=snnn.nnnn,C03=snnn.nnnn,C04=snnn.nnnn\r\n'
 
 where:
 
-    'C00='      4-character preamble with Celcius ('C') and
+    'C01='      4-character preamble with Celcius ('C') and
                 two digit channel number.
+                Channel number usually starts with '01', but might start at '00'
+                if reference channel is included for diagnosis. Therefore, the instrument
+                may appear to have an extra channel.
 
     'snnn.nnnn' 9-character decimal value with negative sign or positive value
                 (s = '-' or '0..9') and decimal point in the fifth position.
@@ -54,13 +60,13 @@ BAUDRATE: int = 19200
 """BAUD for SEL temperature instrument communications ('int').
 """
 
-READ_TIMEOUT: float = 1.5
-"""Serial read timeout for SEL temperature instrument communications ('float').
-
-The read timeout is set to allow a guaranteed timeout for the recurring
-instrument channel serial reads. The number of channels varies between
-SEL instruments (4, 5, 8 etc.). The default read timeout is chosen to
-comfortably allow for up to eight channels at 19200 BAUD.
+CH_READ_TIME: float = 0.167
+"""Channel read time.
+ 
+The channel read time is set to approximate the acquisition/output time 
+period that separates serial channel data from the SEL instrument.
+This may be used to reasonably predict timeout values for instruments
+with any number of channels.
 """
 
 # SEL Temperature Instrument serial data string ....
@@ -80,8 +86,12 @@ TERMINATOR: str = "\r\n"
 """Serial data line terminator.
 """
 
-DEFAULT_VAL: float = "NaN"
-"""Default value for unread or errored temperature channels.
+DEFAULT_VAL: float = "9999.9990"
+"""Default value for unconnected, unread or errored temperature channels.
+"""
+
+SENSOR_UNCONNECTED_VAL: str = "-201.0000"
+"""Channel value output by SEL instrument for unconnected temperature sensor.
 """
 
 
@@ -104,7 +114,7 @@ class SelTemperature(SerialReader):
     """
 
     def __init__(self, name: str, uart_device, channels: int, log=None):
-        super().__init__(name, uart_device, channels, log)
+        super().__init__(name, uart_device, log)
         if log is None:
             self.log = logging.getLogger(type(self).__name__)
         else:
@@ -167,7 +177,7 @@ class SelTemperature(SerialReader):
         self.comport.line_size = self._read_line_size
         self.comport.terminator = TERMINATOR
         self.comport.baudrate = BAUDRATE
-        self.comport.read_timeout = READ_TIMEOUT
+        self.comport.read_timeout = ((self._channels + 1) * CH_READ_TIME)
 
     async def stop(self):
         """Close the comport."""
@@ -216,8 +226,8 @@ class SelTemperature(SerialReader):
         value ('Nan').
         If sensor data (preamble and value) does not meet the instrument
         protocol, the read is invalidated.
-        If protocol error is found, temperature data is populated with default
-        value ('Nan').
+        If protocol error is found, temperature data is populated with default,
+        over-range values.
         The timestamp is updated following conversion of the read line.
         The line error flag is updated with True if any error found and False
         if no error.
@@ -245,13 +255,14 @@ class SelTemperature(SerialReader):
                     if self._test_val(
                         self._preamble_str[i], temps[i]
                     ) or self._test_val(self._old_preamble_str[i], temps[i]):
-                        try:
-                            self._tmp_temperature[i] = float(temps[i][PREAMBLE_SIZE:])
-                        except ValueError:
-                            err = f"Temperature data error. Could not convert value(s) to float: {ser_line}"
-                            await self._message(
-                                f"Failed to convert temperature channel value to float: {ser_line}"
-                            )
+                        if temps[i][PREAMBLE_SIZE:] != SENSOR_UNCONNECTED_VAL:
+                            try:
+                                self._tmp_temperature[i] = float(temps[i][PREAMBLE_SIZE:])
+                            except ValueError:
+                                err = f"Temperature data error. Could not convert value(s) to float: {ser_line}"
+                                await self._message(
+                                    f"Failed to convert temperature channel value to float: {ser_line}"
+                                )
                     else:
                         err = f"Malformed response. Channel preamble or channel data incorrect: {ser_line}"
                     self.temperature[i] = self._tmp_temperature[i]

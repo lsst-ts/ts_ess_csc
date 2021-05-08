@@ -34,7 +34,7 @@ class SerialReader(ABC):
     """
 
     @abstractmethod
-    def __init__(self, name: str, serial_ch_id: str, channels: int, log):
+    def __init__(self, name: str, uart_device, log):
         """Initialize the ESS instrument.
 
         Implementations should add any connection parameters here.
@@ -45,7 +45,7 @@ class SerialReader(ABC):
     async def start(self):
         """Start the ESS instrument.
 
-        Implemetations must Start ESS instrument.
+        Implementations must Start ESS instrument.
         """
         pass
 

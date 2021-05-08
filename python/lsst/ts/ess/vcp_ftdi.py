@@ -30,7 +30,6 @@ import asyncio
 import logging
 import time
 from typing import Any, Dict
-from threading import RLock
 
 import pylibftdi
 from pylibftdi import Device
@@ -74,7 +73,6 @@ class VcpFtdi:
         if name not in VcpFtdi._instances:
             if device_id not in VcpFtdi._devices:
                 self.name: str = name
-                self._lock: RLock = RLock()
                 self._device_id: str = device_id
                 self._read_timeout = 1.0
                 self._terminator: str = "\r\n"
@@ -174,21 +172,20 @@ class VcpFtdi:
     async def open(self) -> None:
         """Open VCP.
 
-        Opens the virtual communications port, sets BAUD and flushes the device
+        Opens the virtual communications port and flushes the device
         input and output buffers.
 
         Raises
         ------
         IOError if virtual communications port fails to open.
         """
-        with self._lock:
-            self._vcp.open()
-            if not self._vcp.closed:
-                self._message("VCP open.")
-                self._vcp.flush()
-            else:
-                self._message("Failed to open VCP.")
-                raise IOError(f"VcpFtdi:{self.name}: Failed to open VCP.")
+        self._vcp.open()
+        if not self._vcp.closed:
+            self._message("VCP open.")
+            self._vcp.flush()
+        else:
+            self._message("Failed to open VCP.")
+            raise IOError(f"VcpFtdi:{self.name}: Failed to open VCP.")
 
     async def close(self) -> None:
         """Close VCP.
@@ -197,13 +194,12 @@ class VcpFtdi:
         ------
         IOError if virtual communications port fails to close.
         """
-        with self._lock:
-            self._vcp.close()
-            if self._vcp.closed:
-                self._message("VCP closed.")
-            else:
-                self._message("VCP failed to close.")
-                raise IOError(f"VcpFtdi:{self.name}: Failed to close VCP.")
+        self._vcp.close()
+        if self._vcp.closed:
+            self._message("VCP closed.")
+        else:
+            self._message("VCP failed to close.")
+            raise IOError(f"VcpFtdi:{self.name}: Failed to close VCP.")
 
     def readline(self) -> str:
         r"""Read a line of ASCII string data from the VCP.
@@ -236,17 +232,23 @@ class VcpFtdi:
         """
         err = "OK"
         resp: str = ""
-        with self._lock:
-            while not resp.endswith("\r\n"):
-                try:
-                    resp += self._vcp.read(1)
-                except pylibftdi.FtdiError as e:
-                    err = "FTDI error."
-                    raise RuntimeWarning(e)
-                if (
-                    len(self._terminator) > 0
-                    and resp[-len(self._terminator) :] == self._terminator
-                ):
-                    return err, resp
-                elif 0 < self._line_size <= len(resp):
-                    return err, resp
+        expiry_time = time.perf_counter() + self._read_timeout
+
+        while time.perf_counter() < expiry_time:
+            try:
+                resp += self._vcp.read(1)
+            except pylibftdi.FtdiError as e:
+                err = "FTDI error."
+                raise RuntimeWarning(e)
+            except UnicodeError as e:
+                err = "Received non-ASCII data in response."
+                raise RuntimeWarning(e)
+            if (
+                len(self._terminator) > 0
+                and resp.endswith(self._terminator)
+            ):
+                return err, resp
+            elif 0 < self._line_size <= len(resp):
+                return err, resp
+        err = "Timed out with incomplete response."
+        return err, resp
