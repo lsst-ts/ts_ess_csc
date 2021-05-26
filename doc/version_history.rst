@@ -6,6 +6,22 @@
 Version History
 ###############
 
+v0.4.0
+======
+
+* Code reworked to be able to work locally and remotely.
+  When working remotely, a running socket server from ts_envsensors is required.
+* Removed ``pytest-runner`` and ``tests_require``.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 8.0
+* ts_envsensors
+* ts_tcpip
+
+
 v0.3.0
 ======
 

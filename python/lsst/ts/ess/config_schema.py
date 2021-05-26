@@ -32,6 +32,15 @@ CONFIG_SCHEMA = yaml.safe_load(
     description: Schema for ESS configuration files
     type: object
     properties:
+      host:
+        description: IP address of the TCP/IP interface
+        type: string
+        format: hostname
+        default: "127.0.0.1"
+      port:
+        description: Port number of the TCP/IP interface
+        type: integer
+        default: 5000
       name:
         description: Name of the sensor
         type: string
