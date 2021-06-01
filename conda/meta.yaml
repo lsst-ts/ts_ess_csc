@@ -23,6 +23,8 @@ test:
     - ts-conda-build =0.3
     - ts-idl {{ idl_version }}
     - ts-salobj {{ salobj_version }}
+    - ts_tcpip
+    - ts_envsensors
     - ts-dds
     - pyserial
     - pyftdi
@@ -40,10 +42,11 @@ requirements:
     - pip
     - setuptools_scm
     - setuptools
-    - pytest-runner
   run:
     - python
     - setuptools
     - setuptools_scm
     - ts-idl {{ idl_version }}
     - ts-salobj {{ salobj_version }}
+    - ts_tcpip
+    - ts_envsensors
