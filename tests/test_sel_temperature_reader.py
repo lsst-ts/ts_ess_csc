@@ -19,11 +19,7 @@
 import unittest
 
 from lsst.ts.ess.sel_temperature_reader import SelTemperature, DELIMITER
-from lsst.ts.ess.mock.mock_temperature_sensor import (
-    MockTemperatureSensor,
-    MIN_TEMP,
-    MAX_TEMP,
-)
+from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
 
 
 class SelTemperatureReaderTestCase(unittest.IsolatedAsyncioTestCase):
@@ -34,10 +30,14 @@ class SelTemperatureReaderTestCase(unittest.IsolatedAsyncioTestCase):
         await sel_temperature.start()
         await sel_temperature.read()
         data = sel_temperature.output
-        self.assertEqual(num_channels + 2, len(data))
+        self.assertEqual(num_channels + 3, len(data))
         for i in range(0, 4):
-            data_item = data[i + 2]
-            self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
+            data_item = data[i + 3]
+            self.assertTrue(
+                MockTemperatureSensor.MIN_TEMP
+                <= float(data_item)
+                <= MockTemperatureSensor.MAX_TEMP
+            )
         await sel_temperature.stop()
 
     async def test_old_sel_temperature_reader(self):
@@ -48,10 +48,14 @@ class SelTemperatureReaderTestCase(unittest.IsolatedAsyncioTestCase):
         await sel_temperature.start()
         await sel_temperature.read()
         data = sel_temperature.output
-        self.assertEqual(num_channels + 2, len(data))
+        self.assertEqual(num_channels + 3, len(data))
         for i in range(0, 4):
-            data_item = data[i + 2]
-            self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
+            data_item = data[i + 3]
+            self.assertTrue(
+                MockTemperatureSensor.MIN_TEMP
+                <= float(data_item)
+                <= MockTemperatureSensor.MAX_TEMP
+            )
         await sel_temperature.stop()
 
     async def test_nan_sel_temperature_reader(self):
@@ -59,17 +63,21 @@ class SelTemperatureReaderTestCase(unittest.IsolatedAsyncioTestCase):
         count_offset = 1
         nan_channel = 2
         device = MockTemperatureSensor(
-            "MockSensor", num_channels, count_offset, nan_channel=nan_channel
+            "MockSensor", num_channels, count_offset, disconnected_channel=nan_channel
         )
         sel_temperature = SelTemperature("MockSensor", device, num_channels)
         await sel_temperature.start()
         await sel_temperature.read()
         data = sel_temperature.output
-        self.assertEqual(num_channels + 2, len(data))
+        self.assertEqual(num_channels + 3, len(data))
         for i in range(0, 4):
-            data_item = data[i + 2]
+            data_item = data[i + 3]
             if i == nan_channel:
                 self.assertAlmostEqual(9999.999, float(data_item), 3)
             else:
-                self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
+                self.assertTrue(
+                    MockTemperatureSensor.MIN_TEMP
+                    <= float(data_item)
+                    <= MockTemperatureSensor.MAX_TEMP
+                )
         await sel_temperature.stop()

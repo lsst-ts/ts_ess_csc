@@ -21,23 +21,22 @@ import asyncio
 
 from lsst.ts.ess.ess_instrument_object import EssInstrument
 from lsst.ts.ess.sel_temperature_reader import SelTemperature
-from lsst.ts.ess.mock.mock_temperature_sensor import (
-    MockTemperatureSensor,
-    MIN_TEMP,
-    MAX_TEMP,
-)
+from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
 
 
 class EssInstrumentObjectTestCase(unittest.IsolatedAsyncioTestCase):
     async def _callback(self, data):
-        print(data)
-        self.assertEqual(self.num_channels + 2, len(data))
+        self.assertEqual(self.num_channels + 3, len(data))
         for i in range(0, self.num_channels):
-            data_item = data[i + 2]
+            data_item = data[i + 3]
             if self.nan_channel and i == self.nan_channel:
                 self.assertAlmostEqual(9999.999, float(data_item), 3)
             else:
-                self.assertTrue(MIN_TEMP <= float(data_item) <= MAX_TEMP)
+                self.assertTrue(
+                    MockTemperatureSensor.MIN_TEMP
+                    <= float(data_item)
+                    <= MockTemperatureSensor.MAX_TEMP
+                )
         self.ess_instrument._enabled = False
 
     async def test_ess_instrument_object(self):
