@@ -43,25 +43,26 @@ properties:
     default: 5000
   devices:
     type: array
-    default: [{"name": "EssTemperature4Ch"}]
+    default:
+    - name: EssTemperature4Ch
+      channels: 4
+      type: FTDI
+      ftdi_id: AL05OBVR
     items:
       type: object
       properties:
         name:
           description: Name of the sensor
           type: string
-          default: EssTemperature4Ch
         channels:
           description: Number of channels
           type: integer
-          default: 4
         type:
           description: Type of the device
           type: string
           enum:
           - FTDI
           - Serial
-          default: FTDI
       anyOf:
       - if:
           properties:
@@ -72,7 +73,6 @@ properties:
             ftdi_id:
               description: FTDI Serial ID to connect to.
               type: string
-              default: "AL05OBVR"
       - if:
           properties:
             type:
@@ -82,6 +82,5 @@ properties:
             serial_port:
               description: Serial port to connect to.
               type: string
-              default: "serial_ch_1"
 """
 )

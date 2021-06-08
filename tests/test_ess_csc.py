@@ -87,11 +87,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 if nan_channel and i == nan_channel + 1:
                     self.assertAlmostEqual(9999.999, temp_telemetry, 3)
                 else:
-                    self.assertTrue(
-                        MockTemperatureSensor.MIN_TEMP
-                        <= temp_telemetry
-                        <= MockTemperatureSensor.MAX_TEMP
-                    )
+                    self.assertLessEqual(MockTemperatureSensor.MIN_TEMP, temp_telemetry)
+                    self.assertLessEqual(temp_telemetry, MockTemperatureSensor.MAX_TEMP)
 
     async def test_receive_telemetry(self):
         logging.info("test_receive_telemetry")

@@ -34,11 +34,8 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
         for i in range(0, num_channels):
             data_item = data[i].split("=")
             self.assertTrue(f"C{i:02d}", data_item[0])
-            self.assertTrue(
-                MockTemperatureSensor.MIN_TEMP
-                <= float(data_item[1])
-                <= MockTemperatureSensor.MAX_TEMP
-            )
+            self.assertLessEqual(MockTemperatureSensor.MIN_TEMP, float(data_item[1]))
+            self.assertLessEqual(float(data_item[1]), MockTemperatureSensor.MAX_TEMP)
 
     async def test_read_old_instrument(self):
         num_channels = 4
@@ -52,11 +49,8 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
         for i in range(0, num_channels):
             data_item = data[i].split("=")
             self.assertTrue(f"C{i + count_offset:02d}", data_item[0])
-            self.assertTrue(
-                MockTemperatureSensor.MIN_TEMP
-                <= float(data_item[1])
-                <= MockTemperatureSensor.MAX_TEMP
-            )
+            self.assertLessEqual(MockTemperatureSensor.MIN_TEMP, float(data_item[1]))
+            self.assertLessEqual(float(data_item[1]), MockTemperatureSensor.MAX_TEMP)
 
     async def test_read_nan(self):
         num_channels = 4
@@ -76,8 +70,9 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
             if i == nan_channel:
                 self.assertTrue(data_item[1] == "9999.9990")
             else:
-                self.assertTrue(
-                    MockTemperatureSensor.MIN_TEMP
-                    <= float(data_item[1])
-                    <= MockTemperatureSensor.MAX_TEMP
+                self.assertLessEqual(
+                    MockTemperatureSensor.MIN_TEMP, float(data_item[1])
+                )
+                self.assertLessEqual(
+                    float(data_item[1]), MockTemperatureSensor.MAX_TEMP
                 )

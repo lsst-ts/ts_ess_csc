@@ -32,11 +32,8 @@ class EssInstrumentObjectTestCase(unittest.IsolatedAsyncioTestCase):
             if self.nan_channel and i == self.nan_channel:
                 self.assertAlmostEqual(9999.999, float(data_item), 3)
             else:
-                self.assertTrue(
-                    MockTemperatureSensor.MIN_TEMP
-                    <= float(data_item)
-                    <= MockTemperatureSensor.MAX_TEMP
-                )
+                self.assertLessEqual(MockTemperatureSensor.MIN_TEMP, float(data_item))
+                self.assertLessEqual(float(data_item), MockTemperatureSensor.MAX_TEMP)
         self.ess_instrument._enabled = False
 
     async def test_ess_instrument_object(self):
