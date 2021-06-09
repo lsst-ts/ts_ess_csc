@@ -22,7 +22,7 @@ import unittest
 
 from lsst.ts import salobj
 from lsst.ts import ess
-from lsst.ts.ess.mock.mock_temperature_sensor import MIN_TEMP, MAX_TEMP
+from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
 from lsst.ts.envsensors import SocketServer
 from lsst.ts import tcpip
 
@@ -76,16 +76,19 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await self.check_bin_script(name="ESS", index=None, exe_name="run_ess.py")
 
     async def validate_telemetry(self, nan_channel=None):
-        telemetry_topic = getattr(
-            self.remote, f"tel_temperature{self.csc.config.channels}Ch"
-        )
-        data = await telemetry_topic.next(flush=False)
-        for i in range(1, self.csc.config.channels + 1):
-            temp_telemetry = getattr(data, f"temperatureC{i:02d}")
-            if nan_channel and i == nan_channel + 1:
-                self.assertAlmostEqual(9999.999, temp_telemetry, 3)
-            else:
-                self.assertTrue(MIN_TEMP <= temp_telemetry <= MAX_TEMP)
+        for sensor_name in self.csc.device_configurations:
+            device_configuration = self.csc.device_configurations[sensor_name]
+            telemetry_topic = getattr(
+                self.remote, f"tel_temperature{device_configuration.channels}Ch"
+            )
+            data = await telemetry_topic.next(flush=False)
+            for i in range(1, device_configuration.channels + 1):
+                temp_telemetry = getattr(data, f"temperatureC{i:02d}")
+                if nan_channel and i == nan_channel + 1:
+                    self.assertAlmostEqual(9999.999, temp_telemetry, 3)
+                else:
+                    self.assertLessEqual(MockTemperatureSensor.MIN_TEMP, temp_telemetry)
+                    self.assertLessEqual(temp_telemetry, MockTemperatureSensor.MAX_TEMP)
 
     async def test_receive_telemetry(self):
         logging.info("test_receive_telemetry")

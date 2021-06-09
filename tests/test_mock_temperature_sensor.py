@@ -19,11 +19,7 @@
 import asyncio
 import unittest
 
-from lsst.ts.ess.mock.mock_temperature_sensor import (
-    MockTemperatureSensor,
-    MIN_TEMP,
-    MAX_TEMP,
-)
+from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
 
 
 class MockTestCase(unittest.IsolatedAsyncioTestCase):
@@ -32,13 +28,14 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
         ess_sensor = MockTemperatureSensor("MockSensor", num_channels)
         ess_sensor.terminator = "\r\n"
         loop = asyncio.get_event_loop()
-        err, resp = await loop.run_in_executor(None, ess_sensor.readline)
+        name, err, resp = await loop.run_in_executor(None, ess_sensor.readline)
         resp = resp.strip(ess_sensor.terminator)
         data = resp.split(",")
         for i in range(0, num_channels):
             data_item = data[i].split("=")
             self.assertTrue(f"C{i:02d}", data_item[0])
-            self.assertTrue(MIN_TEMP <= float(data_item[1]) <= MAX_TEMP)
+            self.assertLessEqual(MockTemperatureSensor.MIN_TEMP, float(data_item[1]))
+            self.assertLessEqual(float(data_item[1]), MockTemperatureSensor.MAX_TEMP)
 
     async def test_read_old_instrument(self):
         num_channels = 4
@@ -46,13 +43,14 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
         ess_sensor = MockTemperatureSensor("MockSensor", num_channels, count_offset)
         ess_sensor.terminator = "\r\n"
         loop = asyncio.get_event_loop()
-        err, resp = await loop.run_in_executor(None, ess_sensor.readline)
+        name, err, resp = await loop.run_in_executor(None, ess_sensor.readline)
         resp = resp.strip(ess_sensor.terminator)
         data = resp.split(",")
         for i in range(0, num_channels):
             data_item = data[i].split("=")
             self.assertTrue(f"C{i + count_offset:02d}", data_item[0])
-            self.assertTrue(MIN_TEMP <= float(data_item[1]) <= MAX_TEMP)
+            self.assertLessEqual(MockTemperatureSensor.MIN_TEMP, float(data_item[1]))
+            self.assertLessEqual(float(data_item[1]), MockTemperatureSensor.MAX_TEMP)
 
     async def test_read_nan(self):
         num_channels = 4
@@ -63,7 +61,7 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
         )
         ess_sensor.terminator = "\r\n"
         loop = asyncio.get_event_loop()
-        err, resp = await loop.run_in_executor(None, ess_sensor.readline)
+        name, err, resp = await loop.run_in_executor(None, ess_sensor.readline)
         resp = resp.strip(ess_sensor.terminator)
         data = resp.split(",")
         for i in range(0, num_channels):
@@ -72,4 +70,9 @@ class MockTestCase(unittest.IsolatedAsyncioTestCase):
             if i == nan_channel:
                 self.assertTrue(data_item[1] == "9999.9990")
             else:
-                self.assertTrue(MIN_TEMP <= float(data_item[1]) <= MAX_TEMP)
+                self.assertLessEqual(
+                    MockTemperatureSensor.MIN_TEMP, float(data_item[1])
+                )
+                self.assertLessEqual(
+                    float(data_item[1]), MockTemperatureSensor.MAX_TEMP
+                )
