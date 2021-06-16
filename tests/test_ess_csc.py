@@ -22,8 +22,7 @@ import unittest
 
 from lsst.ts import salobj
 from lsst.ts import ess
-from lsst.ts.ess.mock.mock_temperature_sensor import MockTemperatureSensor
-from lsst.ts.envsensors import SocketServer
+from lsst.ts.envsensors import SocketServer, Temperature
 from lsst.ts import tcpip
 
 
@@ -34,6 +33,13 @@ logging.basicConfig(
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
+        self.socket_server = SocketServer(
+            host=tcpip.LOCAL_HOST, port=0, simulation_mode=1
+        )
+        await asyncio.wait_for(self.socket_server.start(), timeout=5)
+        self.port = self.socket_server.port
+
     def basic_make_csc(self, initial_state, config_dir, simulation_mode, **kwargs):
         logging.info("basic_make_csc")
         csc = ess.EssCsc(
@@ -41,7 +47,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=config_dir,
             simulation_mode=simulation_mode,
             index=1,
-            local_mode=kwargs["local_mode"],
         )
         return csc
 
@@ -51,8 +56,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.STANDBY,
             config_dir=None,
             simulation_mode=1,
-            local_mode=True,
         ):
+            self.csc.port = self.port
             await self.check_standard_state_transitions(
                 enabled_commands=(),
             )
@@ -63,7 +68,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.STANDBY,
             config_dir=None,
             simulation_mode=1,
-            local_mode=True,
         ):
             await self.assert_next_sample(
                 self.remote.evt_softwareVersions,
@@ -87,8 +91,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 if nan_channel and i == nan_channel + 1:
                     self.assertAlmostEqual(9999.999, temp_telemetry, 3)
                 else:
-                    self.assertLessEqual(MockTemperatureSensor.MIN_TEMP, temp_telemetry)
-                    self.assertLessEqual(temp_telemetry, MockTemperatureSensor.MAX_TEMP)
+                    self.assertLessEqual(Temperature.MIN, temp_telemetry)
+                    self.assertLessEqual(temp_telemetry, Temperature.MAX)
 
     async def test_receive_telemetry(self):
         logging.info("test_receive_telemetry")
@@ -96,50 +100,16 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.STANDBY,
             config_dir=None,
             simulation_mode=1,
-            local_mode=True,
         ):
+            self.csc.port = self.port
+            self.assertFalse(self.socket_server.connected)
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.ENABLED
             )
-            await self.validate_telemetry()
-
-    async def test_receive_telemetry_with_nan(self):
-        logging.info("test_receive_telemetry")
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY,
-            config_dir=None,
-            simulation_mode=1,
-            local_mode=True,
-        ):
-            nan_channel = 1
-            self.csc.nan_channel = nan_channel
-            await salobj.set_summary_state(
-                remote=self.remote, state=salobj.State.ENABLED
-            )
-            await self.validate_telemetry(nan_channel=nan_channel)
-
-    async def test_remote_mode(self):
-        logging.info("test_remote_mode")
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY,
-            config_dir=None,
-            simulation_mode=1,
-            local_mode=False,
-        ):
-            socket_server = SocketServer(
-                host=tcpip.LOCAL_HOST, port=0, simulation_mode=1
-            )
-            await asyncio.wait_for(socket_server.start(), timeout=5)
-            port = socket_server.port
-            self.csc.port = port
-            self.assertFalse(socket_server.connected)
-            await salobj.set_summary_state(
-                remote=self.remote, state=salobj.State.ENABLED
-            )
-            self.assertTrue(socket_server.connected)
+            self.assertTrue(self.socket_server.connected)
             await self.validate_telemetry()
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.DISABLED
             )
-            self.assertFalse(socket_server.connected)
-            await socket_server.exit()
+            self.assertFalse(self.socket_server.connected)
+            await self.socket_server.exit()

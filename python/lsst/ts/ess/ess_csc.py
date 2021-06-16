@@ -29,9 +29,6 @@ import numpy as np
 
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
-from .ess_instrument_object import EssInstrument
-from .mock.mock_temperature_sensor import MockTemperatureSensor
-from .sel_temperature_reader import SelTemperature
 from lsst.ts import salobj, tcpip  # type: ignore
 from lsst.ts.envsensors import (
     DeviceConfig,
@@ -40,15 +37,8 @@ from lsst.ts.envsensors import (
     ResponseCode,
 )
 
-"""The temperature polling interval."""
-TEMPERATURE_POLLING_INTERVAL = 0.25
-
 """Standard timeout in seconds for socket connections."""
 SOCKET_TIMEOUT = 5
-
-"""Constant strings that can be found in data coming from the SocketServer."""
-RESPONSE = "response"
-TELEMETRY = "telemetry"
 
 
 class EssCsc(salobj.ConfigurableCsc):
@@ -73,7 +63,6 @@ class EssCsc(salobj.ConfigurableCsc):
     def __init__(
         self,
         index: int,
-        local_mode: bool = False,
         config_dir: str = None,
         initial_state: salobj.State = salobj.State.STANDBY,
         simulation_mode: int = 0,
@@ -90,23 +79,12 @@ class EssCsc(salobj.ConfigurableCsc):
             simulation_mode=simulation_mode,
         )
 
-        # Temporary mode during transition to remote mode only.
-        self.local_mode: bool = local_mode
-
-        # Used if self.local_mode == True
-        self.ess_instruments: List[EssInstrument] = []
-
-        # Used if self.local_mode == False
         self.reader: Optional[asyncio.StreamReader] = None
         self.writer: Optional[asyncio.StreamWriter] = None
         self.host = None
         self.port = None
         self.telemetry_loop: asyncio.Future = salobj.make_done_future()
         self.last_commands: List[str] = []
-
-        # Unit tests may set this to an integer value to simulate a
-        # disconnected or missing sensor.
-        self.nan_channel = None
 
         self.log.info("ESS CSC created.")
 
@@ -115,8 +93,8 @@ class EssCsc(salobj.ConfigurableCsc):
         try:
             while True:
                 data = await self.read()
-                if RESPONSE in data:
-                    response = data[RESPONSE]
+                if Key.RESPONSE in data:
+                    response = data[Key.RESPONSE]
                     if response != ResponseCode.OK:
                         try:
                             oldest_last_command = self.last_commands.pop(0)
@@ -127,9 +105,11 @@ class EssCsc(salobj.ConfigurableCsc):
                             self.log.error(
                                 f"Received response {data} while no command was waiting for a reply."
                             )
-                if TELEMETRY in data:
-                    output = data[TELEMETRY]
+                elif Key.TELEMETRY in data:
+                    output = data[Key.TELEMETRY]
                     await self.get_telemetry(output=output)
+                else:
+                    raise ValueError(f"Unknown data {data!r} received.")
         except Exception:
             self.log.exception("_read_loop failed")
 
@@ -168,26 +148,25 @@ class EssCsc(salobj.ConfigurableCsc):
         self.writer.write(st.encode() + tcpip.TERMINATOR)
         await self.writer.drain()
 
-    async def get_telemetry(self, output: list) -> None:
+    async def get_telemetry(self, output: List[Union[str, int, float]]) -> None:
         """Get the timestamp and temperatures from the output data.
 
         Parameters
         ----------
         output: `list`
-            An array containing the timestamp, error and temperatures as
+            A list containing the timestamp, error and temperatures as
             measured by the sensor. The order of the items in the list is:
-            - Sensor name
-            - Timestamp
-            - Response code
-            - One or more sensor data
+            - Sensor name: `str`
+            - Timestamp: `float`
+            - Response code: `int`
+            - One or more sensor data: `str` of the form CXX=YYYY.YYY
         """
         try:
-            print(output)
             sensor_name = output[0]
             timestamp = output[1]
             error_code = output[2]
             device_configuration = self.device_configurations[sensor_name]
-            if error_code == "OK":
+            if error_code == ResponseCode.OK:
                 telemetry = {"sensor_name": sensor_name, "timestamp": timestamp}
                 sensor_data = output[3:]
                 if len(sensor_data) != device_configuration.channels:
@@ -214,40 +193,12 @@ class EssCsc(salobj.ConfigurableCsc):
         self.log.info("Connecting")
         self.log.info(self.config)
         self.log.info(f"self.simulation_mode = {self.simulation_mode}")
-        self.log.info(f"self.local_mode = {self.local_mode}")
         if self.config is None:
             raise RuntimeError("Not yet configured")
         if self.connected:
             raise RuntimeError("Already connected")
 
-        if self.local_mode:
-            await self.connect_local_mode()
-        else:
-            await self.connect_socket()
-
-    async def connect_local_mode(self) -> None:
-        """Connect to the ESS sensor or start the mock sensor, if in
-        simulation mode.
-        """
-        self.log.info("Connecting to the local sensor(s).")
-        for sensor_name in self.device_configurations:
-            device_configuration = self.device_configurations[sensor_name]
-            device = self._get_device(device_configuration=device_configuration)
-            sel_temperature = SelTemperature(
-                device_configuration.name,
-                device,
-                device_configuration.channels,
-                self.log,
-            )
-            self.ess_instruments.append(
-                EssInstrument(
-                    device_configuration.name,
-                    sel_temperature,
-                    self.get_telemetry,
-                    self.log,
-                )
-            )
-            self.log.info("Connection to the local sensor established.")
+        await self.connect_socket()
 
     async def connect_socket(self) -> None:
         """Connect to the SocketServer and send the configuration for which
@@ -300,11 +251,7 @@ class EssCsc(salobj.ConfigurableCsc):
             await self.connect()
 
         self.log.info("Start periodic polling of the sensor data.")
-        if self.local_mode:
-            for ess_instrument in self.ess_instruments:
-                await ess_instrument.start()
-        else:
-            await self.write(command="start", parameters={})
+        await self.write(command="start", parameters={})
         await super().end_enable(id_data)
 
     async def begin_disable(self, id_data) -> None:
@@ -319,26 +266,12 @@ class EssCsc(salobj.ConfigurableCsc):
             Command ID and data
         """
         self.cmd_disable.ack_in_progress(id_data, timeout=60)
-        if self.local_mode:
-            try:
-                for ess_instrument in self.ess_instruments:
-                    await ess_instrument.stop()
-            except Exception:
-                self.log.exception("Error in begin_disable. Continuing...")
-        else:
-            await self.write(command="stop", parameters={})
-            self.telemetry_loop.cancel()
-            await self.write(command="disconnect", parameters={})
 
-        await self.disconnect()
+        await self.write(command="stop", parameters={})
+        self.telemetry_loop.cancel()
+        await self.write(command="disconnect", parameters={})
+
         await super().begin_disable(id_data)
-
-    async def disconnect(self) -> None:
-        """Disconnect from the ESS sensor, if connected, and stop the mock
-        sensor, if running.
-        """
-        self.log.info("Disconnecting")
-        self.ess_instruments = []
 
     async def configure(self, config) -> None:
         """Configure the CSC.
@@ -354,105 +287,29 @@ class EssCsc(salobj.ConfigurableCsc):
         """
         self.config = config
         for device in config.devices:
-            if device[Key.TYPE] == DeviceType.FTDI:
+            if device[Key.DEVICE_TYPE] == DeviceType.FTDI:
                 dev_id = Key.FTDI_ID
-            elif device[Key.TYPE] == DeviceType.SERIAL:
+            elif device[Key.DEVICE_TYPE] == DeviceType.SERIAL:
                 dev_id = Key.SERIAL_PORT
             else:
                 raise ValueError(f"Unknown device type {device[Key.TYPE]} encountered.")
             self.device_configurations[device[Key.NAME]] = DeviceConfig(
                 name=device[Key.NAME],
                 channels=device[Key.CHANNELS],
-                dev_type=device[Key.TYPE],
+                dev_type=device[Key.DEVICE_TYPE],
                 dev_id=device[dev_id],
+                sens_type=device[Key.SENSOR_TYPE],
             )
 
     @property
     def connected(self) -> bool:
-        if self.local_mode:
-            return self.ess_instruments is None
-        else:
-            return not (
-                self.reader is None
-                or self.writer is None
-                or self.reader.at_eof()
-                or self.writer.is_closing()
-            )
+        return not (
+            self.reader is None
+            or self.writer is None
+            or self.reader.at_eof()
+            or self.writer.is_closing()
+        )
 
     @staticmethod
     def get_config_pkg() -> str:
         return "ts_config_ocs"
-
-    @classmethod
-    def add_arguments(cls, parser: argparse.ArgumentParser) -> None:
-        """Add command line arguments.
-
-        Parameters
-        ----------
-        parser: `argparse.ArgumentParser`
-            The parser that parses the command line arguments.
-        """
-        parser.add_argument(
-            "--local-mode",
-            default="False",
-            help="Boolean indicating if local mode (True) or remote mode (False) should be used.",
-            dest="local_mode",
-        )
-        super().add_arguments(parser)
-
-    def _get_device(self, device_configuration: DeviceConfig) -> Optional[Any]:
-        """Get the device to connect to by using the configuration of the CSC
-        and by detecting whether the code is running on an aarch64 architecture
-        or not.
-
-        Parameters
-        ----------
-        device_configuration: `dict`
-            A dict representing the device to connect to. The format of the
-            dict follows `lsst.ts.ess.CONFIG_SCHEMA`.
-
-        Returns
-        -------
-        device: `MockTemperatureSensor` or `VcpFtdi` or `RpiSerialHat` or
-            `None`
-            The device to connect to.
-
-        Raises
-        ------
-        RuntimeError
-            In case an incorrect configuration has been loaded.
-        """
-        device: Any = None
-        if self.simulation_mode == 1:
-            self.log.info("Connecting to the mock sensor.")
-            device = MockTemperatureSensor(
-                device_configuration.name,
-                device_configuration.channels,
-                disconnected_channel=self.nan_channel,
-            )
-        elif device_configuration.dev_type == DeviceType.FTDI:
-            from .vcp_ftdi import VcpFtdi
-
-            device = VcpFtdi(
-                device_configuration.name,
-                device_configuration.dev_id,
-                self.log,
-            )
-        elif device_configuration.dev_type == DeviceType.SERIAL:
-            # make sure we are on a Raspberry Pi4
-            if "aarch64" in platform.platform():
-                from .rpi_serial_hat import RpiSerialHat
-
-                device = RpiSerialHat(
-                    device_configuration.name,
-                    device_configuration.dev_id,
-                    self.log,
-                )
-
-        if device is None:
-            raise RuntimeError(
-                f"Could not get a {device_configuration['type']!r} device on "
-                f"architecture {platform.platform()}. Please check the "
-                f"configuration."
-            )
-        return device

@@ -6,6 +6,20 @@
 Version History
 ###############
 
+v0.5.0
+======
+
+* Removed all sensor code.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 9.1
+* ts_envsensors
+* ts_tcpip
+
+
 v0.4.0
 ======
 

@@ -45,8 +45,9 @@ properties:
     type: array
     default:
     - name: EssTemperature4Ch
+      sensor_type: Temperature
       channels: 4
-      type: FTDI
+      device_type: FTDI
       ftdi_id: AL05OBVR
     items:
       type: object
@@ -54,10 +55,17 @@ properties:
         name:
           description: Name of the sensor
           type: string
+        sensor_type:
+          description: Type of the sensor
+          type: string
+          enum:
+          - Temperature
+          - Humidity
+          - Wind
         channels:
           description: Number of channels
           type: integer
-        type:
+        device_type:
           description: Type of the device
           type: string
           enum:
@@ -66,7 +74,7 @@ properties:
       anyOf:
       - if:
           properties:
-            type:
+            device_type:
               const: FTDI
         then:
           properties:
@@ -75,7 +83,7 @@ properties:
               type: string
       - if:
           properties:
-            type:
+            device_type:
               const: Serial
         then:
           properties:
