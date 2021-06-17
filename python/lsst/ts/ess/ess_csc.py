@@ -106,8 +106,8 @@ class EssCsc(salobj.ConfigurableCsc):
                                 f"Received response {data} while no command was waiting for a reply."
                             )
                 elif Key.TELEMETRY in data:
-                    output = data[Key.TELEMETRY]
-                    await self.get_telemetry(output=output)
+                    sensor_data = data[Key.TELEMETRY]
+                    await self.get_telemetry(data=sensor_data)
                 else:
                     raise ValueError(f"Unknown data {data!r} received.")
         except Exception:
@@ -148,30 +148,30 @@ class EssCsc(salobj.ConfigurableCsc):
         self.writer.write(st.encode() + tcpip.TERMINATOR)
         await self.writer.drain()
 
-    async def get_telemetry(self, output: List[Union[str, int, float]]) -> None:
+    async def get_telemetry(self, data: List[Union[str, int, float]]) -> None:
         """Get the timestamp and temperatures from the output data.
 
         Parameters
         ----------
-        output: `list`
+        data: `list`
             A list containing the timestamp, error and temperatures as
             measured by the sensor. The order of the items in the list is:
             - Sensor name: `str`
             - Timestamp: `float`
             - Response code: `int`
-            - One or more sensor data: `str` of the form CXX=YYYY.YYY
+            - One or more sensor data: each of type `float`
         """
         try:
-            sensor_name = output[0]
-            timestamp = output[1]
-            error_code = output[2]
+            sensor_name = data[0]
+            timestamp = data[1]
+            error_code = data[2]
             device_configuration = self.device_configurations[sensor_name]
             if error_code == ResponseCode.OK:
                 telemetry = {"sensor_name": sensor_name, "timestamp": timestamp}
-                sensor_data = output[3:]
-                if len(sensor_data) != device_configuration.channels:
+                sensor_data = data[3:]
+                if len(sensor_data) != device_configuration.num_channels:
                     raise RuntimeError(
-                        f"Expected {device_configuration.channels} temperatures "
+                        f"Expected {device_configuration.num_channels} temperatures "
                         f"but received {len(sensor_data)}."
                     )
                 for i, value in enumerate(sensor_data):
@@ -180,7 +180,7 @@ class EssCsc(salobj.ConfigurableCsc):
                 self.log.info(f"Received temperatures {telemetry}")
                 self.log.info("Sending telemetry.")
                 telemetry_method = getattr(
-                    self, f"tel_temperature{device_configuration.channels}Ch"
+                    self, f"tel_temperature{device_configuration.num_channels}Ch"
                 )
                 telemetry_method.set_put(**telemetry)
         except Exception:
@@ -295,7 +295,7 @@ class EssCsc(salobj.ConfigurableCsc):
                 raise ValueError(f"Unknown device type {device[Key.TYPE]} encountered.")
             self.device_configurations[device[Key.NAME]] = DeviceConfig(
                 name=device[Key.NAME],
-                channels=device[Key.CHANNELS],
+                num_channels=device[Key.CHANNELS],
                 dev_type=device[Key.DEVICE_TYPE],
                 dev_id=device[dev_id],
                 sens_type=device[Key.SENSOR_TYPE],

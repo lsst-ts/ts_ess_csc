@@ -18,11 +18,12 @@
 
 import asyncio
 import logging
+import math
 import unittest
 
 from lsst.ts import salobj
 from lsst.ts import ess
-from lsst.ts.envsensors import SocketServer, Temperature
+from lsst.ts.envsensors import SocketServer, MockTemperatureConfig
 from lsst.ts import tcpip
 
 
@@ -79,23 +80,25 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         logging.info("test_bin_script")
         await self.check_bin_script(name="ESS", index=None, exe_name="run_ess.py")
 
-    async def validate_telemetry(self, nan_channel=None):
+    async def validate_telemetry(self, disconnected_channel, missed_channels):
         for sensor_name in self.csc.device_configurations:
             device_configuration = self.csc.device_configurations[sensor_name]
             telemetry_topic = getattr(
-                self.remote, f"tel_temperature{device_configuration.channels}Ch"
+                self.remote, f"tel_temperature{device_configuration.num_channels}Ch"
             )
             data = await telemetry_topic.next(flush=False)
-            for i in range(1, device_configuration.channels + 1):
-                temp_telemetry = getattr(data, f"temperatureC{i:02d}")
-                if nan_channel and i == nan_channel + 1:
-                    self.assertAlmostEqual(9999.999, temp_telemetry, 3)
+            for i in range(0, device_configuration.num_channels):
+                # Channels indices are 1-based
+                temp_telemetry = getattr(data, f"temperatureC{i + 1:02d}")
+                if i < missed_channels:
+                    self.assertTrue(math.isnan(temp_telemetry))
+                elif i == disconnected_channel:
+                    self.assertTrue(math.isnan(temp_telemetry))
                 else:
-                    self.assertLessEqual(Temperature.MIN, temp_telemetry)
-                    self.assertLessEqual(temp_telemetry, Temperature.MAX)
+                    self.assertLessEqual(MockTemperatureConfig.min, temp_telemetry)
+                    self.assertLessEqual(temp_telemetry, MockTemperatureConfig.max)
 
-    async def test_receive_telemetry(self):
-        logging.info("test_receive_telemetry")
+    async def receive_telemetry(self, disconnected_channel, missed_channels):
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=None,
@@ -107,9 +110,61 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 remote=self.remote, state=salobj.State.ENABLED
             )
             self.assertTrue(self.socket_server.connected)
-            await self.validate_telemetry()
+
+            # Make sure that the mock sensor outputs data for a disconnected
+            # channel.
+            self.socket_server.command_handler._devices[
+                0
+            ]._disconnected_channel = disconnected_channel
+
+            # Make sure that the mock sensor outputs truncated data.
+            self.socket_server.command_handler._devices[
+                0
+            ]._missed_channels = missed_channels
+
+            await self.validate_telemetry(
+                disconnected_channel == disconnected_channel,
+                missed_channels=missed_channels,
+            )
+
+            # Reset self.missed_channels and read again. The data should not be
+            # truncated anymore.
+            missed_channels = 0
+
+            await self.validate_telemetry(
+                disconnected_channel == disconnected_channel,
+                missed_channels=missed_channels,
+            )
+
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.DISABLED
             )
             self.assertFalse(self.socket_server.connected)
             await self.socket_server.exit()
+
+    async def test_receive_telemetry(self):
+        logging.info("test_receive_telemetry")
+        disconnected_channel = None
+        missed_channels = 0
+        await self.receive_telemetry(
+            disconnected_channel == disconnected_channel,
+            missed_channels=missed_channels,
+        )
+
+    async def test_receive_telemetry_with_disconnected_channel(self):
+        logging.info("test_receive_telemetry")
+        disconnected_channel = 1
+        missed_channels = 0
+        await self.receive_telemetry(
+            disconnected_channel == disconnected_channel,
+            missed_channels=missed_channels,
+        )
+
+    async def test_receive_telemetry_with_truncated_output(self):
+        logging.info("test_receive_telemetry")
+        disconnected_channel = None
+        missed_channels = 2
+        await self.receive_telemetry(
+            disconnected_channel == disconnected_channel,
+            missed_channels=missed_channels,
+        )
