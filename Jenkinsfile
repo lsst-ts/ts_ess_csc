@@ -21,7 +21,7 @@ pipeline {
                 script {
                     sh """
                     chmod -R a+rw \${WORKSPACE}
-                    container=\$(docker run -v \${WORKSPACE}:/home/saluser/repo/ -td --rm --name \${container_name} -e LTD_USERNAME=\${user_ci_USR} -e LTD_PASSWORD=\${user_ci_PSW} lsstts/salobj:develop)
+                    container=\$(docker run -v \${WORKSPACE}:/home/saluser/repo/ -td --rm --name \${container_name} -e LTD_USERNAME=\${user_ci_USR} -e LTD_PASSWORD=\${user_ci_PSW} lsstts/develop-env:develop)
                     """
                 }
             }
@@ -84,7 +84,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos && git clone https://github.com/lsst-ts/ts_tcpip.git && cd ts_tcpip && pip install --ignore-installed -e . && eups declare -r . -t saluser \"
+                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos/ts_tcpip/ && /home/saluser/.checkout_repo.sh \${work_branches} \"
                     """
                 }
             }
@@ -107,15 +107,15 @@ pipeline {
                 }
             }
         }
-//         stage("Build and Upload documentation") {
-//             steps {
-//                 script {
-//                     sh """
-//                     docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd repo && pip install --ignore-installed -e . && package-docs build && ltd upload --product ts-ess --git-ref \${GIT_BRANCH} --dir doc/_build/html\"
-//                     """
-//                 }
-//             }
-//         }
+        stage("Build and Upload documentation") {
+            steps {
+                script {
+                    sh """
+                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd repo && pip install --ignore-installed -e . && package-docs build && ltd upload --product ts-ess --git-ref \${GIT_BRANCH} --dir doc/_build/html\"
+                    """
+                }
+            }
+        }
     }
     post {
         always {
