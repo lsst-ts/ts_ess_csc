@@ -80,6 +80,24 @@ pipeline {
                 }
             }
         }
+        stage("Checkout ts_tcpip") {
+            steps {
+                script {
+                    sh """
+                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos/ts_tcpip/ && /home/saluser/.checkout_repo.sh \${work_branches} \"
+                    """
+                }
+            }
+        }
+        stage("Checkout ts_envsensors") {
+            steps {
+                script {
+                    sh """
+                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos && git clone https://github.com/lsst-ts/ts_envsensors.git && cd ts_envsensors && pip install --ignore-installed -e . && eups declare -r . -t saluser \"
+                    """
+                }
+            }
+        }
         stage("Running tests") {
             steps {
                 script {
