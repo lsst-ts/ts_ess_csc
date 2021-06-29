@@ -6,17 +6,25 @@
 lsst.ts.ess
 ###########
 
-.. Paragraph that describes what this Python module does and links to related modules and frameworks.
+``ts_ess`` is a Commandable SAL Component (CSC) to control various environmental sensors at the Vera C. Rubin Observatory.
+There will be at least one, and likely several, CSC(s) running at Rubin Observatory.
+The CSC makes a socket connection to several Raspberry Pi 4's, to which the actual sensors ar connected, distributed around the observatory.
+The Raspberry Pi 4's then use the code from `ts_envsensors`_ to retrieve the sensor telemetry from the sensors and to convert the telemetry to a common format.
+The telemetry then is sent to the CSC which sends it to the EFD.
+The protocol used for commands for controlling the ``ts_envsensors`` code and well for transferring the telemetry is described in :doc:`Communication Protocols <protocols>`.
 
-.. .. _lsst.ts.ess-using:
+.. _ts_envsensors: https://ts-envsensors.lsst.io
 
-.. Using lsst.ts.ess
-.. =================
+.. _lsst.ts.ess-using:
+
+Using lsst.ts.ess
+=================
 
 .. toctree linking to topics related to using the module's APIs.
 
-.. .. toctree::
-..    :maxdepth: 1
+.. toctree::
+    protocols
+    :maxdepth: 1
 
 .. _lsst.ts.ess-contributing:
 

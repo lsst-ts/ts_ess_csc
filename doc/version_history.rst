@@ -6,6 +6,20 @@
 Version History
 ###############
 
+v0.6.0
+======
+
+* Added a description of the communication protocol.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 9.1
+* ts_envsensors
+* ts_tcpip
+
+
 v0.5.0
 ======
 

@@ -107,15 +107,6 @@ pipeline {
                 }
             }
         }
-        stage("Build and Upload documentation") {
-            steps {
-                script {
-                    sh """
-                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd repo && pip install --ignore-installed -e . && package-docs build && ltd upload --product ts-ess --git-ref \${GIT_BRANCH} --dir doc/_build/html\"
-                    """
-                }
-            }
-        }
     }
     post {
         always {
@@ -128,6 +119,24 @@ pipeline {
                 reportFiles: 'index.html',
                 reportName: "Coverage Report"
               ])
+
+            sh "docker exec -u saluser \${container_name} sh -c \"" +
+                "source ~/.setup.sh && " +
+                "cd /home/saluser/repo/ && " +
+                "setup ts_ess -t saluser && " +
+                "package-docs build\""
+
+            script {
+                def RESULT = sh returnStatus: true, script: "docker exec -u saluser \${container_name} sh -c \"" +
+                    "source ~/.setup.sh && " +
+                    "cd /home/saluser/repo/ && " +
+                    "setup ts_ess -t saluser && " +
+                    "ltd upload --product ts-ess --git-ref \${GIT_BRANCH} --dir doc/_build/html\""
+
+                if ( RESULT != 0 ) {
+                    unstable("Failed to push documentation.")
+                }
+             }
         }
         cleanup {
             sh """
