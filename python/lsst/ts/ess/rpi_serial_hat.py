@@ -360,7 +360,7 @@ class RpiSerialHat:
 
         resp: str = ""
         err: str = "OK"
-        await self._rpi_pin_state(self._pin_dirn, RpiSerialHat.STATE_DIRN_RX)
+        self._rpi_pin_state(self._pin_dirn, RpiSerialHat.STATE_DIRN_RX)
         with self._lock:
             while not resp.endswith("\r\n"):
                 try:

@@ -210,7 +210,9 @@ class VcpFtdi:
 
         Returns
         -------
-        error, resp : 'tuple'
+        name, error, resp : 'tuple'
+        name: 'str'
+            The name of the device
         error : 'str'
             Error string.
             'OK' = No error
@@ -247,6 +249,6 @@ class VcpFtdi:
                     len(self._terminator) > 0
                     and resp[-len(self._terminator) :] == self._terminator
                 ):
-                    return err, resp
+                    return self.name, err, resp
                 elif 0 < self._line_size <= len(resp):
-                    return err, resp
+                    return self.name, err, resp

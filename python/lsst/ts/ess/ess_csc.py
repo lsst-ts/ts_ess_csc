@@ -73,7 +73,7 @@ class EssCsc(salobj.ConfigurableCsc):
     def __init__(
         self,
         index: int,
-        local_mode: bool = False,
+        local_mode: bool = True,
         config_dir: str = None,
         initial_state: salobj.State = salobj.State.STANDBY,
         simulation_mode: int = 0,

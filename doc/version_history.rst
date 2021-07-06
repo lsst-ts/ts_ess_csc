@@ -6,6 +6,22 @@
 Version History
 ###############
 
+v0.4.1
+======
+
+* Fixed a bug for FTDI devices where data were readf correctly but not sent to the CSC.
+* Removed an `await` in a normal function (not coroutine) for RpiSerialHat devices.
+* Made sure that the CSC starts up in local mode.
+
+Requires:
+
+* ts_salobj 6.4
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 9.1
+* ts_envsensors
+* ts_tcpip
+
+
 v0.4.0
 ======
 
