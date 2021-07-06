@@ -25,48 +25,70 @@ import yaml
 
 CONFIG_SCHEMA = yaml.safe_load(
     """
-    $schema: http://json-schema.org/draft-07/schema#
-    $id: https://github.com/lsst-ts/ts_ess/blob/master/python/lsst/ts/ess/config_schema.py
-    # title must end with one or more spaces followed by the schema version, which must begin with "v"
-    title: ESS v1
-    description: Schema for ESS configuration files
-    type: object
-    properties:
-      name:
-        description: Name of the sensor
-        type: string
-        default: EssTemperature4Ch
-      channels:
-        description: Number of channels
-        type: integer
-        default: 4
-      type:
-        description: Type of the device
-        type: string
-        enum:
-        - FTDI
-        - Serial
-        default: FTDI
-    anyOf:
-    - if:
-        properties:
-          type:
-            const: FTDI
-      then:
-        properties:
-          ftdi_id:
-            description: FTDI Serial ID to connect to.
-            type: string
-            default: "AL05OBVR"
-    - if:
-        properties:
-          type:
-            const: Serial
-      then:
-        properties:
-          port:
-            description: Serial port to connect to.
-            type: string
-            default: "serial_ch_1"
-    """
+$schema: http://json-schema.org/draft-07/schema#
+$id: https://github.com/lsst-ts/ts_ess/blob/master/python/lsst/ts/ess/config_schema.py
+# title must end with one or more spaces followed by the schema version, which must begin with "v"
+title: ESS v1
+description: Schema for ESS configuration files
+type: object
+properties:
+  host:
+    description: IP address of the TCP/IP interface
+    type: string
+    format: hostname
+    default: "127.0.0.1"
+  port:
+    description: Port number of the TCP/IP interface
+    type: integer
+    default: 5000
+  devices:
+    type: array
+    default:
+    - name: EssTemperature4Ch
+      sensor_type: Temperature
+      channels: 4
+      device_type: FTDI
+      ftdi_id: AL05OBVR
+    items:
+      type: object
+      properties:
+        name:
+          description: Name of the sensor
+          type: string
+        sensor_type:
+          description: Type of the sensor
+          type: string
+          enum:
+          - Temperature
+          - Humidity
+          - Wind
+        channels:
+          description: Number of channels
+          type: integer
+        device_type:
+          description: Type of the device
+          type: string
+          enum:
+          - FTDI
+          - Serial
+      anyOf:
+      - if:
+          properties:
+            device_type:
+              const: FTDI
+        then:
+          properties:
+            ftdi_id:
+              description: FTDI Serial ID to connect to.
+              type: string
+      - if:
+          properties:
+            device_type:
+              const: Serial
+        then:
+          properties:
+            serial_port:
+              description: Serial port to connect to.
+              type: string
+"""
 )

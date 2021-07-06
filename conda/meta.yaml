@@ -1,4 +1,5 @@
 {% set data= load_setup_py_data() %}
+
 package:
   name: "ts-ess"
   version: {{ data.get('version') }}
@@ -7,6 +8,7 @@ source:
   path: ../
 
 build:
+  noarch: generic
   script: python -m pip install --no-deps --ignore-installed .
   script_env:
     - PATH
@@ -23,6 +25,8 @@ test:
     - ts-conda-build =0.3
     - ts-idl {{ idl_version }}
     - ts-salobj {{ salobj_version }}
+    - ts-tcpip
+    - ts-envsensors
     - ts-dds
     - pyserial
     - pyftdi
@@ -40,10 +44,11 @@ requirements:
     - pip
     - setuptools_scm
     - setuptools
-    - pytest-runner
   run:
     - python
     - setuptools
     - setuptools_scm
-    - ts-idl {{ idl_version }}
-    - ts-salobj {{ salobj_version }}
+    - ts-idl
+    - ts-salobj
+    - ts-tcpip
+    - ts-envsensors

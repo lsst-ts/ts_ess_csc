@@ -6,6 +6,52 @@
 Version History
 ###############
 
+v0.6.0
+======
+
+* Added a description of the communication protocol.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 9.1
+* ts_envsensors
+* ts_tcpip
+
+
+v0.5.0
+======
+
+* Removed all sensor code.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 9.1
+* ts_envsensors
+* ts_tcpip
+
+
+v0.4.0
+======
+
+* Code reworked to be able to work locally and remotely.
+  When working remotely, a running socket server from ts_envsensors is required.
+* Removed ``pytest-runner`` and ``tests_require``.
+* Added support for multiple sensors.
+* Added handling of configuration errors.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 9.1
+* ts_envsensors
+* ts_tcpip
+
+
 v0.3.0
 ======
 

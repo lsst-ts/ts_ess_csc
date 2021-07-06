@@ -17,9 +17,9 @@
 # GNU General Public License for more details.
 
 try:
-    from .version import *
+    from .version import *  # type: ignore
 except ModuleNotFoundError:
     __version__ = "?"
 
-from .ess_csc import *
+from .ess_csc import EssCsc
 from .config_schema import CONFIG_SCHEMA
