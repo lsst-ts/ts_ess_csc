@@ -6,10 +6,12 @@
 Version History
 ###############
 
-v0.6.0
+v0.5.0
 ======
 
+* Removed all sensor code.
 * Added a description of the communication protocol.
+* Added support for the Omega HX85A and HX85BA humidity sensors.
 
 Requires:
 
@@ -20,10 +22,10 @@ Requires:
 * ts_tcpip
 
 
-v0.5.0
+v0.4.1
 ======
 
-* Removed all sensor code.
+* Fixed code errors to make the CSC work on the summit.
 
 Requires:
 
