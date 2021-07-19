@@ -59,8 +59,9 @@ properties:
           description: Type of the sensor
           type: string
           enum:
+          - HX85A
+          - HX85BA
           - Temperature
-          - Humidity
           - Wind
         channels:
           description: Number of channels
