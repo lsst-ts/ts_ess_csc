@@ -260,6 +260,10 @@ class EssCsc(salobj.ConfigurableCsc):
                     await self.process_hx85a_telemetry(data=data)
                 elif device_configuration.sens_type == SensorType.HX85BA:
                     await self.process_hx85ba_telemetry(data=data)
+            elif error_code == ResponseCode.DEVICE_READ_ERROR:
+                self.log.error(
+                    f"Error reading sensor {sensor_name}. Please check the hardware."
+                )
         except Exception:
             self.log.exception("Method get_telemetry() failed.")
 
