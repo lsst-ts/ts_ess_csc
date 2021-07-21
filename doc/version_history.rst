@@ -12,6 +12,7 @@ v0.5.0
 * Removed all sensor code.
 * Added a description of the communication protocol.
 * Added support for the Omega HX85A and HX85BA humidity sensors.
+* Added rudimentary exception handling in case a sensor encounters an error.
 
 Requires:
 
