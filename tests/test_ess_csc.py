@@ -22,8 +22,8 @@ import math
 import unittest
 
 from lsst.ts import salobj
-from lsst.ts import ess
-from lsst.ts.envsensors import SocketServer, MockTemperatureConfig
+from lsst.ts.ess import csc
+from lsst.ts.ess.sensors import SocketServer, MockTemperatureConfig
 from lsst.ts import tcpip
 
 
@@ -43,13 +43,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     def basic_make_csc(self, initial_state, config_dir, simulation_mode, **kwargs):
         logging.info("basic_make_csc")
-        csc = ess.EssCsc(
+        ess_csc = csc.EssCsc(
             initial_state=initial_state,
             config_dir=config_dir,
             simulation_mode=simulation_mode,
             index=1,
         )
-        return csc
+        return ess_csc
 
     async def test_standard_state_transitions(self):
         logging.info("test_standard_state_transitions")
@@ -72,7 +72,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await self.assert_next_sample(
                 self.remote.evt_softwareVersions,
-                cscVersion=ess.__version__,
+                cscVersion=csc.__version__,
                 subsystemVersions="",
             )
 

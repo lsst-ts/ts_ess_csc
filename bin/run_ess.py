@@ -21,7 +21,7 @@
 import asyncio
 import logging
 
-from lsst.ts import ess
+from lsst.ts.ess import csc
 
 logging.basicConfig(
     format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
@@ -29,4 +29,4 @@ logging.basicConfig(
 )
 
 
-asyncio.run(ess.EssCsc.amain(index=1))
+asyncio.run(csc.EssCsc.amain(index=1))

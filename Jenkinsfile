@@ -89,11 +89,11 @@ pipeline {
                 }
             }
         }
-        stage("Checkout ts_envsensors") {
+        stage("Checkout ts_ess_sensors") {
             steps {
                 script {
                     sh """
-                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos && git clone https://github.com/lsst-ts/ts_envsensors.git && cd ts_envsensors && pip install --ignore-installed -e . && eups declare -r . -t saluser \"
+                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos && git clone https://github.com/lsst-ts/ts_ess_sensors.git && cd ts_ess_sensors && pip install --ignore-installed -e . && eups declare -r . -t saluser \"
                     """
                 }
             }

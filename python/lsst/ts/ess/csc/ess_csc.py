@@ -29,14 +29,8 @@ import numpy as np
 
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
-from lsst.ts import salobj, tcpip  # type: ignore
-from lsst.ts.envsensors import (
-    DeviceConfig,
-    DeviceType,
-    Key,
-    ResponseCode,
-    SensorType,
-)
+from lsst.ts import salobj, tcpip
+from lsst.ts.ess import sensors
 
 """Standard timeout in seconds for socket connections."""
 SOCKET_TIMEOUT = 5
@@ -69,7 +63,7 @@ class EssCsc(salobj.ConfigurableCsc):
         simulation_mode: int = 0,
     ) -> None:
         self.config: Optional[SimpleNamespace] = None
-        self.device_configurations: Dict[str, DeviceConfig] = {}
+        self.device_configurations: Dict[str, sensors.DeviceConfig] = {}
         self._config_dir = config_dir
         super().__init__(
             name="ESS",
@@ -94,9 +88,9 @@ class EssCsc(salobj.ConfigurableCsc):
         try:
             while True:
                 data = await self.read()
-                if Key.RESPONSE in data:
-                    response = data[Key.RESPONSE]
-                    if response != ResponseCode.OK:
+                if sensors.Key.RESPONSE in data:
+                    response = data[sensors.Key.RESPONSE]
+                    if response != sensors.ResponseCode.OK:
                         try:
                             oldest_last_command = self.last_commands.pop(0)
                             self.log.error(
@@ -106,8 +100,8 @@ class EssCsc(salobj.ConfigurableCsc):
                             self.log.error(
                                 f"Received response {data} while no command was waiting for a reply."
                             )
-                elif Key.TELEMETRY in data:
-                    sensor_data = data[Key.TELEMETRY]
+                elif sensors.Key.TELEMETRY in data:
+                    sensor_data = data[sensors.Key.TELEMETRY]
                     await self.process_telemetry(data=sensor_data)
                 else:
                     raise ValueError(f"Unknown data {data!r} received.")
@@ -253,14 +247,14 @@ class EssCsc(salobj.ConfigurableCsc):
             sensor_name = data[0]
             error_code = data[2]
             device_configuration = self.device_configurations[sensor_name]
-            if error_code == ResponseCode.OK:
-                if device_configuration.sens_type == SensorType.TEMPERATURE:
+            if error_code == sensors.ResponseCode.OK:
+                if device_configuration.sens_type == sensors.SensorType.TEMPERATURE:
                     await self.process_temperature_telemetry(data=data)
-                elif device_configuration.sens_type == SensorType.HX85A:
+                elif device_configuration.sens_type == sensors.SensorType.HX85A:
                     await self.process_hx85a_telemetry(data=data)
-                elif device_configuration.sens_type == SensorType.HX85BA:
+                elif device_configuration.sens_type == sensors.SensorType.HX85BA:
                     await self.process_hx85ba_telemetry(data=data)
-            elif error_code == ResponseCode.DEVICE_READ_ERROR:
+            elif error_code == sensors.ResponseCode.DEVICE_READ_ERROR:
                 self.log.error(
                     f"Error reading sensor {sensor_name}. Please check the hardware."
                 )
@@ -368,22 +362,24 @@ class EssCsc(salobj.ConfigurableCsc):
         """
         self.config = config
         for device in config.devices:
-            if device[Key.DEVICE_TYPE] == DeviceType.FTDI:
-                dev_id = Key.FTDI_ID
-            elif device[Key.DEVICE_TYPE] == DeviceType.SERIAL:
-                dev_id = Key.SERIAL_PORT
+            if device[sensors.Key.DEVICE_TYPE] == sensors.DeviceType.FTDI:
+                dev_id = sensors.Key.FTDI_ID
+            elif device[sensors.Key.DEVICE_TYPE] == sensors.DeviceType.SERIAL:
+                dev_id = sensors.Key.SERIAL_PORT
             else:
-                raise ValueError(f"Unknown device type {device[Key.TYPE]} encountered.")
+                raise ValueError(
+                    f"Unknown device type {device[sensors.Key.TYPE]} encountered."
+                )
             num_channels = 0
-            sensor_type = device[Key.SENSOR_TYPE]
-            if sensor_type == SensorType.TEMPERATURE:
-                num_channels = device[Key.CHANNELS]
-            self.device_configurations[device[Key.NAME]] = DeviceConfig(
-                name=device[Key.NAME],
+            sensor_type = device[sensors.Key.SENSOR_TYPE]
+            if sensor_type == sensors.SensorType.TEMPERATURE:
+                num_channels = device[sensors.Key.CHANNELS]
+            self.device_configurations[device[sensors.Key.NAME]] = sensors.DeviceConfig(
+                name=device[sensors.Key.NAME],
                 num_channels=num_channels,
-                dev_type=device[Key.DEVICE_TYPE],
+                dev_type=device[sensors.Key.DEVICE_TYPE],
                 dev_id=device[dev_id],
-                sens_type=device[Key.SENSOR_TYPE],
+                sens_type=device[sensors.Key.SENSOR_TYPE],
             )
 
     @property

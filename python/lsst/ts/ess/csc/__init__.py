@@ -17,7 +17,7 @@
 # GNU General Public License for more details.
 
 try:
-    from .version import *  # type: ignore
+    from .version import *
 except ModuleNotFoundError:
     __version__ = "?"
 
