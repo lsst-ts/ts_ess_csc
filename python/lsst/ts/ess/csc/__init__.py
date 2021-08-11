@@ -1,4 +1,4 @@
-# This file is part of ts_ess.
+# This file is part of ts_ess_csc.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -15,11 +15,21 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from .version import *
-except ModuleNotFoundError:
+import typing
+
+# For an explanation why these next lines are so complicated, see
+# https://confluence.lsstcorp.org/pages/viewpage.action?spaceKey=LTS&title=Enabling+Mypy+in+Pytest
+if typing.TYPE_CHECKING:
     __version__ = "?"
+else:
+    try:
+        from .version import *
+    except ImportError:
+        __version__ = "?"
 
 from .ess_csc import EssCsc
 from .config_schema import CONFIG_SCHEMA
