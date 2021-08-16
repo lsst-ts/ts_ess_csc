@@ -1,4 +1,4 @@
-# This file is part of ts_ess.
+# This file is part of ts_ess_csc.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -15,6 +15,9 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 """Sphinx configuration file for an LSST stack package.
 
@@ -22,13 +25,17 @@ This configuration only affects single-package Sphinx documentation builds.
 """
 
 from documenteer.conf.pipelinespkg import *  # noqa
-import lsst.ts.ess  # noqa
+import lsst.ts.ess.csc  # noqa
 
-project = "ts_ess"
+project = "ts_ess_csc"
 html_theme_options["logotext"] = project  # noqa
 html_title = project
 html_short_title = project
 doxylink = {}  # Avoid warning: Could not find tag file _doxygen/doxygen.tag
 
 intersphinx_mapping["ts_tcpip"] = ("https://ts-tcpip.lsst.io", None)  # noqa
-intersphinx_mapping["ts_envsensors"] = ("https://ts-envsensors.lsst.io", None)  # noqa
+intersphinx_mapping["ts_ess_common"] = ("https://ts-ess-common.lsst.io", None)  # noqa
+intersphinx_mapping["ts_ess_controller"] = (
+    "https://ts-ess-controller.lsst.io",
+    None,
+)  # noqa

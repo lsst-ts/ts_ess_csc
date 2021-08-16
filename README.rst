@@ -1,8 +1,8 @@
-######
-ts_ess
-######
+##########
+ts_ess_csc
+##########
 
-``ts_ess`` is a Commandable SAL Component (CSC) to control various environmental sensors at the Vera C. Rubin Observatory.
+``ts_ess_csc`` is a Commandable SAL Component (CSC) to control various environmental sensors at the Vera C. Rubin Observatory.
 
 `Documentation <https://ts-ess.lsst.io>`_
 

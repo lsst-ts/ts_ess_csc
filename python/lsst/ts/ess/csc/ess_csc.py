@@ -1,4 +1,4 @@
-# This file is part of ts_ess.
+# This file is part of ts_ess_csc.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -15,6 +15,9 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 __all__ = ["EssCsc"]
 
@@ -29,14 +32,8 @@ import numpy as np
 
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
-from lsst.ts import salobj, tcpip  # type: ignore
-from lsst.ts.envsensors import (
-    DeviceConfig,
-    DeviceType,
-    Key,
-    ResponseCode,
-    SensorType,
-)
+from lsst.ts import salobj, tcpip
+from lsst.ts.ess import common
 
 """Standard timeout in seconds for socket connections."""
 SOCKET_TIMEOUT = 5
@@ -69,7 +66,7 @@ class EssCsc(salobj.ConfigurableCsc):
         simulation_mode: int = 0,
     ) -> None:
         self.config: Optional[SimpleNamespace] = None
-        self.device_configurations: Dict[str, DeviceConfig] = {}
+        self.device_configurations: Dict[str, common.DeviceConfig] = {}
         self._config_dir = config_dir
         super().__init__(
             name="ESS",
@@ -94,9 +91,9 @@ class EssCsc(salobj.ConfigurableCsc):
         try:
             while True:
                 data = await self.read()
-                if Key.RESPONSE in data:
-                    response = data[Key.RESPONSE]
-                    if response != ResponseCode.OK:
+                if common.Key.RESPONSE in data:
+                    response = data[common.Key.RESPONSE]
+                    if response != common.ResponseCode.OK:
                         try:
                             oldest_last_command = self.last_commands.pop(0)
                             self.log.error(
@@ -106,8 +103,8 @@ class EssCsc(salobj.ConfigurableCsc):
                             self.log.error(
                                 f"Received response {data} while no command was waiting for a reply."
                             )
-                elif Key.TELEMETRY in data:
-                    sensor_data = data[Key.TELEMETRY]
+                elif common.Key.TELEMETRY in data:
+                    sensor_data = data[common.Key.TELEMETRY]
                     await self.process_telemetry(data=sensor_data)
                 else:
                     raise ValueError(f"Unknown data {data!r} received.")
@@ -253,14 +250,14 @@ class EssCsc(salobj.ConfigurableCsc):
             sensor_name = data[0]
             error_code = data[2]
             device_configuration = self.device_configurations[sensor_name]
-            if error_code == ResponseCode.OK:
-                if device_configuration.sens_type == SensorType.TEMPERATURE:
+            if error_code == common.ResponseCode.OK:
+                if device_configuration.sens_type == common.SensorType.TEMPERATURE:
                     await self.process_temperature_telemetry(data=data)
-                elif device_configuration.sens_type == SensorType.HX85A:
+                elif device_configuration.sens_type == common.SensorType.HX85A:
                     await self.process_hx85a_telemetry(data=data)
-                elif device_configuration.sens_type == SensorType.HX85BA:
+                elif device_configuration.sens_type == common.SensorType.HX85BA:
                     await self.process_hx85ba_telemetry(data=data)
-            elif error_code == ResponseCode.DEVICE_READ_ERROR:
+            elif error_code == common.ResponseCode.DEVICE_READ_ERROR:
                 self.log.error(
                     f"Error reading sensor {sensor_name}. Please check the hardware."
                 )
@@ -368,22 +365,24 @@ class EssCsc(salobj.ConfigurableCsc):
         """
         self.config = config
         for device in config.devices:
-            if device[Key.DEVICE_TYPE] == DeviceType.FTDI:
-                dev_id = Key.FTDI_ID
-            elif device[Key.DEVICE_TYPE] == DeviceType.SERIAL:
-                dev_id = Key.SERIAL_PORT
+            if device[common.Key.DEVICE_TYPE] == common.DeviceType.FTDI:
+                dev_id = common.Key.FTDI_ID
+            elif device[common.Key.DEVICE_TYPE] == common.DeviceType.SERIAL:
+                dev_id = common.Key.SERIAL_PORT
             else:
-                raise ValueError(f"Unknown device type {device[Key.TYPE]} encountered.")
+                raise ValueError(
+                    f"Unknown device type {device[common.Key.TYPE]} encountered."
+                )
             num_channels = 0
-            sensor_type = device[Key.SENSOR_TYPE]
-            if sensor_type == SensorType.TEMPERATURE:
-                num_channels = device[Key.CHANNELS]
-            self.device_configurations[device[Key.NAME]] = DeviceConfig(
-                name=device[Key.NAME],
+            sensor_type = device[common.Key.SENSOR_TYPE]
+            if sensor_type == common.SensorType.TEMPERATURE:
+                num_channels = device[common.Key.CHANNELS]
+            self.device_configurations[device[common.Key.NAME]] = common.DeviceConfig(
+                name=device[common.Key.NAME],
                 num_channels=num_channels,
-                dev_type=device[Key.DEVICE_TYPE],
+                dev_type=device[common.Key.DEVICE_TYPE],
                 dev_id=device[dev_id],
-                sens_type=device[Key.SENSOR_TYPE],
+                sens_type=device[common.Key.SENSOR_TYPE],
             )
 
     @property

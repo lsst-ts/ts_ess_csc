@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# This file is part of ts_ess.
+# This file is part of ts_ess_csc.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -17,11 +17,14 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
 import logging
 
-from lsst.ts import ess
+from lsst.ts.ess import csc
 
 logging.basicConfig(
     format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
@@ -29,4 +32,4 @@ logging.basicConfig(
 )
 
 
-asyncio.run(ess.EssCsc.amain(index=1))
+asyncio.run(csc.EssCsc.amain(index=1))

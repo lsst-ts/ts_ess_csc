@@ -4,7 +4,7 @@
 #   the "sconsUtils" package.
 setupRequired(sconsUtils)
 setupRequired(ts_salobj)
-setupRequired(ts_envsensors)
+setupRequired(ts_ess_common)
 setupRequired(ts_tcpip)
 setupRequired(ts_config_ocs)
 

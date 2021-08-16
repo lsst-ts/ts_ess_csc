@@ -1,4 +1,4 @@
-# This file is part of ts_ess.
+# This file is part of ts_ess_csc.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -26,7 +26,7 @@ import yaml
 CONFIG_SCHEMA = yaml.safe_load(
     """
 $schema: http://json-schema.org/draft-07/schema#
-$id: https://github.com/lsst-ts/ts_ess/blob/master/python/lsst/ts/ess/config_schema.py
+$id: https://github.com/lsst-ts/ts_ess/blob/master/python/lsst/ts/ess/csc/config_schema.py
 # title must end with one or more spaces followed by the schema version, which must begin with "v"
 title: ESS v1
 description: Schema for ESS configuration files
