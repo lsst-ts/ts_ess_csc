@@ -140,7 +140,7 @@ pipeline {
                     "source ~/.setup.sh && " +
                     "cd /home/saluser/repo/ && " +
                     "setup ts_ess_csc -t saluser && " +
-                    "ltd upload --product ts-ess --git-ref \${GIT_BRANCH} --dir doc/_build/html\""
+                    "ltd upload --product ts-ess-csc --git-ref \${GIT_BRANCH} --dir doc/_build/html\""
 
                 if ( RESULT != 0 ) {
                     unstable("Failed to push documentation.")
