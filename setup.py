@@ -41,7 +41,7 @@ setuptools.setup(
     package_dir={"": "python"},
     packages=setuptools.find_namespace_packages(where="python"),
     package_data={"": ["*.rst", "*.yaml", "*.xml"]},
-    scripts=["bin/run_ess.py"],
+    scripts=["bin/run_ess_csc.py"],
     extras_require={"dev": dev_requires},
     license="GPL",
     project_urls={

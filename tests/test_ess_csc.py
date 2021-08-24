@@ -86,7 +86,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_bin_script(self):
         logging.info("test_bin_script")
-        await self.check_bin_script(name="ESS", index=None, exe_name="run_ess.py")
+        await self.check_bin_script(name="ESS", index=None, exe_name="run_ess_csc.py")
 
     async def validate_telemetry(self):
         for sensor_name in self.csc.device_configurations:

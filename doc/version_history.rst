@@ -14,13 +14,14 @@ v0.5.0
 * Added support for the Omega HX85A and HX85BA humidity sensors.
 * Added rudimentary exception handling in case a sensor encounters an error.
 * Renamed the project to ts_ess_csc.
-* Made sure to refer to the ts_ess_common Python package.
+* Made sure to refer to the ts_ess_common and ts_ess_controller Python packages.
 
 Requires:
 
 * ts_salobj 6.3
 * ts_idl 3.1
 * IDL file for ESS from ts_xml 9.1
+* ts_ess_controller
 * ts_ess_common
 * ts_tcpip
 
