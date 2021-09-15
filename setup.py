@@ -1,4 +1,4 @@
-# This file is part of ts_ess.
+# This file is part of ts_ess_csc.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -15,10 +15,11 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import sys
 import setuptools
-import pathlib
 
 install_requires = ["pyserial", "pyftdi", "pylibftdi"]
 dev_requires = install_requires + ["documenteer[pipelines]"]
@@ -27,15 +28,12 @@ __all__ = ["__version__"]
 
 __version__ = "{version}"
 """
-tools_path = pathlib.PurePosixPath(setuptools.__path__[0])
-base_prefix = pathlib.PurePosixPath(sys.base_prefix)
-data_files_path = tools_path.relative_to(base_prefix).parents[1]
 
 setuptools.setup(
-    name="ts_ess",
+    name="ts_ess_csc",
     description="LSST Environment Sensors Support",
     use_scm_version={
-        "write_to": "python/lsst/ts/ess/version.py",
+        "write_to": "python/lsst/ts/ess/csc/version.py",
         "write_to_template": scm_version_template,
     },
     setup_requires=["setuptools_scm"],
@@ -43,12 +41,11 @@ setuptools.setup(
     package_dir={"": "python"},
     packages=setuptools.find_namespace_packages(where="python"),
     package_data={"": ["*.rst", "*.yaml", "*.xml"]},
-    data_files=[],
-    scripts=["bin/run_ess.py"],
+    scripts=["bin/run_ess_csc.py"],
     extras_require={"dev": dev_requires},
     license="GPL",
     project_urls={
         "Bug Tracker": "https://jira.lsstcorp.org/secure/Dashboard.jspa",
-        "Source Code": "https://github.com/lsst-ts/ts_ess",
+        "Source Code": "https://github.com/lsst-ts/ts_ess_csc",
     },
 )

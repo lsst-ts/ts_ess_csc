@@ -89,11 +89,20 @@ pipeline {
                 }
             }
         }
-        stage("Checkout ts_envsensors") {
+        stage("Checkout ts_ess_common") {
             steps {
                 script {
                     sh """
-                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos && git clone https://github.com/lsst-ts/ts_envsensors.git && cd ts_envsensors && pip install --ignore-installed -e . && eups declare -r . -t saluser \"
+                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos && git clone https://github.com/lsst-ts/ts_ess_common.git && cd ts_ess_common && pip install --ignore-installed -e . && eups declare -r . -t saluser \"
+                    """
+                }
+            }
+        }
+        stage("Checkout ts_ess_controller") {
+            steps {
+                script {
+                    sh """
+                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos && git clone https://github.com/lsst-ts/ts_ess_controller.git && cd ts_ess_controller && pip install --ignore-installed -e . && eups declare -r . -t saluser \"
                     """
                 }
             }
@@ -102,7 +111,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd repo && pip install --ignore-installed -e . && eups declare -r . -t saluser && setup ts_ess -t saluser && pytest --junitxml=\${XML_REPORT}\"
+                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd repo && pip install --ignore-installed -e . && eups declare -r . -t saluser && setup ts_ess_csc -t saluser && pytest --junitxml=\${XML_REPORT}\"
                     """
                 }
             }
@@ -123,15 +132,15 @@ pipeline {
             sh "docker exec -u saluser \${container_name} sh -c \"" +
                 "source ~/.setup.sh && " +
                 "cd /home/saluser/repo/ && " +
-                "setup ts_ess -t saluser && " +
+                "setup ts_ess_csc -t saluser && " +
                 "package-docs build\""
 
             script {
                 def RESULT = sh returnStatus: true, script: "docker exec -u saluser \${container_name} sh -c \"" +
                     "source ~/.setup.sh && " +
                     "cd /home/saluser/repo/ && " +
-                    "setup ts_ess -t saluser && " +
-                    "ltd upload --product ts-ess --git-ref \${GIT_BRANCH} --dir doc/_build/html\""
+                    "setup ts_ess_csc -t saluser && " +
+                    "ltd upload --product ts-ess-csc --git-ref \${GIT_BRANCH} --dir doc/_build/html\""
 
                 if ( RESULT != 0 ) {
                     unstable("Failed to push documentation.")

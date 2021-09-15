@@ -1,4 +1,4 @@
-# This file is part of ts_ess.
+# This file is part of ts_ess_csc.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
 # This product includes software developed by the LSST Project
@@ -15,6 +15,9 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 __all__ = ["EssCsc"]
 
@@ -29,13 +32,8 @@ import numpy as np
 
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
-from lsst.ts import salobj, tcpip  # type: ignore
-from lsst.ts.envsensors import (
-    DeviceConfig,
-    DeviceType,
-    Key,
-    ResponseCode,
-)
+from lsst.ts import salobj, tcpip
+from lsst.ts.ess import common
 
 """Standard timeout in seconds for socket connections."""
 SOCKET_TIMEOUT = 5
@@ -68,7 +66,7 @@ class EssCsc(salobj.ConfigurableCsc):
         simulation_mode: int = 0,
     ) -> None:
         self.config: Optional[SimpleNamespace] = None
-        self.device_configurations: Dict[str, DeviceConfig] = {}
+        self.device_configurations: Dict[str, common.DeviceConfig] = {}
         self._config_dir = config_dir
         super().__init__(
             name="ESS",
@@ -93,9 +91,9 @@ class EssCsc(salobj.ConfigurableCsc):
         try:
             while True:
                 data = await self.read()
-                if Key.RESPONSE in data:
-                    response = data[Key.RESPONSE]
-                    if response != ResponseCode.OK:
+                if common.Key.RESPONSE in data:
+                    response = data[common.Key.RESPONSE]
+                    if response != common.ResponseCode.OK:
                         try:
                             oldest_last_command = self.last_commands.pop(0)
                             self.log.error(
@@ -105,9 +103,9 @@ class EssCsc(salobj.ConfigurableCsc):
                             self.log.error(
                                 f"Received response {data} while no command was waiting for a reply."
                             )
-                elif Key.TELEMETRY in data:
-                    sensor_data = data[Key.TELEMETRY]
-                    await self.get_telemetry(data=sensor_data)
+                elif common.Key.TELEMETRY in data:
+                    sensor_data = data[common.Key.TELEMETRY]
+                    await self.process_telemetry(data=sensor_data)
                 else:
                     raise ValueError(f"Unknown data {data!r} received.")
         except Exception:
@@ -148,43 +146,123 @@ class EssCsc(salobj.ConfigurableCsc):
         self.writer.write(st.encode() + tcpip.TERMINATOR)
         await self.writer.drain()
 
-    async def get_telemetry(self, data: List[Union[str, int, float]]) -> None:
-        """Get the timestamp and temperatures from the output data.
+    async def process_temperature_telemetry(
+        self, data: List[Union[str, int, float]]
+    ) -> None:
+        """Process the temperature telemetry and send to EFD.
 
         Parameters
         ----------
         data: `list`
-            A list containing the timestamp, error and temperatures as
-            measured by the sensor. The order of the items in the list is:
+            A list containing the timestamp, error and sensor data. The order
+            of the items in the list is:
+            - Sensor name: `str`
+            - Timestamp: `float`
+            - Response code: `int`
+            - One or more sensor data: each of type `float`
+        """
+        sensor_name = data[0]
+        timestamp = data[1]
+        sensor_data = data[3:]
+        device_configuration = self.device_configurations[sensor_name]
+        telemetry = {"sensorName": sensor_name, "timestamp": timestamp}
+
+        if len(sensor_data) != device_configuration.num_channels:
+            raise RuntimeError(
+                f"Expected {device_configuration.num_channels} temperatures "
+                f"but received {len(sensor_data)}."
+            )
+        for i, value in enumerate(sensor_data):
+            # The telemetry channels start counting at 1 and not 0.
+            telemetry[f"temperatureC{i + 1:02d}"] = value
+        self.log.info(f"Received temperatures {telemetry}")
+        self.log.info("Sending telemetry.")
+        telemetry_method = getattr(
+            self, f"tel_temperature{device_configuration.num_channels}Ch"
+        )
+        telemetry_method.set_put(**telemetry)
+
+    async def process_hx85a_telemetry(self, data: List[Union[str, int, float]]) -> None:
+        """Process the HX85A humidity sensor telemetry and send to EFD.
+
+        Parameters
+        ----------
+        data: `list`
+            A list containing the timestamp, error and sensor data. The order
+            of the items in the list is:
+            - Sensor name: `str`
+            - Timestamp: `float`
+            - Response code: `int`
+            - One or more sensor data: each of type `float`
+        """
+        sensor_name = data[0]
+        timestamp = data[1]
+        telemetry = {
+            "sensorName": sensor_name,
+            "timestamp": timestamp,
+            "relativeHumidity": data[3],
+            "airTemperature": data[4],
+            "dewPoint": data[5],
+        }
+        self.tel_hx85a.set_put(**telemetry)
+
+    async def process_hx85ba_telemetry(
+        self, data: List[Union[str, int, float]]
+    ) -> None:
+        """Process the HX85BA humidity sensor telemetry and send to EFD.
+
+        Parameters
+        ----------
+        data: `list`
+            A list containing the timestamp, error and sensor data. The order
+            of the items in the list is:
+            - Sensor name: `str`
+            - Timestamp: `float`
+            - Response code: `int`
+            - One or more sensor data: each of type `float`
+        """
+        sensor_name = data[0]
+        timestamp = data[1]
+        telemetry = {
+            "sensorName": sensor_name,
+            "timestamp": timestamp,
+            "relativeHumidity": data[3],
+            "airTemperature": data[4],
+            "barometricPressure": data[5],
+        }
+        self.tel_hx85ba.set_put(**telemetry)
+
+    async def process_telemetry(self, data: List[Union[str, int, float]]) -> None:
+        """Process the sensor telemetry
+
+        Parameters
+        ----------
+        data: `list`
+            A list containing the timestamp, error and sensor data. The order
+            of the items in the list is:
             - Sensor name: `str`
             - Timestamp: `float`
             - Response code: `int`
             - One or more sensor data: each of type `float`
         """
         try:
+            self.log.debug(f"Processing data {data}")
             sensor_name = data[0]
-            timestamp = data[1]
             error_code = data[2]
             device_configuration = self.device_configurations[sensor_name]
-            if error_code == ResponseCode.OK:
-                telemetry = {"sensor_name": sensor_name, "timestamp": timestamp}
-                sensor_data = data[3:]
-                if len(sensor_data) != device_configuration.num_channels:
-                    raise RuntimeError(
-                        f"Expected {device_configuration.num_channels} temperatures "
-                        f"but received {len(sensor_data)}."
-                    )
-                for i, value in enumerate(sensor_data):
-                    # The telemetry channels start counting at 1 and not 0.
-                    telemetry[f"temperatureC{i+1:02d}"] = value
-                self.log.info(f"Received temperatures {telemetry}")
-                self.log.info("Sending telemetry.")
-                telemetry_method = getattr(
-                    self, f"tel_temperature{device_configuration.num_channels}Ch"
+            if error_code == common.ResponseCode.OK:
+                if device_configuration.sens_type == common.SensorType.TEMPERATURE:
+                    await self.process_temperature_telemetry(data=data)
+                elif device_configuration.sens_type == common.SensorType.HX85A:
+                    await self.process_hx85a_telemetry(data=data)
+                elif device_configuration.sens_type == common.SensorType.HX85BA:
+                    await self.process_hx85ba_telemetry(data=data)
+            elif error_code == common.ResponseCode.DEVICE_READ_ERROR:
+                self.log.error(
+                    f"Error reading sensor {sensor_name}. Please check the hardware."
                 )
-                telemetry_method.set_put(**telemetry)
         except Exception:
-            self.log.exception("Method get_telemetry() failed")
+            self.log.exception("Method get_telemetry() failed.")
 
     async def connect(self) -> None:
         """Determine if running in local or remote mode and dispatch to the
@@ -287,18 +365,24 @@ class EssCsc(salobj.ConfigurableCsc):
         """
         self.config = config
         for device in config.devices:
-            if device[Key.DEVICE_TYPE] == DeviceType.FTDI:
-                dev_id = Key.FTDI_ID
-            elif device[Key.DEVICE_TYPE] == DeviceType.SERIAL:
-                dev_id = Key.SERIAL_PORT
+            if device[common.Key.DEVICE_TYPE] == common.DeviceType.FTDI:
+                dev_id = common.Key.FTDI_ID
+            elif device[common.Key.DEVICE_TYPE] == common.DeviceType.SERIAL:
+                dev_id = common.Key.SERIAL_PORT
             else:
-                raise ValueError(f"Unknown device type {device[Key.TYPE]} encountered.")
-            self.device_configurations[device[Key.NAME]] = DeviceConfig(
-                name=device[Key.NAME],
-                num_channels=device[Key.CHANNELS],
-                dev_type=device[Key.DEVICE_TYPE],
+                raise ValueError(
+                    f"Unknown device type {device[common.Key.TYPE]} encountered."
+                )
+            num_channels = 0
+            sensor_type = device[common.Key.SENSOR_TYPE]
+            if sensor_type == common.SensorType.TEMPERATURE:
+                num_channels = device[common.Key.CHANNELS]
+            self.device_configurations[device[common.Key.NAME]] = common.DeviceConfig(
+                name=device[common.Key.NAME],
+                num_channels=num_channels,
+                dev_type=device[common.Key.DEVICE_TYPE],
                 dev_id=device[dev_id],
-                sens_type=device[Key.SENSOR_TYPE],
+                sens_type=device[common.Key.SENSOR_TYPE],
             )
 
     @property
