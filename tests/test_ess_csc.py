@@ -91,17 +91,15 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def validate_telemetry(self):
         for sensor_name in self.csc.device_configurations:
             device_configuration = self.csc.device_configurations[sensor_name]
-            telemetry_topic = getattr(
-                self.remote, f"tel_temperature{device_configuration.num_channels}Ch"
-            )
-            data = await telemetry_topic.next(flush=False)
-            for i in range(0, device_configuration.num_channels):
-                # Channels indices are 1-based
-                temp_telemetry = getattr(data, f"temperatureC{i + 1:02d}")
-                self.assertLessEqual(common.MockTemperatureConfig.min, temp_telemetry)
-                self.assertLessEqual(temp_telemetry, common.MockTemperatureConfig.max)
+            data = await self.remote.tel_temperature.next(flush=False)
+            assert data.numChannels == device_configuration.num_channels
+            temperature = data.temperature
+            temperature = data.temperature[: device_configuration.num_channels]
+            assert common.MockTemperatureConfig.min <= min(temperature)
+            assert common.MockTemperatureConfig.max >= max(temperature)
 
-    async def receive_telemetry(self):
+    async def test_receive_telemetry(self):
+        logging.info("test_receive_telemetry")
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             config_dir=None,
@@ -123,7 +121,3 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             self.assertFalse(self.socket_server.connected)
             await self.socket_server.exit()
-
-    async def test_receive_telemetry(self):
-        logging.info("test_receive_telemetry")
-        await self.receive_telemetry()
