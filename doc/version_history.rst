@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.6.0
+======
+
+* Consolidated all multi-channel temperature topics into one.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 10.1
+* ts_ess_controller
+* ts_ess_common
+* ts_tcpip
+
+
 v0.5.0
 ======
 

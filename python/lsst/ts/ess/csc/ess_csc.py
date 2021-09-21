@@ -24,6 +24,7 @@ __all__ = ["EssCsc"]
 import argparse
 import asyncio
 import json
+import math
 import platform
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Union
@@ -35,8 +36,15 @@ from . import __version__
 from lsst.ts import salobj, tcpip
 from lsst.ts.ess import common
 
-"""Standard timeout in seconds for socket connections."""
 SOCKET_TIMEOUT = 5
+"""Standard timeout in seconds for socket connections."""
+
+NUMBER_OF_TEMPERATURE_CHANNELS = 16
+"""The number of temperature channels expected in the telemetry."""
+
+TEMPERATURE_NANS = [math.nan] * NUMBER_OF_TEMPERATURE_CHANNELS
+"""Initial array with NaN values in which the temperature values of
+the sensors will be stored."""
 
 
 class EssCsc(salobj.ConfigurableCsc):
@@ -165,22 +173,22 @@ class EssCsc(salobj.ConfigurableCsc):
         timestamp = data[1]
         sensor_data = data[3:]
         device_configuration = self.device_configurations[sensor_name]
-        telemetry = {"sensorName": sensor_name, "timestamp": timestamp}
+        telemetry = {
+            "sensorName": sensor_name,
+            "timestamp": timestamp,
+            "numChannels": device_configuration.num_channels,
+        }
 
         if len(sensor_data) != device_configuration.num_channels:
             raise RuntimeError(
                 f"Expected {device_configuration.num_channels} temperatures "
                 f"but received {len(sensor_data)}."
             )
-        for i, value in enumerate(sensor_data):
-            # The telemetry channels start counting at 1 and not 0.
-            telemetry[f"temperatureC{i + 1:02d}"] = value
-        self.log.info(f"Received temperatures {telemetry}")
-        self.log.info("Sending telemetry.")
-        telemetry_method = getattr(
-            self, f"tel_temperature{device_configuration.num_channels}Ch"
-        )
-        telemetry_method.set_put(**telemetry)
+        temperature = TEMPERATURE_NANS[:]
+        temperature[: device_configuration.num_channels] = sensor_data
+        telemetry["temperature"] = temperature
+        self.log.debug(f"Sending telemetry {telemetry}")
+        self.tel_temperature.set_put(**telemetry)
 
     async def process_hx85a_telemetry(self, data: List[Union[str, int, float]]) -> None:
         """Process the HX85A humidity sensor telemetry and send to EFD.
@@ -201,7 +209,7 @@ class EssCsc(salobj.ConfigurableCsc):
             "sensorName": sensor_name,
             "timestamp": timestamp,
             "relativeHumidity": data[3],
-            "airTemperature": data[4],
+            "temperature": data[4],
             "dewPoint": data[5],
         }
         self.tel_hx85a.set_put(**telemetry)
@@ -227,7 +235,7 @@ class EssCsc(salobj.ConfigurableCsc):
             "sensorName": sensor_name,
             "timestamp": timestamp,
             "relativeHumidity": data[3],
-            "airTemperature": data[4],
+            "temperature": data[4],
             "barometricPressure": data[5],
         }
         self.tel_hx85ba.set_put(**telemetry)
