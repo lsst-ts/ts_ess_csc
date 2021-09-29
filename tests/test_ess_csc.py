@@ -49,13 +49,16 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(self.socket_server.start(), timeout=5)
         self.port = self.socket_server.port
 
-    def basic_make_csc(self, initial_state, config_dir, simulation_mode, **kwargs):
+    def basic_make_csc(
+        self, initial_state, config_dir, simulation_mode, settings_to_apply, **kwargs
+    ):
         logging.info("basic_make_csc")
         ess_csc = csc.EssCsc(
             initial_state=initial_state,
             config_dir=config_dir,
             simulation_mode=simulation_mode,
             index=1,
+            settings_to_apply=settings_to_apply,
         )
         return ess_csc
 
@@ -65,6 +68,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.STANDBY,
             config_dir=None,
             simulation_mode=1,
+            settings_to_apply="",
         ):
             self.csc.port = self.port
             await self.check_standard_state_transitions(
@@ -77,6 +81,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.STANDBY,
             config_dir=None,
             simulation_mode=1,
+            settings_to_apply="",
         ):
             await self.assert_next_sample(
                 self.remote.evt_softwareVersions,
@@ -86,7 +91,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def test_bin_script(self):
         logging.info("test_bin_script")
-        await self.check_bin_script(name="ESS", index=None, exe_name="run_ess_csc.py")
+        await self.check_bin_script(name="ESS", index=1, exe_name="run_ess_csc.py")
 
     async def validate_telemetry(self):
         for sensor_name in self.csc.device_configurations:
@@ -104,6 +109,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.STANDBY,
             config_dir=None,
             simulation_mode=1,
+            settings_to_apply="",
         ):
             self.csc.port = self.port
             self.assertFalse(self.socket_server.connected)
