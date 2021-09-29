@@ -32,4 +32,4 @@ logging.basicConfig(
 )
 
 
-asyncio.run(csc.EssCsc.amain(index=1))
+asyncio.run(csc.EssCsc.amain(index=True))
