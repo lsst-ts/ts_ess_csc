@@ -33,7 +33,7 @@ import numpy as np
 
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
-from lsst.ts import salobj, tcpip
+from lsst.ts import salobj, tcpip, utils
 from lsst.ts.ess import common
 
 SOCKET_TIMEOUT = 5
@@ -89,7 +89,7 @@ class EssCsc(salobj.ConfigurableCsc):
         self.writer: Optional[asyncio.StreamWriter] = None
         self.host = None
         self.port = None
-        self.telemetry_loop: asyncio.Future = salobj.make_done_future()
+        self.telemetry_loop: asyncio.Future = utils.make_done_future()
         self.last_commands: List[str] = []
 
         self.log.info("ESS CSC created.")
