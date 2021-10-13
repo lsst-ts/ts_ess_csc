@@ -10,6 +10,7 @@ v0.6.0
 ======
 
 * Consolidated all multi-channel temperature topics into one.
+* Replaced the use of ts_salobj functions with ts_utils functions.
 
 Requires:
 
@@ -19,6 +20,7 @@ Requires:
 * ts_ess_controller
 * ts_ess_common
 * ts_tcpip
+* ts_utils 1.0
 
 
 v0.5.0
