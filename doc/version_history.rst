@@ -23,6 +23,21 @@ Requires:
 * ts_utils 1.0
 
 
+v0.5.1
+======
+
+* Fixed launch script to get index argument.
+* Added auto-enable capability.
+
+Requires:
+
+* ts_salobj 6.6
+* ts_idl 3.3
+* IDL file for ESS from ts_xml 10.0
+* ts_ess_controller
+* ts_ess_common
+* ts_tcpip
+
 v0.5.0
 ======
 

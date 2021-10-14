@@ -63,6 +63,7 @@ class EssCsc(salobj.ConfigurableCsc):
         Simulation mode (1) or not (0)
     """
 
+    enable_cmdline_state = True
     valid_simulation_modes = (0, 1)
     version = __version__
 
@@ -72,6 +73,7 @@ class EssCsc(salobj.ConfigurableCsc):
         config_dir: str = None,
         initial_state: salobj.State = salobj.State.STANDBY,
         simulation_mode: int = 0,
+        settings_to_apply="",
     ) -> None:
         self.config: Optional[SimpleNamespace] = None
         self.device_configurations: Dict[str, common.DeviceConfig] = {}
@@ -83,6 +85,7 @@ class EssCsc(salobj.ConfigurableCsc):
             config_dir=config_dir,
             initial_state=initial_state,
             simulation_mode=simulation_mode,
+            settings_to_apply=settings_to_apply,
         )
 
         self.reader: Optional[asyncio.StreamReader] = None
