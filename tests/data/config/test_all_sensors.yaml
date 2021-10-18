@@ -1,0 +1,5 @@
+devices: [
+  {name: EssTemperature4Ch, channels: 4, device_type: FTDI, ftdi_id: ABC, sensor_type: Temperature},
+  {name: HX85A, device_type: FTDI, ftdi_id: ABC, sensor_type: HX85A},
+  {name: HX85BA, device_type: FTDI, ftdi_id: ABC, sensor_type: HX85BA},
+]

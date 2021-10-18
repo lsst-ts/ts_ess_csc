@@ -22,7 +22,10 @@
 import asyncio
 import logging
 import math
+import pathlib
 import unittest
+
+import numpy as np
 
 from lsst.ts import salobj
 from lsst.ts.ess import csc, common
@@ -34,6 +37,9 @@ logging.basicConfig(
     level=logging.DEBUG,
 )
 
+STD_TIMEOUT = 2  # standard command timeout (sec)
+TEST_CONFIG_DIR = pathlib.Path(__file__).parents[1].joinpath("tests", "data", "config")
+
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
@@ -41,7 +47,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             name="EssCscTest", host=tcpip.LOCAL_HOST, port=0, simulation_mode=1
         )
         mock_command_handler = common.MockCommandHandler(
-            name="EssTemperature4Ch",
             callback=self.socket_server.write,
             simulation_mode=1,
         )
@@ -49,16 +54,17 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(self.socket_server.start(), timeout=5)
         self.port = self.socket_server.port
 
-    def basic_make_csc(
-        self, initial_state, config_dir, simulation_mode, settings_to_apply, **kwargs
-    ):
+    def basic_make_csc(self, initial_state, config_dir, simulation_mode, **kwargs):
         logging.info("basic_make_csc")
+        _settings_to_apply = ""
+        if "settings_to_apply" in kwargs:
+            _settings_to_apply = kwargs["settings_to_apply"]
         ess_csc = csc.EssCsc(
             initial_state=initial_state,
             config_dir=config_dir,
             simulation_mode=simulation_mode,
             index=1,
-            settings_to_apply=settings_to_apply,
+            settings_to_apply=_settings_to_apply,
         )
         return ess_csc
 
@@ -68,7 +74,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.STANDBY,
             config_dir=None,
             simulation_mode=1,
-            settings_to_apply="",
         ):
             self.csc.port = self.port
             await self.check_standard_state_transitions(
@@ -81,7 +86,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.STANDBY,
             config_dir=None,
             simulation_mode=1,
-            settings_to_apply="",
         ):
             await self.assert_next_sample(
                 self.remote.evt_softwareVersions,
@@ -94,27 +98,72 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await self.check_bin_script(name="ESS", index=1, exe_name="run_ess_csc.py")
 
     async def validate_telemetry(self):
+        mtt = common.MockTestTools()
         for sensor_name in self.csc.device_configurations:
-            device_configuration = self.csc.device_configurations[sensor_name]
-            data = await self.remote.tel_temperature.next(flush=False)
-            assert data.numChannels == device_configuration.num_channels
-            temperature = data.temperature
-            temperature = data.temperature[: device_configuration.num_channels]
-            assert common.MockTemperatureConfig.min <= min(temperature)
-            assert common.MockTemperatureConfig.max >= max(temperature)
+            md_props = common.MockDeviceProperties(name=sensor_name)
+            device_config: common.DeviceConfig = self.csc.device_configurations[
+                sensor_name
+            ]
+            if device_config.sens_type == common.SensorType.TEMPERATURE:
+                md_props.num_channels = device_config.num_channels
+                data = await self.remote.tel_temperature.next(flush=False)
+
+                # First make sure that the temperature data contain the
+                # expected number of NaN values.
+                expected_num_nans = len(data.temperature) - device_config.num_channels
+                nan_array = [math.nan] * expected_num_nans
+                np.testing.assert_array_equal(
+                    nan_array, data.temperature[device_config.num_channels :]
+                )
+
+                # Next validate the rest of the data.
+                assert data.numChannels == device_config.num_channels
+                reply = [
+                    data.sensorName,
+                    data.timestamp,
+                    common.ResponseCode.OK,
+                ] + data.temperature[: device_config.num_channels]
+                mtt.check_temperature_reply(md_props=md_props, reply=reply)
+            elif device_config.sens_type == common.SensorType.HX85A:
+                data = await self.remote.tel_hx85a.next(flush=False)
+                reply = [
+                    data.sensorName,
+                    data.timestamp,
+                    common.ResponseCode.OK,
+                    data.relativeHumidity,
+                    data.temperature,
+                    data.dewPoint,
+                ]
+                mtt.check_hx85a_reply(md_props=md_props, reply=reply)
+            elif device_config.sens_type == common.SensorType.HX85BA:
+                data = await self.remote.tel_hx85ba.next(flush=False)
+                reply = [
+                    data.sensorName,
+                    data.timestamp,
+                    common.ResponseCode.OK,
+                    data.relativeHumidity,
+                    data.temperature,
+                    data.barometricPressure,
+                ]
+                mtt.check_hx85ba_reply(md_props=md_props, reply=reply)
+            else:
+                raise ValueError(
+                    f"Unsupported sensor type {device_config.sens_type} encountered."
+                )
 
     async def test_receive_telemetry(self):
         logging.info("test_receive_telemetry")
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
-            config_dir=None,
+            config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
-            settings_to_apply="",
         ):
             self.csc.port = self.port
             self.assertFalse(self.socket_server.connected)
             await salobj.set_summary_state(
-                remote=self.remote, state=salobj.State.ENABLED
+                remote=self.remote,
+                state=salobj.State.ENABLED,
+                settingsToApply="test_all_sensors",
             )
             self.assertTrue(self.socket_server.connected)
 

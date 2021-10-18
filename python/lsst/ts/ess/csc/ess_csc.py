@@ -370,9 +370,9 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        config : `object`
+        config : `types.SimpleNamespace`
             The configuration as described by the schema at
-            `lsst.ts.ess.CONFIG_SCHEMA`, as a struct-like object.
+            `lsst.ts.ess.csc.CONFIG_SCHEMA`, as a struct-like object.
         """
         self.config = config
         for device in config.devices:
