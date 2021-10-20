@@ -28,14 +28,13 @@ from documenteer.conf.pipelinespkg import *  # noqa
 import lsst.ts.ess.csc  # noqa
 
 project = "ts_ess_csc"
-html_theme_options["logotext"] = project  # noqa
+html_theme_options["logotext"] = project  # type: ignore # noqa
 html_title = project
 html_short_title = project
-doxylink = {}  # Avoid warning: Could not find tag file _doxygen/doxygen.tag
 
-intersphinx_mapping["ts_tcpip"] = ("https://ts-tcpip.lsst.io", None)  # noqa
-intersphinx_mapping["ts_ess_common"] = ("https://ts-ess-common.lsst.io", None)  # noqa
-intersphinx_mapping["ts_ess_controller"] = (
+intersphinx_mapping["ts_tcpip"] = ("https://ts-tcpip.lsst.io", None)  # type: ignore # noqa
+intersphinx_mapping["ts_ess_common"] = ("https://ts-ess-common.lsst.io", None)  # type: ignore # noqa
+intersphinx_mapping["ts_ess_controller"] = (  # type: ignore # noqa
     "https://ts-ess-controller.lsst.io",
     None,
-)  # noqa
+)

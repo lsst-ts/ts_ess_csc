@@ -54,17 +54,16 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(self.socket_server.start(), timeout=5)
         self.port = self.socket_server.port
 
-    def basic_make_csc(self, initial_state, config_dir, simulation_mode, **kwargs):
+    def basic_make_csc(
+        self, initial_state, config_dir, simulation_mode, settings_to_apply="", **kwargs
+    ):
         logging.info("basic_make_csc")
-        _settings_to_apply = ""
-        if "settings_to_apply" in kwargs:
-            _settings_to_apply = kwargs["settings_to_apply"]
         ess_csc = csc.EssCsc(
             initial_state=initial_state,
             config_dir=config_dir,
             simulation_mode=simulation_mode,
             index=1,
-            settings_to_apply=_settings_to_apply,
+            settings_to_apply=settings_to_apply,
         )
         return ess_csc
 
@@ -97,13 +96,34 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         logging.info("test_bin_script")
         await self.check_bin_script(name="ESS", index=1, exe_name="run_ess_csc.py")
 
+    def create_reply_list(self, sensor_name, timestamp, additional_data):
+        """Create a list that represents a reply from a sensor.
+
+        Parameters
+        ----------
+        sensor_name: `str`
+            The name of the sensor.
+        timestamp: `float`
+            The timestamp of the data.
+        additional_data: `list`
+            A list of additional data to add to the reply.
+        Returns
+        -------
+        `list`
+            A list formed by the sensor name, the timestamp, a ResponseCode and
+            the additional data.
+        """
+        return [
+            sensor_name,
+            timestamp,
+            common.ResponseCode.OK,
+        ] + additional_data
+
     async def validate_telemetry(self):
         mtt = common.MockTestTools()
         for sensor_name in self.csc.device_configurations:
             md_props = common.MockDeviceProperties(name=sensor_name)
-            device_config: common.DeviceConfig = self.csc.device_configurations[
-                sensor_name
-            ]
+            device_config = self.csc.device_configurations[sensor_name]
             if device_config.sens_type == common.SensorType.TEMPERATURE:
                 md_props.num_channels = device_config.num_channels
                 data = await self.remote.tel_temperature.next(flush=False)
@@ -118,33 +138,35 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
                 # Next validate the rest of the data.
                 assert data.numChannels == device_config.num_channels
-                reply = [
-                    data.sensorName,
-                    data.timestamp,
-                    common.ResponseCode.OK,
-                ] + data.temperature[: device_config.num_channels]
+                reply = self.create_reply_list(
+                    sensor_name=data.sensorName,
+                    timestamp=data.timestamp,
+                    additional_data=data.temperature[: device_config.num_channels],
+                )
                 mtt.check_temperature_reply(md_props=md_props, reply=reply)
             elif device_config.sens_type == common.SensorType.HX85A:
                 data = await self.remote.tel_hx85a.next(flush=False)
-                reply = [
-                    data.sensorName,
-                    data.timestamp,
-                    common.ResponseCode.OK,
-                    data.relativeHumidity,
-                    data.temperature,
-                    data.dewPoint,
-                ]
+                reply = self.create_reply_list(
+                    sensor_name=data.sensorName,
+                    timestamp=data.timestamp,
+                    additional_data=[
+                        data.relativeHumidity,
+                        data.temperature,
+                        data.dewPoint,
+                    ],
+                )
                 mtt.check_hx85a_reply(md_props=md_props, reply=reply)
             elif device_config.sens_type == common.SensorType.HX85BA:
                 data = await self.remote.tel_hx85ba.next(flush=False)
-                reply = [
-                    data.sensorName,
-                    data.timestamp,
-                    common.ResponseCode.OK,
-                    data.relativeHumidity,
-                    data.temperature,
-                    data.barometricPressure,
-                ]
+                reply = self.create_reply_list(
+                    sensor_name=data.sensorName,
+                    timestamp=data.timestamp,
+                    additional_data=[
+                        data.relativeHumidity,
+                        data.temperature,
+                        data.barometricPressure,
+                    ],
+                )
                 mtt.check_hx85ba_reply(md_props=md_props, reply=reply)
             else:
                 raise ValueError(
