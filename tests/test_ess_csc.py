@@ -122,10 +122,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def validate_telemetry(self):
         mtt = common.MockTestTools()
         for sensor_name in self.csc.device_configurations:
-            md_props = common.MockDeviceProperties(name=sensor_name)
+            name = sensor_name
             device_config = self.csc.device_configurations[sensor_name]
             if device_config.sens_type == common.SensorType.TEMPERATURE:
-                md_props.num_channels = device_config.num_channels
+                num_channels = device_config.num_channels
                 data = await self.remote.tel_temperature.next(flush=False)
 
                 # First make sure that the temperature data contain the
@@ -143,7 +143,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     timestamp=data.timestamp,
                     additional_data=data.temperature[: device_config.num_channels],
                 )
-                mtt.check_temperature_reply(md_props=md_props, reply=reply)
+                mtt.check_temperature_reply(
+                    reply=reply, name=name, num_channels=num_channels
+                )
             elif device_config.sens_type == common.SensorType.HX85A:
                 data = await self.remote.tel_hx85a.next(flush=False)
                 reply = self.create_reply_list(
@@ -155,7 +157,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         data.dewPoint,
                     ],
                 )
-                mtt.check_hx85a_reply(md_props=md_props, reply=reply)
+                mtt.check_hx85a_reply(reply=reply, name=name)
             elif device_config.sens_type == common.SensorType.HX85BA:
                 data = await self.remote.tel_hx85ba.next(flush=False)
                 reply = self.create_reply_list(
@@ -167,7 +169,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         data.barometricPressure,
                     ],
                 )
-                mtt.check_hx85ba_reply(md_props=md_props, reply=reply)
+                mtt.check_hx85ba_reply(reply=reply, name=name)
             else:
                 raise ValueError(
                     f"Unsupported sensor type {device_config.sens_type} encountered."
