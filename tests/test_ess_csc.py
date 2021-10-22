@@ -27,9 +27,10 @@ import unittest
 
 import numpy as np
 
-from lsst.ts import salobj
 from lsst.ts.ess import csc, common
+from lsst.ts import salobj
 from lsst.ts import tcpip
+from lsst.ts import utils
 
 
 logging.basicConfig(
@@ -39,6 +40,28 @@ logging.basicConfig(
 
 STD_TIMEOUT = 2  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parents[1].joinpath("tests", "data", "config")
+
+
+def create_reply_list(sensor_name, additional_data):
+    """Create a list that represents a reply from a sensor.
+
+    Parameters
+    ----------
+    sensor_name: `str`
+        The name of the sensor.
+    additional_data: `list`
+        A list of additional data to add to the reply.
+    Returns
+    -------
+    `list`
+        A list formed by the sensor name, the timestamp, a ResponseCode and
+        the additional data.
+    """
+    return [
+        sensor_name,
+        utils.current_tai(),
+        common.ResponseCode.OK,
+    ] + additional_data
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
@@ -96,29 +119,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         logging.info("test_bin_script")
         await self.check_bin_script(name="ESS", index=1, exe_name="run_ess_csc.py")
 
-    def create_reply_list(self, sensor_name, timestamp, additional_data):
-        """Create a list that represents a reply from a sensor.
-
-        Parameters
-        ----------
-        sensor_name: `str`
-            The name of the sensor.
-        timestamp: `float`
-            The timestamp of the data.
-        additional_data: `list`
-            A list of additional data to add to the reply.
-        Returns
-        -------
-        `list`
-            A list formed by the sensor name, the timestamp, a ResponseCode and
-            the additional data.
-        """
-        return [
-            sensor_name,
-            timestamp,
-            common.ResponseCode.OK,
-        ] + additional_data
-
     async def validate_telemetry(self):
         mtt = common.MockTestTools()
         for sensor_name in self.csc.device_configurations:
@@ -138,9 +138,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
                 # Next validate the rest of the data.
                 assert data.numChannels == device_config.num_channels
-                reply = self.create_reply_list(
+                reply = create_reply_list(
                     sensor_name=data.sensorName,
-                    timestamp=data.timestamp,
                     additional_data=data.temperature[: device_config.num_channels],
                 )
                 mtt.check_temperature_reply(
@@ -148,9 +147,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 )
             elif device_config.sens_type == common.SensorType.HX85A:
                 data = await self.remote.tel_hx85a.next(flush=False)
-                reply = self.create_reply_list(
+                reply = create_reply_list(
                     sensor_name=data.sensorName,
-                    timestamp=data.timestamp,
                     additional_data=[
                         data.relativeHumidity,
                         data.temperature,
@@ -160,9 +158,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 mtt.check_hx85a_reply(reply=reply, name=name)
             elif device_config.sens_type == common.SensorType.HX85BA:
                 data = await self.remote.tel_hx85ba.next(flush=False)
-                reply = self.create_reply_list(
+                reply = create_reply_list(
                     sensor_name=data.sensorName,
-                    timestamp=data.timestamp,
                     additional_data=[
                         data.relativeHumidity,
                         data.temperature,
