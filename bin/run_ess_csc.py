@@ -22,14 +22,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
-import logging
 
 from lsst.ts.ess import csc
-
-logging.basicConfig(
-    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
-    level=logging.DEBUG,
-)
 
 
 asyncio.run(csc.EssCsc.amain(index=True))

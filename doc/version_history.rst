@@ -11,13 +11,14 @@ v0.6.0
 
 * Consolidated all multi-channel temperature topics into one.
 * Replaced the use of ts_salobj functions with ts_utils functions.
+* Added tests for all supported devices in the test class for the CSC.
+* Removed logging configuration from CSC run script.
 
 Requires:
 
 * ts_salobj 6.3
 * ts_idl 3.1
 * IDL file for ESS from ts_xml 10.1
-* ts_ess_controller
 * ts_ess_common
 * ts_tcpip
 * ts_utils 1.0

@@ -21,15 +21,11 @@
 
 __all__ = ["EssCsc"]
 
-import argparse
 import asyncio
 import json
 import math
-import platform
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Union
-
-import numpy as np
 
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
@@ -61,6 +57,9 @@ class EssCsc(salobj.ConfigurableCsc):
         The initial state of the CSC
     simulation_mode : `int`
         Simulation mode (1) or not (0)
+    settings_to_apply : `str`, optional
+        Settings to apply if ``initial_state`` is `State.DISABLED`
+        or `State.ENABLED`.
     """
 
     enable_cmdline_state = True
@@ -73,7 +72,7 @@ class EssCsc(salobj.ConfigurableCsc):
         config_dir: str = None,
         initial_state: salobj.State = salobj.State.STANDBY,
         simulation_mode: int = 0,
-        settings_to_apply="",
+        settings_to_apply: str = "",
     ) -> None:
         self.config: Optional[SimpleNamespace] = None
         self.device_configurations: Dict[str, common.DeviceConfig] = {}
@@ -370,9 +369,9 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        config : `object`
+        config : `types.SimpleNamespace`
             The configuration as described by the schema at
-            `lsst.ts.ess.CONFIG_SCHEMA`, as a struct-like object.
+            `lsst.ts.ess.csc.CONFIG_SCHEMA`, as a struct-like object.
         """
         self.config = config
         for device in config.devices:

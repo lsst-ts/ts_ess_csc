@@ -93,16 +93,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos && git clone https://github.com/lsst-ts/ts_ess_common.git && cd ts_ess_common && pip install --ignore-installed -e . && eups declare -r . -t saluser \"
-                    """
-                }
-            }
-        }
-        stage("Checkout ts_ess_controller") {
-            steps {
-                script {
-                    sh """
-                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos && git clone https://github.com/lsst-ts/ts_ess_controller.git && cd ts_ess_controller && pip install --ignore-installed -e . && eups declare -r . -t saluser \"
+                    docker exec -u saluser \${container_name} sh -c \"source ~/.setup.sh && cd /home/saluser/repos && git clone https://github.com/lsst-ts/ts_ess_common.git && cd ts_ess_common && /home/saluser/.checkout_repo.sh \${work_branches} && pip install --ignore-installed -e . && eups declare -r . -t saluser \"
                     """
                 }
             }
