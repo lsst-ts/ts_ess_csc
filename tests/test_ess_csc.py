@@ -164,6 +164,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         data.relativeHumidity,
                         data.temperature,
                         data.barometricPressure,
+                        data.dewPoint,
                     ],
                 )
                 mtt.check_hx85ba_reply(reply=reply, name=name)
@@ -180,13 +181,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=1,
         ):
             self.csc.port = self.port
-            self.assertFalse(self.socket_server.connected)
+            assert not self.socket_server.connected
             await salobj.set_summary_state(
                 remote=self.remote,
                 state=salobj.State.ENABLED,
                 settingsToApply="test_all_sensors",
             )
-            self.assertTrue(self.socket_server.connected)
+            assert self.socket_server.connected
 
             await self.validate_telemetry()
 
@@ -195,5 +196,5 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.DISABLED
             )
-            self.assertFalse(self.socket_server.connected)
+            assert not self.socket_server.connected
             await self.socket_server.exit()

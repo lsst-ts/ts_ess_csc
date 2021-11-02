@@ -13,6 +13,8 @@ v0.6.0
 * Replaced the use of ts_salobj functions with ts_utils functions.
 * Added tests for all supported devices in the test class for the CSC.
 * Removed logging configuration from CSC run script.
+* Added telemetry for the computed dew point in all humidity sensors that don't provide it themselves.
+
 
 Requires:
 
