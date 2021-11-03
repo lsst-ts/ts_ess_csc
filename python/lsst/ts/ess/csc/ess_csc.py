@@ -49,7 +49,7 @@ class EssCsc(salobj.ConfigurableCsc):
 
     Parameters
     ----------
-    index: `int`
+    index : `int`
         The index of the CSC
     config_dir : `str`
         The configuration directory
@@ -143,9 +143,9 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        command: `str`
+        command : `str`
             The command to write.
-        data: `dict`
+        data : `dict`
             The data to write.
         """
         if not self.writer or not self.connected:
@@ -163,13 +163,13 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        data: `list`
+        data : `list`
             A list containing the timestamp, error and sensor data. The order
             of the items in the list is:
-            - Sensor name: `str`
-            - Timestamp: `float`
-            - Response code: `int`
-            - One or more sensor data: each of type `float`
+            - Sensor name : `str`
+            - Timestamp : `float`
+            - Response code : `int`
+            - One or more sensor data : each of type `float`
         """
         sensor_name = data[0]
         timestamp = data[1]
@@ -197,13 +197,13 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        data: `list`
+        data : `list`
             A list containing the timestamp, error and sensor data. The order
             of the items in the list is:
-            - Sensor name: `str`
-            - Timestamp: `float`
-            - Response code: `int`
-            - One or more sensor data: each of type `float`
+            - Sensor name : `str`
+            - Timestamp : `float`
+            - Response code : `int`
+            - One or more sensor data : each of type `float`
         """
         sensor_name = data[0]
         timestamp = data[1]
@@ -223,13 +223,13 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        data: `list`
+        data : `list`
             A list containing the timestamp, error and sensor data. The order
             of the items in the list is:
-            - Sensor name: `str`
-            - Timestamp: `float`
-            - Response code: `int`
-            - One or more sensor data: each of type `float`
+            - Sensor name : `str`
+            - Timestamp : `float`
+            - Response code : `int`
+            - One or more sensor data : each of type `float`
         """
         sensor_name = data[0]
         timestamp = data[1]
@@ -239,6 +239,7 @@ class EssCsc(salobj.ConfigurableCsc):
             "relativeHumidity": data[3],
             "temperature": data[4],
             "barometricPressure": data[5],
+            "dewPoint": data[6],
         }
         self.tel_hx85ba.set_put(**telemetry)
 
@@ -247,13 +248,13 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        data: `list`
+        data : `list`
             A list containing the timestamp, error and sensor data. The order
             of the items in the list is:
-            - Sensor name: `str`
-            - Timestamp: `float`
-            - Response code: `int`
-            - One or more sensor data: each of type `float`
+            - Sensor name : `str`
+            - Timestamp : `float`
+            - Response code : `int`
+            - One or more sensor data : each of type `float`
         """
         try:
             self.log.debug(f"Processing data {data}")
