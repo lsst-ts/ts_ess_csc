@@ -14,6 +14,7 @@ v0.6.0
 * Added tests for all supported devices in the test class for the CSC.
 * Removed logging configuration from CSC run script.
 * Added telemetry for the computed dew point in all humidity sensors that don't provide it themselves.
+* Made sure that the CSC goes into FAULT state in case of an error.
 
 
 Requires:

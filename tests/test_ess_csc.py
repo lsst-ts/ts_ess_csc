@@ -28,6 +28,7 @@ import unittest
 import numpy as np
 
 from lsst.ts.ess import csc, common
+from lsst.ts.idl.enums.ESS import ErrorCode
 from lsst.ts import salobj
 from lsst.ts import tcpip
 from lsst.ts import utils
@@ -38,7 +39,7 @@ logging.basicConfig(
     level=logging.DEBUG,
 )
 
-STD_TIMEOUT = 2  # standard command timeout (sec)
+STD_TIMEOUT = 10  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parents[1].joinpath("tests", "data", "config")
 
 
@@ -198,3 +199,51 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             assert not self.socket_server.connected
             await self.socket_server.exit()
+
+    async def test_handle_no_connection(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=None,
+            simulation_mode=1,
+        ):
+            self.csc.port = self.port
+            await salobj.set_summary_state(
+                remote=self.remote,
+                state=salobj.State.ENABLED,
+            )
+            assert self.socket_server.connected
+
+            await self.socket_server.exit()
+
+            fault = await self.remote.evt_errorCode.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
+            assert fault is not None
+
+            # Due to the timing of the loops in the CSC, more than one
+            # ErrorCode may happen.
+            assert fault.errorCode in [
+                ErrorCode.NotConnected,
+                ErrorCode.ReadLoopFailed,
+            ]
+
+    async def test_handle_already_connected(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            config_dir=None,
+            simulation_mode=1,
+        ):
+            self.csc.port = self.port
+            await salobj.set_summary_state(
+                remote=self.remote,
+                state=salobj.State.ENABLED,
+            )
+            assert self.socket_server.connected
+
+            await self.csc.connect()
+
+            fault = await self.remote.evt_errorCode.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
+            assert fault is not None
+            assert fault.errorCode == ErrorCode.AlreadyConnected

@@ -31,6 +31,7 @@ from .config_schema import CONFIG_SCHEMA
 from . import __version__
 from lsst.ts import salobj, tcpip, utils
 from lsst.ts.ess import common
+from lsst.ts.idl.enums.ESS import ErrorCode
 
 SOCKET_TIMEOUT = 5
 """Standard timeout in seconds for socket connections."""
@@ -117,9 +118,10 @@ class EssCsc(salobj.ConfigurableCsc):
                     sensor_data = data[common.Key.TELEMETRY]
                     await self.process_telemetry(data=sensor_data)
                 else:
-                    raise ValueError(f"Unknown data {data!r} received.")
-        except Exception:
+                    self.log.error(f"Unknown data {data!r} received. Ignoring.")
+        except Exception as e:
             self.log.exception("_read_loop failed")
+            self.fault(code=ErrorCode.ReadLoopFailed, report=f"{e}")
 
     async def read(self) -> dict:
         """Utility function to read a string from the reader and unmarshal it
@@ -130,7 +132,8 @@ class EssCsc(salobj.ConfigurableCsc):
             A dictionary with objects representing the string read.
         """
         if not self.reader or not self.connected:
-            raise RuntimeError("Not connected")
+            self.fault(code=ErrorCode.NotConnected, report="Not connected.")
+            return
 
         read_bytes = await asyncio.wait_for(
             self.reader.readuntil(tcpip.TERMINATOR), timeout=SOCKET_TIMEOUT
@@ -149,7 +152,8 @@ class EssCsc(salobj.ConfigurableCsc):
             The data to write.
         """
         if not self.writer or not self.connected:
-            raise RuntimeError("Not connected")
+            self.fault(code=ErrorCode.NotConnected, report="Not connected.")
+            return
 
         st = json.dumps({"command": command, **data})
         self.last_commands.append(st)
@@ -269,11 +273,12 @@ class EssCsc(salobj.ConfigurableCsc):
                 elif device_configuration.sens_type == common.SensorType.HX85BA:
                     await self.process_hx85ba_telemetry(data=data)
             elif error_code == common.ResponseCode.DEVICE_READ_ERROR:
-                self.log.error(
-                    f"Error reading sensor {sensor_name}. Please check the hardware."
+                self.fault(
+                    code=ErrorCode.HardwareError,
+                    report=f"Error reading sensor {sensor_name}. Please check the hardware.",
                 )
-        except Exception:
-            self.log.exception("Method get_telemetry() failed.")
+        except Exception as e:
+            self.fault(code=ErrorCode.TelemetryError, report=f"Telemetry error: {e}")
 
     async def connect(self) -> None:
         """Determine if running in local or remote mode and dispatch to the
@@ -283,17 +288,12 @@ class EssCsc(salobj.ConfigurableCsc):
         self.log.info(self.config)
         self.log.info(f"self.simulation_mode = {self.simulation_mode}")
         if self.config is None:
-            raise RuntimeError("Not yet configured")
+            self.fault(code=ErrorCode.NotConfigured, report="Not configured.")
+            return
         if self.connected:
-            raise RuntimeError("Already connected")
+            self.fault(code=ErrorCode.AlreadyConnected, report="Already connected.")
+            return
 
-        await self.connect_socket()
-
-    async def connect_socket(self) -> None:
-        """Connect to the SocketServer and send the configuration for which
-        sensors to start reading the data of."""
-        if not self.config:
-            raise RuntimeError("Not configured yet.")
         if not self.host:
             self.host = self.config.host
         if not self.port:
@@ -360,7 +360,20 @@ class EssCsc(salobj.ConfigurableCsc):
         self.telemetry_loop.cancel()
         await self.write(command="disconnect", parameters={})
 
+        self.writer.close()
+        await self.writer.wait_closed()
+        self.writer = None
+        self.reader = None
+
         await super().begin_disable(id_data)
+
+    def fault(self, code, report, traceback=""):
+        if self.connected:
+            asyncio.create_task(self.write(command="stop", parameters={}))
+        self.telemetry_loop.cancel()
+        if self.connected:
+            asyncio.create_task(self.write(command="disconnect", parameters={}))
+        super().fault(code=code, report=report, traceback=traceback)
 
     async def configure(self, config) -> None:
         """Configure the CSC.
@@ -381,9 +394,11 @@ class EssCsc(salobj.ConfigurableCsc):
             elif device[common.Key.DEVICE_TYPE] == common.DeviceType.SERIAL:
                 dev_id = common.Key.SERIAL_PORT
             else:
-                raise ValueError(
-                    f"Unknown device type {device[common.Key.TYPE]} encountered."
+                self.fault(
+                    code=ErrorCode.BadConfiguration,
+                    report=f"Unknown device type {device[common.Key.DEVICE_TYPE]} encountered.",
                 )
+                return
             num_channels = 0
             sensor_type = device[common.Key.SENSOR_TYPE]
             if sensor_type == common.SensorType.TEMPERATURE:
