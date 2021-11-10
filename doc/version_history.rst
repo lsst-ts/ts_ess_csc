@@ -15,7 +15,8 @@ v0.6.0
 * Removed logging configuration from CSC run script.
 * Added telemetry for the computed dew point in all humidity sensors that don't provide it themselves.
 * Made sure that the CSC goes into FAULT state in case of an error.
-
+* Added location to the configuration of the devices.
+* Made sure that the CSC reports the sensor location in the telemetry.
 
 Requires:
 

@@ -183,6 +183,7 @@ class EssCsc(salobj.ConfigurableCsc):
             "sensorName": sensor_name,
             "timestamp": timestamp,
             "numChannels": device_configuration.num_channels,
+            "location": device_configuration.location,
         }
 
         if len(sensor_data) != device_configuration.num_channels:
@@ -211,12 +212,14 @@ class EssCsc(salobj.ConfigurableCsc):
         """
         sensor_name = data[0]
         timestamp = data[1]
+        device_configuration = self.device_configurations[sensor_name]
         telemetry = {
             "sensorName": sensor_name,
             "timestamp": timestamp,
             "relativeHumidity": data[3],
             "temperature": data[4],
             "dewPoint": data[5],
+            "location": device_configuration.location,
         }
         self.tel_hx85a.set_put(**telemetry)
 
@@ -237,6 +240,7 @@ class EssCsc(salobj.ConfigurableCsc):
         """
         sensor_name = data[0]
         timestamp = data[1]
+        device_configuration = self.device_configurations[sensor_name]
         telemetry = {
             "sensorName": sensor_name,
             "timestamp": timestamp,
@@ -244,6 +248,7 @@ class EssCsc(salobj.ConfigurableCsc):
             "temperature": data[4],
             "barometricPressure": data[5],
             "dewPoint": data[6],
+            "location": device_configuration.location,
         }
         self.tel_hx85ba.set_put(**telemetry)
 
@@ -409,6 +414,7 @@ class EssCsc(salobj.ConfigurableCsc):
                 dev_type=device[common.Key.DEVICE_TYPE],
                 dev_id=device[dev_id],
                 sens_type=device[common.Key.SENSOR_TYPE],
+                location=device[common.Key.LOCATION],
             )
 
     @property

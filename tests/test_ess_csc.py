@@ -139,6 +139,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
                 # Next validate the rest of the data.
                 assert data.numChannels == device_config.num_channels
+                assert data.location == device_config.location
                 reply = create_reply_list(
                     sensor_name=data.sensorName,
                     additional_data=data.temperature[: device_config.num_channels],
@@ -148,6 +149,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 )
             elif device_config.sens_type == common.SensorType.HX85A:
                 data = await self.remote.tel_hx85a.next(flush=False)
+                assert data.location == device_config.location
                 reply = create_reply_list(
                     sensor_name=data.sensorName,
                     additional_data=[
@@ -159,6 +161,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 mtt.check_hx85a_reply(reply=reply, name=name)
             elif device_config.sens_type == common.SensorType.HX85BA:
                 data = await self.remote.tel_hx85ba.next(flush=False)
+                assert data.location == device_config.location
                 reply = create_reply_list(
                     sensor_name=data.sensorName,
                     additional_data=[
