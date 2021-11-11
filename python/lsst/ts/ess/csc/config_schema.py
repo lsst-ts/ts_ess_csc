@@ -33,12 +33,12 @@ description: Schema for ESS configuration files
 type: object
 properties:
   host:
-    description: IP address of the TCP/IP interface
+    description: IP address of the TCP/IP interface.
     type: string
     format: hostname
     default: "127.0.0.1"
   port:
-    description: Port number of the TCP/IP interface
+    description: Port number of the TCP/IP interface.
     type: integer
     default: 5000
   devices:
@@ -49,14 +49,15 @@ properties:
       channels: 4
       device_type: FTDI
       ftdi_id: AL05OBVR
+      location: Test
     items:
       type: object
       properties:
         name:
-          description: Name of the sensor
+          description: Name of the sensor.
           type: string
         sensor_type:
-          description: Type of the sensor
+          description: Type of the sensor.
           type: string
           enum:
           - HX85A
@@ -64,14 +65,21 @@ properties:
           - Temperature
           - Wind
         channels:
-          description: Number of channels
+          description: Number of channels.
           type: integer
         device_type:
-          description: Type of the device
+          description: Type of the device.
           type: string
           enum:
           - FTDI
           - Serial
+        location:
+          description: >-
+            The location of the device. In case of a multi-channel device with
+            probes that can be far away from the sensor, a comma separated line
+            can be used to give the location of each probe. In that case the
+            locations should be given in the order of the channels.
+          type: string
       anyOf:
       - if:
           properties:
@@ -91,5 +99,15 @@ properties:
             serial_port:
               description: Serial port to connect to.
               type: string
+      required:
+        - name
+        - sensor_type
+        - device_type
+        - location
+required:
+  - host
+  - port
+  - devices
+additionalProperties: false
 """
 )

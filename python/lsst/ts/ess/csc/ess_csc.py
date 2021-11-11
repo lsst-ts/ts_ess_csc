@@ -21,22 +21,27 @@
 
 __all__ = ["EssCsc"]
 
-import argparse
 import asyncio
 import json
-import platform
+import math
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Union
 
-import numpy as np
-
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
-from lsst.ts import salobj, tcpip
+from lsst.ts import salobj, tcpip, utils
 from lsst.ts.ess import common
+from lsst.ts.idl.enums.ESS import ErrorCode
 
-"""Standard timeout in seconds for socket connections."""
 SOCKET_TIMEOUT = 5
+"""Standard timeout in seconds for socket connections."""
+
+NUMBER_OF_TEMPERATURE_CHANNELS = 16
+"""The number of temperature channels expected in the telemetry."""
+
+TEMPERATURE_NANS = [math.nan] * NUMBER_OF_TEMPERATURE_CHANNELS
+"""Initial array with NaN values in which the temperature values of
+the sensors will be stored."""
 
 
 class EssCsc(salobj.ConfigurableCsc):
@@ -45,7 +50,7 @@ class EssCsc(salobj.ConfigurableCsc):
 
     Parameters
     ----------
-    index: `int`
+    index : `int`
         The index of the CSC
     config_dir : `str`
         The configuration directory
@@ -53,8 +58,12 @@ class EssCsc(salobj.ConfigurableCsc):
         The initial state of the CSC
     simulation_mode : `int`
         Simulation mode (1) or not (0)
+    settings_to_apply : `str`, optional
+        Settings to apply if ``initial_state`` is `State.DISABLED`
+        or `State.ENABLED`.
     """
 
+    enable_cmdline_state = True
     valid_simulation_modes = (0, 1)
     version = __version__
 
@@ -64,6 +73,7 @@ class EssCsc(salobj.ConfigurableCsc):
         config_dir: str = None,
         initial_state: salobj.State = salobj.State.STANDBY,
         simulation_mode: int = 0,
+        settings_to_apply: str = "",
     ) -> None:
         self.config: Optional[SimpleNamespace] = None
         self.device_configurations: Dict[str, common.DeviceConfig] = {}
@@ -75,13 +85,14 @@ class EssCsc(salobj.ConfigurableCsc):
             config_dir=config_dir,
             initial_state=initial_state,
             simulation_mode=simulation_mode,
+            settings_to_apply=settings_to_apply,
         )
 
         self.reader: Optional[asyncio.StreamReader] = None
         self.writer: Optional[asyncio.StreamWriter] = None
         self.host = None
         self.port = None
-        self.telemetry_loop: asyncio.Future = salobj.make_done_future()
+        self.telemetry_loop: asyncio.Future = utils.make_done_future()
         self.last_commands: List[str] = []
 
         self.log.info("ESS CSC created.")
@@ -107,9 +118,10 @@ class EssCsc(salobj.ConfigurableCsc):
                     sensor_data = data[common.Key.TELEMETRY]
                     await self.process_telemetry(data=sensor_data)
                 else:
-                    raise ValueError(f"Unknown data {data!r} received.")
-        except Exception:
+                    self.log.error(f"Unknown data {data!r} received. Ignoring.")
+        except Exception as e:
             self.log.exception("_read_loop failed")
+            self.fault(code=ErrorCode.ReadLoopFailed, report=f"{e}")
 
     async def read(self) -> dict:
         """Utility function to read a string from the reader and unmarshal it
@@ -120,7 +132,8 @@ class EssCsc(salobj.ConfigurableCsc):
             A dictionary with objects representing the string read.
         """
         if not self.reader or not self.connected:
-            raise RuntimeError("Not connected")
+            self.fault(code=ErrorCode.NotConnected, report="Not connected.")
+            return
 
         read_bytes = await asyncio.wait_for(
             self.reader.readuntil(tcpip.TERMINATOR), timeout=SOCKET_TIMEOUT
@@ -133,13 +146,14 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        command: `str`
+        command : `str`
             The command to write.
-        data: `dict`
+        data : `dict`
             The data to write.
         """
         if not self.writer or not self.connected:
-            raise RuntimeError("Not connected")
+            self.fault(code=ErrorCode.NotConnected, report="Not connected.")
+            return
 
         st = json.dumps({"command": command, **data})
         self.last_commands.append(st)
@@ -153,56 +167,59 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        data: `list`
+        data : `list`
             A list containing the timestamp, error and sensor data. The order
             of the items in the list is:
-            - Sensor name: `str`
-            - Timestamp: `float`
-            - Response code: `int`
-            - One or more sensor data: each of type `float`
+            - Sensor name : `str`
+            - Timestamp : `float`
+            - Response code : `int`
+            - One or more sensor data : each of type `float`
         """
         sensor_name = data[0]
         timestamp = data[1]
         sensor_data = data[3:]
         device_configuration = self.device_configurations[sensor_name]
-        telemetry = {"sensorName": sensor_name, "timestamp": timestamp}
+        telemetry = {
+            "sensorName": sensor_name,
+            "timestamp": timestamp,
+            "numChannels": device_configuration.num_channels,
+            "location": device_configuration.location,
+        }
 
         if len(sensor_data) != device_configuration.num_channels:
             raise RuntimeError(
                 f"Expected {device_configuration.num_channels} temperatures "
                 f"but received {len(sensor_data)}."
             )
-        for i, value in enumerate(sensor_data):
-            # The telemetry channels start counting at 1 and not 0.
-            telemetry[f"temperatureC{i + 1:02d}"] = value
-        self.log.info(f"Received temperatures {telemetry}")
-        self.log.info("Sending telemetry.")
-        telemetry_method = getattr(
-            self, f"tel_temperature{device_configuration.num_channels}Ch"
-        )
-        telemetry_method.set_put(**telemetry)
+        temperature = TEMPERATURE_NANS[:]
+        temperature[: device_configuration.num_channels] = sensor_data
+        telemetry["temperature"] = temperature
+        self.log.debug(f"Sending telemetry {telemetry}")
+        self.tel_temperature.set_put(**telemetry)
 
     async def process_hx85a_telemetry(self, data: List[Union[str, int, float]]) -> None:
         """Process the HX85A humidity sensor telemetry and send to EFD.
 
         Parameters
         ----------
-        data: `list`
+        data : `list`
             A list containing the timestamp, error and sensor data. The order
             of the items in the list is:
-            - Sensor name: `str`
-            - Timestamp: `float`
-            - Response code: `int`
-            - One or more sensor data: each of type `float`
+            - Sensor name : `str`
+            - Timestamp : `float`
+            - Response code : `int`
+            - One or more sensor data : each of type `float`
         """
         sensor_name = data[0]
         timestamp = data[1]
+        device_configuration = self.device_configurations[sensor_name]
         telemetry = {
             "sensorName": sensor_name,
             "timestamp": timestamp,
             "relativeHumidity": data[3],
-            "airTemperature": data[4],
+            "temperature": data[4],
             "dewPoint": data[5],
+            "location": device_configuration.location,
         }
         self.tel_hx85a.set_put(**telemetry)
 
@@ -213,22 +230,25 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        data: `list`
+        data : `list`
             A list containing the timestamp, error and sensor data. The order
             of the items in the list is:
-            - Sensor name: `str`
-            - Timestamp: `float`
-            - Response code: `int`
-            - One or more sensor data: each of type `float`
+            - Sensor name : `str`
+            - Timestamp : `float`
+            - Response code : `int`
+            - One or more sensor data : each of type `float`
         """
         sensor_name = data[0]
         timestamp = data[1]
+        device_configuration = self.device_configurations[sensor_name]
         telemetry = {
             "sensorName": sensor_name,
             "timestamp": timestamp,
             "relativeHumidity": data[3],
-            "airTemperature": data[4],
+            "temperature": data[4],
             "barometricPressure": data[5],
+            "dewPoint": data[6],
+            "location": device_configuration.location,
         }
         self.tel_hx85ba.set_put(**telemetry)
 
@@ -237,13 +257,13 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        data: `list`
+        data : `list`
             A list containing the timestamp, error and sensor data. The order
             of the items in the list is:
-            - Sensor name: `str`
-            - Timestamp: `float`
-            - Response code: `int`
-            - One or more sensor data: each of type `float`
+            - Sensor name : `str`
+            - Timestamp : `float`
+            - Response code : `int`
+            - One or more sensor data : each of type `float`
         """
         try:
             self.log.debug(f"Processing data {data}")
@@ -258,11 +278,12 @@ class EssCsc(salobj.ConfigurableCsc):
                 elif device_configuration.sens_type == common.SensorType.HX85BA:
                     await self.process_hx85ba_telemetry(data=data)
             elif error_code == common.ResponseCode.DEVICE_READ_ERROR:
-                self.log.error(
-                    f"Error reading sensor {sensor_name}. Please check the hardware."
+                self.fault(
+                    code=ErrorCode.HardwareError,
+                    report=f"Error reading sensor {sensor_name}. Please check the hardware.",
                 )
-        except Exception:
-            self.log.exception("Method get_telemetry() failed.")
+        except Exception as e:
+            self.fault(code=ErrorCode.TelemetryError, report=f"Telemetry error: {e}")
 
     async def connect(self) -> None:
         """Determine if running in local or remote mode and dispatch to the
@@ -272,17 +293,12 @@ class EssCsc(salobj.ConfigurableCsc):
         self.log.info(self.config)
         self.log.info(f"self.simulation_mode = {self.simulation_mode}")
         if self.config is None:
-            raise RuntimeError("Not yet configured")
+            self.fault(code=ErrorCode.NotConfigured, report="Not configured.")
+            return
         if self.connected:
-            raise RuntimeError("Already connected")
+            self.fault(code=ErrorCode.AlreadyConnected, report="Already connected.")
+            return
 
-        await self.connect_socket()
-
-    async def connect_socket(self) -> None:
-        """Connect to the SocketServer and send the configuration for which
-        sensors to start reading the data of."""
-        if not self.config:
-            raise RuntimeError("Not configured yet.")
         if not self.host:
             self.host = self.config.host
         if not self.port:
@@ -349,7 +365,20 @@ class EssCsc(salobj.ConfigurableCsc):
         self.telemetry_loop.cancel()
         await self.write(command="disconnect", parameters={})
 
+        self.writer.close()
+        await self.writer.wait_closed()
+        self.writer = None
+        self.reader = None
+
         await super().begin_disable(id_data)
+
+    def fault(self, code, report, traceback=""):
+        if self.connected:
+            asyncio.create_task(self.write(command="stop", parameters={}))
+        self.telemetry_loop.cancel()
+        if self.connected:
+            asyncio.create_task(self.write(command="disconnect", parameters={}))
+        super().fault(code=code, report=report, traceback=traceback)
 
     async def configure(self, config) -> None:
         """Configure the CSC.
@@ -359,9 +388,9 @@ class EssCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        config : `object`
+        config : `types.SimpleNamespace`
             The configuration as described by the schema at
-            `lsst.ts.ess.CONFIG_SCHEMA`, as a struct-like object.
+            `lsst.ts.ess.csc.CONFIG_SCHEMA`, as a struct-like object.
         """
         self.config = config
         for device in config.devices:
@@ -370,9 +399,11 @@ class EssCsc(salobj.ConfigurableCsc):
             elif device[common.Key.DEVICE_TYPE] == common.DeviceType.SERIAL:
                 dev_id = common.Key.SERIAL_PORT
             else:
-                raise ValueError(
-                    f"Unknown device type {device[common.Key.TYPE]} encountered."
+                self.fault(
+                    code=ErrorCode.BadConfiguration,
+                    report=f"Unknown device type {device[common.Key.DEVICE_TYPE]} encountered.",
                 )
+                return
             num_channels = 0
             sensor_type = device[common.Key.SENSOR_TYPE]
             if sensor_type == common.SensorType.TEMPERATURE:
@@ -383,6 +414,7 @@ class EssCsc(salobj.ConfigurableCsc):
                 dev_type=device[common.Key.DEVICE_TYPE],
                 dev_id=device[dev_id],
                 sens_type=device[common.Key.SENSOR_TYPE],
+                location=device[common.Key.LOCATION],
             )
 
     @property
