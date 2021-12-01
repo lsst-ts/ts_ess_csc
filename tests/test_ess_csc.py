@@ -19,7 +19,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import asyncio
 import logging
 import math
 import pathlib
@@ -27,10 +26,9 @@ import unittest
 
 import numpy as np
 
-from lsst.ts.ess import csc, common
 from lsst.ts.idl.enums.ESS import ErrorCode
+from lsst.ts.ess import csc, common
 from lsst.ts import salobj
-from lsst.ts import tcpip
 from lsst.ts import utils
 
 
@@ -66,30 +64,30 @@ def create_reply_list(sensor_name, additional_data):
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
-    async def asyncSetUp(self) -> None:
-        self.socket_server = common.SocketServer(
-            name="EssCscTest", host=tcpip.LOCAL_HOST, port=0, simulation_mode=1
-        )
-        mock_command_handler = common.MockCommandHandler(
-            callback=self.socket_server.write,
-            simulation_mode=1,
-        )
-        self.socket_server.set_command_handler(mock_command_handler)
-        await asyncio.wait_for(self.socket_server.start(), timeout=5)
-        self.port = self.socket_server.port
-
     def basic_make_csc(
-        self, initial_state, config_dir, simulation_mode, settings_to_apply="", **kwargs
+        self,
+        initial_state,
+        config_dir,
+        index=1,
+        simulation_mode=1,
+        settings_to_apply="",
     ):
         logging.info("basic_make_csc")
         ess_csc = csc.EssCsc(
             initial_state=initial_state,
             config_dir=config_dir,
             simulation_mode=simulation_mode,
-            index=1,
+            index=index,
             settings_to_apply=settings_to_apply,
         )
         return ess_csc
+
+    def get_mock_server(self, index):
+        """Get the mock server from the specified RPiModel model."""
+        assert len(self.csc.models) > index
+        model = self.csc.models[index]
+        assert isinstance(model, csc.RPiModel)
+        return model.mock_server
 
     async def test_standard_state_transitions(self):
         logging.info("test_standard_state_transitions")
@@ -98,9 +96,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=None,
             simulation_mode=1,
         ):
-            self.csc.port = self.port
             await self.check_standard_state_transitions(
-                enabled_commands=(),
+                enabled_commands=(), settingsToApply="default.yaml"
             )
 
     async def test_version(self):
@@ -180,18 +177,16 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     async def test_receive_telemetry(self):
         logging.info("test_receive_telemetry")
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY,
+            initial_state=salobj.State.ENABLED,
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
+            settings_to_apply="test_all_sensors.yaml",
         ):
-            self.csc.port = self.port
-            assert not self.socket_server.connected
-            await salobj.set_summary_state(
-                remote=self.remote,
-                state=salobj.State.ENABLED,
-                settingsToApply="test_all_sensors",
-            )
-            assert self.socket_server.connected
+            await self.assert_next_summary_state(salobj.State.ENABLED, timeout=2)
+            assert len(self.csc.models) == 3
+            for model in self.csc.models:
+                assert isinstance(model, csc.RPiModel)
+                assert model.mock_server.connected
 
             await self.validate_telemetry()
 
@@ -200,53 +195,67 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.DISABLED
             )
-            assert not self.socket_server.connected
-            await self.socket_server.exit()
+            for model in self.csc.models:
+                assert not model.mock_server.connected
 
-    async def test_handle_no_connection(self):
+    async def test_rpimodel_loses_connecton(self):
+        """The CSC should fault when an RPiModel loses its connection
+        to the server.
+        """
         async with self.make_csc(
-            initial_state=salobj.State.STANDBY,
-            config_dir=None,
+            initial_state=salobj.State.ENABLED,
+            config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
+            settings_to_apply="test_all_sensors.yaml",
         ):
-            self.csc.port = self.port
-            await salobj.set_summary_state(
-                remote=self.remote,
-                state=salobj.State.ENABLED,
-            )
-            assert self.socket_server.connected
+            await self.assert_next_summary_state(salobj.State.ENABLED)
+            assert len(self.csc.models) == 3
+            for model in self.csc.models:
+                assert model.mock_server.connected
 
-            await self.socket_server.exit()
+            # Disconnect one of the mock server
+            await self.csc.models[1].mock_server.exit()
+
+            await self.assert_next_summary_state(salobj.State.FAULT)
+            fault = await self.remote.evt_errorCode.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
+            # TODO: simplify error codes and pick the right one here.
+            # # Due to the timing of the loops in the CSC, more than one
+            # # ErrorCode may happen.
+            assert fault.errorCode in set(ErrorCode)
+            # assert fault.errorCode in {
+            #     ErrorCode.NotConnected,
+            #     ErrorCode.ReadLoopFailed,
+            # }
+
+    async def test_rpimodel_cannot_connect(self):
+        """The CSC should fault if an RPiModel cannot connect
+        to the server.
+        """
+        # Start in DISABLED state so the models have been constructed,
+        # but have not yet created and connecte to their mock servers.
+        async with self.make_csc(
+            initial_state=salobj.State.DISABLED,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=1,
+            settings_to_apply="test_all_sensors.yaml",
+        ):
+            await self.assert_next_summary_state(salobj.State.DISABLED)
+
+            # Prevent one of the models from connecting,
+            # then try to enable the CSC.
+            assert len(self.csc.models) == 3
+            for model in self.csc.models:
+                assert model.enable_mock_server
+            self.csc.models[1].enable_mock_server = False
+            with salobj.assertRaisesAckError():
+                await self.remote.cmd_enable.start(timeout=STD_TIMEOUT)
+            await self.assert_next_summary_state(salobj.State.FAULT)
 
             fault = await self.remote.evt_errorCode.next(
                 flush=False, timeout=STD_TIMEOUT
             )
-            assert fault is not None
-
-            # Due to the timing of the loops in the CSC, more than one
-            # ErrorCode may happen.
-            assert fault.errorCode in [
-                ErrorCode.NotConnected,
-                ErrorCode.ReadLoopFailed,
-            ]
-
-    async def test_handle_already_connected(self):
-        async with self.make_csc(
-            initial_state=salobj.State.STANDBY,
-            config_dir=None,
-            simulation_mode=1,
-        ):
-            self.csc.port = self.port
-            await salobj.set_summary_state(
-                remote=self.remote,
-                state=salobj.State.ENABLED,
-            )
-            assert self.socket_server.connected
-
-            await self.csc.connect()
-
-            fault = await self.remote.evt_errorCode.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
-            assert fault is not None
-            assert fault.errorCode == ErrorCode.AlreadyConnected
+            assert fault.errorCode in set(ErrorCode)
+            # TODO: simplify error codes and pick the right one here.
+            # assert fault.errorCode == ErrorCode.AlreadyConnected

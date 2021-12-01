@@ -1,5 +1,28 @@
-devices: [
-  {name: EssTemperature4Ch, channels: 4, device_type: FTDI, ftdi_id: ABC, sensor_type: Temperature, location: Test1},
-  {name: HX85A, device_type: FTDI, ftdi_id: ABC, sensor_type: HX85A, location: Test2},
-  {name: HX85BA, device_type: FTDI, ftdi_id: ABC, sensor_type: HX85BA, location: Test3},
-]
+instances:
+  - sal_index: 1
+    models:
+      - model_class: RPiModel
+        config:
+          devices:
+            - name: EssTemperature4Ch
+              channels: 4
+              device_type: FTDI
+              ftdi_id: ABC
+              sensor_type: Temperature
+              location: Test1
+      - model_class: RPiModel
+        config:
+          devices:
+            - name: HX85A
+              device_type: FTDI
+              ftdi_id: ABC
+              sensor_type: HX85A
+              location: Test2
+      - model_class: RPiModel
+        config:
+          devices:
+            - name: HX85BA
+              device_type: FTDI
+              ftdi_id: ABC
+              sensor_type: HX85BA
+              location: Test3
