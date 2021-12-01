@@ -28,86 +28,44 @@ CONFIG_SCHEMA = yaml.safe_load(
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_ess/blob/master/python/lsst/ts/ess/csc/config_schema.py
 # title must end with one or more spaces followed by the schema version, which must begin with "v"
-title: ESS v1
-description: Schema for ESS configuration files
+title: ESS v2
+description: Schema for ESS configuration
 type: object
 properties:
-  host:
-    description: IP address of the TCP/IP interface.
-    type: string
-    format: hostname
-    default: "127.0.0.1"
-  port:
-    description: Port number of the TCP/IP interface.
-    type: integer
-    default: 5000
-  devices:
+  instances:
     type: array
-    default:
-    - name: EssTemperature4Ch
-      sensor_type: Temperature
-      channels: 4
-      device_type: FTDI
-      ftdi_id: AL05OBVR
-      location: Test
+    description: Configuration for each ESS instance.
+    minItem: 1
     items:
       type: object
       properties:
-        name:
-          description: Name of the sensor.
-          type: string
-        sensor_type:
-          description: Type of the sensor.
-          type: string
-          enum:
-          - HX85A
-          - HX85BA
-          - Temperature
-          - Wind
-        channels:
-          description: Number of channels.
+        sal_index:
           type: integer
-        device_type:
-          description: Type of the device.
-          type: string
-          enum:
-          - FTDI
-          - Serial
-        location:
-          description: >-
-            The location of the device. In case of a multi-channel device with
-            probes that can be far away from the sensor, a comma separated line
-            can be used to give the location of each probe. In that case the
-            locations should be given in the order of the channels.
-          type: string
-      anyOf:
-      - if:
-          properties:
-            device_type:
-              const: FTDI
-        then:
-          properties:
-            ftdi_id:
-              description: FTDI Serial ID to connect to.
-              type: string
-      - if:
-          properties:
-            device_type:
-              const: Serial
-        then:
-          properties:
-            serial_port:
-              description: Serial port to connect to.
-              type: string
+          description: SAL index of ESS instance.
+          minimum: 1
+        data_clients:
+          description: Configuration for each data client run by this instance.
+          type: array
+          minItems: 1
+          items:
+            type: object
+            properties:
+              client_class:
+                description: Data client class name, e.g. RPiDataClient.
+                type: string
+              config:
+                description: Configuration for the data client.
+                type: object
+            required:
+              - client_class
+              - config
+            additionalProperties: false
       required:
-        - name
-        - sensor_type
-        - device_type
-        - location
+        - sal_index
+        - data_clients
+      additionalProperties: false
 required:
-  - host
-  - port
-  - devices
+  - instances
 additionalProperties: false
 """
 )
