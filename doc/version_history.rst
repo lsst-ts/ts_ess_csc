@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.6.1
+======
+
+* Fixed import for ESS Common MockTestTools.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 3.1
+* IDL file for ESS from ts_xml 10.1
+* ts_ess_common
+* ts_tcpip
+* ts_utils 1.0
+
+
 v0.6.0
 ======
 
