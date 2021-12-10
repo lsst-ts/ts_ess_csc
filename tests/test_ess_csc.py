@@ -32,6 +32,7 @@ from lsst.ts.idl.enums.ESS import ErrorCode
 from lsst.ts import salobj
 from lsst.ts import tcpip
 from lsst.ts import utils
+from lsst.ts.ess.common.test_utils import MockTestTools
 
 
 logging.basicConfig(
@@ -121,7 +122,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await self.check_bin_script(name="ESS", index=1, exe_name="run_ess_csc.py")
 
     async def validate_telemetry(self):
-        mtt = common.MockTestTools()
+        mtt = MockTestTools()
         for sensor_name in self.csc.device_configurations:
             name = sensor_name
             device_config = self.csc.device_configurations[sensor_name]
