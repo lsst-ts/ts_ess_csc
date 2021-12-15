@@ -4,7 +4,7 @@ ts_ess_csc
 
 ``ts_ess_csc`` is a Commandable SAL Component (CSC) to control various environmental sensors at the Vera C. Rubin Observatory.
 
-`Documentation <https://ts-ess.lsst.io>`_
+`Documentation <https://ts-ess-csc.lsst.io>`_
 
 The package is compatible with Vera Rubin LSST DM's ``scons`` build system, and the `eups <https://github.com/RobertLuptonTheGood/eups>`_ package management system.
 Assuming you have the basic DM stack installed you can do the following, from within the package directory:
