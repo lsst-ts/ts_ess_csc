@@ -1,12 +1,14 @@
 .. py:currentmodule:: lsst.ts.ess.csc
 
-.. _lsst.ts.ess.csc-protocols:
+.. _lsst.ts.ess.csc-rpi_protocol:
 
-#######################
-Communication Protocols
-#######################
+##########################
+RPi Communication Protocol
+##########################
 
-This page describes the communication protocols used by the `EssCSC` to communicate with the ``ts_ess_controller`` code running on the Raspberry Pi 4's.
+This page describes the communication protocol used by the Raspberry Pi 4 servers.
+This is the protocol used by `RPiDataClient`.
+
 All communication is done via JSON encoded strings.
 All JSON strings have a common header, indicated by the ``msg_type`` keyword.
 The ``msg_type`` keyword can have the values
