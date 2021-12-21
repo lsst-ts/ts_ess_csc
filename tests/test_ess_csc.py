@@ -217,6 +217,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             settings_to_apply="test_all_sensors.yaml",
         ):
             await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
             assert len(self.csc.data_clients) == 3
             for data_client in self.csc.data_clients:
                 assert data_client.mock_server.connected
@@ -225,13 +226,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.csc.data_clients[1].mock_server.exit()
 
             await self.assert_next_summary_state(salobj.State.FAULT)
-            fault = await self.remote.evt_errorCode.next(
-                flush=False, timeout=STD_TIMEOUT
+            await self.assert_next_sample(
+                topic=self.remote.evt_errorCode, errorCode=ErrorCode.ConnectionLost
             )
-            fault = await self.remote.evt_errorCode.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
-            assert fault.errorCode == ErrorCode.ConnectionLost
 
     async def test_rpi_data_client_cannot_connect(self) -> None:
         """The CSC should fault if an RPiDataClient cannot connect
@@ -245,6 +242,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=1,
             settings_to_apply="test_all_sensors.yaml",
         ):
+            await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
             await self.assert_next_summary_state(salobj.State.DISABLED)
 
             # Prevent one of the data_clients from connecting,
@@ -256,14 +254,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_enable.start(timeout=STD_TIMEOUT)
             await self.assert_next_summary_state(salobj.State.FAULT)
-
-            fault = await self.remote.evt_errorCode.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
-            fault = await self.remote.evt_errorCode.next(
-                flush=False, timeout=STD_TIMEOUT
-            )
-            assert (
-                fault.errorCode == ErrorCode.StartFailed
-                or fault.errorCode == ErrorCode.ConnectionFailed
+            await self.assert_next_sample(
+                topic=self.remote.evt_errorCode, errorCode=ErrorCode.ConnectionFailed
             )
