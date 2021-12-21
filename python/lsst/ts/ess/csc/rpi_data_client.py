@@ -311,7 +311,7 @@ additionalProperties: false
                         )
                         continue
                     timestamp = telemetry_data[1]
-                    if not isinstance(sensor_name, float):
+                    if not isinstance(timestamp, float):
                         self.log.warning(
                             f"Ignoring data with non-float timestamp: {timestamp!r}."
                         )
