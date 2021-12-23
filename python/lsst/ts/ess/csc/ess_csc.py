@@ -23,7 +23,6 @@ __all__ = ["EssCsc"]
 
 import asyncio
 import enum
-import math
 import traceback
 import types
 from typing import Dict, List, Optional, Sequence, Tuple, Union
@@ -38,16 +37,6 @@ from lsst.ts.ess import common
 # TODO DM-32972 uncomment the following line,
 # and remove the custom ErrorCode class below:
 # from lsst.ts.idl.enums.ESS import ErrorCode
-
-SOCKET_TIMEOUT = 5
-"""Standard timeout in seconds for socket connections."""
-
-NUMBER_OF_TEMPERATURE_CHANNELS = 16
-"""The number of temperature channels expected in the telemetry."""
-
-TEMPERATURE_NANS = [math.nan] * NUMBER_OF_TEMPERATURE_CHANNELS
-"""Initial array with NaN values in which the temperature values of
-the sensors will be stored."""
 
 
 class ErrorCode(enum.IntEnum):

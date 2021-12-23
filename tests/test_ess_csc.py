@@ -90,13 +90,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         )
         return ess_csc
 
-    def get_mock_server(self, index: int) -> common.SocketServer:
-        """Get the mock server from the specified RPiDataClient data_client."""
-        assert len(self.csc.data_clients) > index
-        data_client = self.csc.data_clients[index]
-        assert isinstance(data_client, csc.RPiDataClient)
-        return data_client.mock_server
-
     async def test_standard_state_transitions(self) -> None:
         logging.info("test_standard_state_transitions")
         async with self.make_csc(
