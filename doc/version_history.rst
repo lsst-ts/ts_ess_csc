@@ -16,6 +16,7 @@ v0.7.0
 * Fix API docs.
 * Enable mypy type checking.
 * Change ``master`` to ``main`` in CONFIG_SCHEMA's ``id``, in preparation for renaming the branch.
+* Renamed the conda package from 'ts-ess' to 'ts-ess-csc'.
 
 Requires:
 
