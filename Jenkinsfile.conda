@@ -1,2 +1,2 @@
 @Library('JenkinsShared')_
-CondaPipeline(["ts_config_ocs"], "ts-ess", "lsst.ts.ess", "noarch")
+CondaPipeline(["ts_config_ocs"], "ts-ess-csc", "lsst.ts.ess", "noarch")
