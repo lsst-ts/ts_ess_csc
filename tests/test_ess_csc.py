@@ -228,6 +228,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             fault = await self.remote.evt_errorCode.next(
                 flush=False, timeout=STD_TIMEOUT
             )
+            fault = await self.remote.evt_errorCode.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
             assert fault.errorCode == ErrorCode.ConnectionLost
 
     async def test_rpi_data_client_cannot_connect(self) -> None:
@@ -257,4 +260,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             fault = await self.remote.evt_errorCode.next(
                 flush=False, timeout=STD_TIMEOUT
             )
-            assert fault.errorCode == ErrorCode.ConnectionFailed
+            fault = await self.remote.evt_errorCode.next(
+                flush=False, timeout=STD_TIMEOUT
+            )
+            assert (
+                fault.errorCode == ErrorCode.StartFailed
+                or fault.errorCode == ErrorCode.ConnectionFailed
+            )
