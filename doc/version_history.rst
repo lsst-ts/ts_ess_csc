@@ -9,18 +9,20 @@ Version History
 v0.7.0
 ======
 
-* Modify to use data clients (instances of `lsst.ts.ess.common.BaseDataClient`) to communicate with data servers.
+* Update unit tests for ts_salobj 6.8.
+  This change requires ts_salobj 6.8.
+* Modify to use data clients (subclasses of `lsst.ts.ess.common.BaseDataClient`) to communicate with data servers.
   This requires ts_ess_common 0.7.
 * Use new error codes from ts_idl 3.7, which is recommended but not required, due to a temporary local version of the ErrorCode enum class.
   All clients of this CSC should use ts_idl v3.7.0 in order to get correct ErrorCode values.
+* Rename the conda package from ts-ess to ts-ess-csc.
 * Fix API docs.
 * Enable mypy type checking.
 * Change ``master`` to ``main`` in CONFIG_SCHEMA's ``id``, in preparation for renaming the branch.
-* Renamed the conda package from 'ts-ess' to 'ts-ess-csc'.
 
 Requires:
 
-* ts_salobj 6.3
+* ts_salobj 6.8
 * ts_idl 3.7 strongly recommended, but 3.5 or 3.6 will do
 * IDL file for ESS from ts_xml 10.1
 * ts_ess_common 0.7
