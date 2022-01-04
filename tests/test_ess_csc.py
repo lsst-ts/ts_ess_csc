@@ -119,61 +119,70 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await self.check_bin_script(name="ESS", index=1, exe_name="run_ess_csc.py")
 
     async def validate_telemetry(self) -> None:
+        print("validate telemetry")
         mtt = MockTestTools()
-        for sensor_name in self.csc.device_configurations:
-            name = sensor_name
-            device_config = self.csc.device_configurations[sensor_name]
-            if device_config.sens_type == common.SensorType.TEMPERATURE:
-                num_channels = device_config.num_channels
-                data = await self.remote.tel_temperature.next(flush=False)
+        for data_client in self.csc.data_clients:
+            for sensor_name, device_config in data_client.device_configurations.items():
+                name = sensor_name
+                if device_config.sens_type == common.SensorType.TEMPERATURE:
+                    num_channels = device_config.num_channels
+                    print("wait for temperature data")
+                    data = await self.remote.tel_temperature.next(flush=False)
+                    print("data=", data)
 
-                # First make sure that the temperature data contain the
-                # expected number of NaN values.
-                expected_num_nans = len(data.temperature) - device_config.num_channels
-                nan_array = [math.nan] * expected_num_nans
-                np.testing.assert_array_equal(
-                    nan_array, data.temperature[device_config.num_channels :]
-                )
+                    # First make sure that the temperature data contain the
+                    # expected number of NaN values.
+                    expected_num_nans = (
+                        len(data.temperature) - device_config.num_channels
+                    )
+                    nan_array = [math.nan] * expected_num_nans
+                    np.testing.assert_array_equal(
+                        nan_array, data.temperature[device_config.num_channels :]
+                    )
 
-                # Next validate the rest of the data.
-                assert data.numChannels == device_config.num_channels
-                assert data.location == device_config.location
-                reply = create_reply_list(
-                    sensor_name=data.sensorName,
-                    additional_data=data.temperature[: device_config.num_channels],
-                )
-                mtt.check_temperature_reply(
-                    reply=reply, name=name, num_channels=num_channels
-                )
-            elif device_config.sens_type == common.SensorType.HX85A:
-                data = await self.remote.tel_hx85a.next(flush=False)
-                assert data.location == device_config.location
-                reply = create_reply_list(
-                    sensor_name=data.sensorName,
-                    additional_data=[
-                        data.relativeHumidity,
-                        data.temperature,
-                        data.dewPoint,
-                    ],
-                )
-                mtt.check_hx85a_reply(reply=reply, name=name)
-            elif device_config.sens_type == common.SensorType.HX85BA:
-                data = await self.remote.tel_hx85ba.next(flush=False)
-                assert data.location == device_config.location
-                reply = create_reply_list(
-                    sensor_name=data.sensorName,
-                    additional_data=[
-                        data.relativeHumidity,
-                        data.temperature,
-                        data.barometricPressure,
-                        data.dewPoint,
-                    ],
-                )
-                mtt.check_hx85ba_reply(reply=reply, name=name)
-            else:
-                raise ValueError(
-                    f"Unsupported sensor type {device_config.sens_type} encountered."
-                )
+                    # Next validate the rest of the data.
+                    assert data.numChannels == device_config.num_channels
+                    assert data.location == device_config.location
+                    reply = create_reply_list(
+                        sensor_name=data.sensorName,
+                        additional_data=data.temperature[: device_config.num_channels],
+                    )
+                    mtt.check_temperature_reply(
+                        reply=reply, name=name, num_channels=num_channels
+                    )
+                elif device_config.sens_type == common.SensorType.HX85A:
+                    print("wait for HX85A data")
+                    data = await self.remote.tel_hx85a.next(flush=False)
+                    print("data=", data)
+                    assert data.location == device_config.location
+                    reply = create_reply_list(
+                        sensor_name=data.sensorName,
+                        additional_data=[
+                            data.relativeHumidity,
+                            data.temperature,
+                            data.dewPoint,
+                        ],
+                    )
+                    mtt.check_hx85a_reply(reply=reply, name=name)
+                elif device_config.sens_type == common.SensorType.HX85BA:
+                    print("wait for HX85BA data")
+                    data = await self.remote.tel_hx85ba.next(flush=False)
+                    print("data=", data)
+                    assert data.location == device_config.location
+                    reply = create_reply_list(
+                        sensor_name=data.sensorName,
+                        additional_data=[
+                            data.relativeHumidity,
+                            data.temperature,
+                            data.barometricPressure,
+                            data.dewPoint,
+                        ],
+                    )
+                    mtt.check_hx85ba_reply(reply=reply, name=name)
+                else:
+                    raise ValueError(
+                        f"Unsupported sensor type {device_config.sens_type} encountered."
+                    )
 
     async def test_receive_telemetry(self) -> None:
         logging.info("test_receive_telemetry")
