@@ -25,7 +25,7 @@ import asyncio
 import enum
 import traceback
 import types
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import jsonschema
 
@@ -113,8 +113,6 @@ class EssCsc(salobj.ConfigurableCsc):
         settings_to_apply: str = "",
     ) -> None:
         self.config: Optional[types.SimpleNamespace] = None
-        self.device_configurations: Dict[str, common.DeviceConfig] = {}
-        self._config_dir = config_dir
         self.data_clients: List[common.BaseDataClient] = list()
         self.start_data_clients_task = utils.make_done_future()
         self.run_data_clients_task = utils.make_done_future()

@@ -26,7 +26,7 @@ import json
 import logging
 import math
 import types
-from typing import Any, Dict, Sequence, Union
+from typing import Any, Dict, Optional, Sequence, Union
 
 import yaml
 
@@ -67,14 +67,18 @@ class RPiDataClient(common.BaseDataClient):
         log: logging.Logger,
         simulation_mode: int = 0,
     ) -> None:
-        self.device_configurations: Dict[str, Any] = dict()
-        self.stream_lock = asyncio.Lock()
-        self.reader = None
-        self.writer = None
+        # Dict of sensor_name: device configuration
+        self.device_configurations: Dict[str, common.DeviceConfig] = dict()
 
-        # Set this False before calling start,
-        # to test failure to connect to the server.
-        # Ignored if not simulating.
+        # Lock for TCP/IP communication
+        self.stream_lock = asyncio.Lock()
+
+        # TCP/IP stream reader and writer
+        self.reader: Optional[asyncio.StreamReader] = None
+        self.writer: Optional[asyncio.StreamWriter] = None
+
+        # Set this attribute false before calling `start` to test failure
+        # to connect to the server. Ignored if not simulating.
         self.enable_mock_server = True
 
         # Array of NaNs used to initialize reported temperatures.
@@ -375,9 +379,11 @@ additionalProperties: false
         try:
             data = json.loads(read_bytes.decode())
         except json.decoder.JSONDecodeError as e:
-            raise RuntimeError(f"Could not parse {read_bytes} as json.") from e
+            raise RuntimeError(f"Could not parse {read_bytes!r} as json.") from e
         if not isinstance(data, dict):
-            raise RuntimeError(f"Could not parse {read_bytes} as a json-encoded dict.")
+            raise RuntimeError(
+                f"Could not parse {read_bytes!r} as a json-encoded dict."
+            )
         return data
 
     async def run_command(self, command: str, **parameters: Any) -> None:
