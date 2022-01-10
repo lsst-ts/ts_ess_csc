@@ -267,7 +267,6 @@ additionalProperties: false
         )
         configuration = {"devices": self.config.devices}
         await self.run_command(command="configure", configuration=configuration)
-        await self.run_command(command="start")
 
     async def disconnect(self) -> None:
         """Disconnect from the RPi.
@@ -275,22 +274,12 @@ additionalProperties: false
         Always safe to call, though it may raise asyncio.CancelledError
         if the writer is currently being closed.
         """
-        try:
-            if self.connected:
-                await self.run_command(command="stop")
-            if self.connected:
-                await self.run_command(command="exit")
-        except ConnectionError:
-            # The connection was lost.
-            # This is not worth getting upset about.
-            self.log.debug("Connection lost in disconnect")
-        finally:
-            if self.connected:
-                await asyncio.wait_for(
-                    tcpip.close_stream_writer(self.writer), timeout=CONNECT_TIMEOUT
-                )
-            if self.mock_server is not None:
-                await self.mock_server.close()
+        if self.connected:
+            await asyncio.wait_for(
+                tcpip.close_stream_writer(self.writer), timeout=CONNECT_TIMEOUT
+            )
+        if self.mock_server is not None:
+            await self.mock_server.close()
 
     async def run(self) -> None:
         """Read and process data from the RPi."""
@@ -461,13 +450,14 @@ additionalProperties: false
 
         Parameters
         ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
+        sensor_name : `str`
+            The name of the sensor.
+        timestamp : `float`
+            The timestamp of the data.
+        response_code : `int`
+            The ResponseCode
+        sensor_data : each of type `float`
+            A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
         telemetry = {
@@ -499,13 +489,14 @@ additionalProperties: false
 
         Parameters
         ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
+        sensor_name : `str`
+            The name of the sensor.
+        timestamp : `float`
+            The timestamp of the data.
+        response_code : `int`
+            The ResponseCode
+        sensor_data : each of type `float`
+            A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
         telemetry = {
@@ -529,13 +520,14 @@ additionalProperties: false
 
         Parameters
         ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
+        sensor_name : `str`
+            The name of the sensor.
+        timestamp : `float`
+            The timestamp of the data.
+        response_code : `int`
+            The ResponseCode
+        sensor_data : each of type `float`
+            A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
         telemetry = {
@@ -560,13 +552,14 @@ additionalProperties: false
 
         Parameters
         ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
+        sensor_name : `str`
+            The name of the sensor.
+        timestamp : `float`
+            The timestamp of the data.
+        response_code : `int`
+            The ResponseCode
+        sensor_data : each of type `float`
+            A Sequence of float representing the sensor telemetry data.
 
         Raises
         ------
