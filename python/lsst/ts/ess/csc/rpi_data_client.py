@@ -292,30 +292,30 @@ additionalProperties: false
                 elif common.Key.TELEMETRY in data:
                     self.log.debug(f"Processing data {data}")
                     telemetry_data = data[common.Key.TELEMETRY]
-                    if len(telemetry_data) <= 4:
+                    if len(telemetry_data) < 4:
                         self.log.warning(
                             f"Ignoring telemetry data with fewer than 4 fields: {telemetry_data}."
                         )
                         continue
-                    sensor_name = telemetry_data[0]
+                    sensor_name = telemetry_data[common.Key.NAME]
                     if not isinstance(sensor_name, str):
                         self.log.warning(
                             f"Ignoring data with non-str sensor_name: {sensor_name!r}."
                         )
                         continue
-                    timestamp = telemetry_data[1]
+                    timestamp = telemetry_data[common.Key.TIMESTAMP]
                     if not isinstance(timestamp, float):
                         self.log.warning(
                             f"Ignoring data with non-float timestamp: {timestamp!r}."
                         )
                         continue
-                    response_code = telemetry_data[2]
+                    response_code = telemetry_data[common.Key.RESPONSE_CODE]
                     if not isinstance(response_code, int):
                         self.log.warning(
                             f"Ignoring data with non-int response_code: {response_code!r}."
                         )
                         continue
-                    sensor_data = telemetry_data[3:]
+                    sensor_data = telemetry_data[common.Key.SENSOR_TELEMETRY]
                     if not all(isinstance(value, float) for value in sensor_data):
                         self.log.warning(
                             f"Ignoring data with non-float sensor_data: {sensor_data!r}."

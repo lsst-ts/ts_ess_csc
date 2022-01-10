@@ -47,9 +47,9 @@ STD_TIMEOUT = 10  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parents[1].joinpath("tests", "data", "config")
 
 
-def create_reply_list(
+def create_reply_dict(
     sensor_name: str, additional_data: List[float]
-) -> List[Union[str, int, float]]:
+) -> common.test_utils.SensorReply:
     """Create a list that represents a reply from a sensor.
 
     Parameters
@@ -64,11 +64,12 @@ def create_reply_list(
         A list formed by the sensor name, the timestamp, a ResponseCode and
         the additional data.
     """
-    return [
-        sensor_name,
-        utils.current_tai(),
-        common.ResponseCode.OK,
-    ] + additional_data
+    return {
+        common.Key.NAME: sensor_name,
+        common.Key.TIMESTAMP: utils.current_tai(),
+        common.Key.RESPONSE_CODE: common.ResponseCode.OK,
+        common.Key.SENSOR_TELEMETRY: additional_data,
+    }
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
@@ -126,9 +127,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 name = sensor_name
                 if device_config.sens_type == common.SensorType.TEMPERATURE:
                     num_channels = device_config.num_channels
-                    print("wait for temperature data")
                     data = await self.remote.tel_temperature.next(flush=False)
-                    print("data=", data)
 
                     # First make sure that the temperature data contain the
                     # expected number of NaN values.
@@ -143,7 +142,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     # Next validate the rest of the data.
                     assert data.numChannels == device_config.num_channels
                     assert data.location == device_config.location
-                    reply = create_reply_list(
+                    reply = create_reply_dict(
                         sensor_name=data.sensorName,
                         additional_data=data.temperature[: device_config.num_channels],
                     )
@@ -151,11 +150,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         reply=reply, name=name, num_channels=num_channels
                     )
                 elif device_config.sens_type == common.SensorType.HX85A:
-                    print("wait for HX85A data")
                     data = await self.remote.tel_hx85a.next(flush=False)
-                    print("data=", data)
                     assert data.location == device_config.location
-                    reply = create_reply_list(
+                    reply = create_reply_dict(
                         sensor_name=data.sensorName,
                         additional_data=[
                             data.relativeHumidity,
@@ -165,11 +162,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     )
                     mtt.check_hx85a_reply(reply=reply, name=name)
                 elif device_config.sens_type == common.SensorType.HX85BA:
-                    print("wait for HX85BA data")
                     data = await self.remote.tel_hx85ba.next(flush=False)
-                    print("data=", data)
                     assert data.location == device_config.location
-                    reply = create_reply_list(
+                    reply = create_reply_dict(
                         sensor_name=data.sensorName,
                         additional_data=[
                             data.relativeHumidity,

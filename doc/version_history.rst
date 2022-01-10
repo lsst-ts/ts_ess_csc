@@ -20,6 +20,7 @@ v0.7.0
 * Enable mypy type checking.
 * Change ``master`` to ``main`` in CONFIG_SCHEMA's ``id``, in preparation for renaming the branch.
 * Remove START and STOP commands from RPi Data Client.
+* The sensor name, timestamp, response code and data are encoded as separate named entities.
 
 Requires:
 
