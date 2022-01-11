@@ -77,8 +77,8 @@ def get_task_index_exception(
         if task.done() and not task.cancelled() and task.exception() is not None:
             # Mypy thinks task.exception() could be None,
             # so block type checking
-            return index, task.exception()  # type: ignore
-    return None, None
+            return (index, task.exception())  # type: ignore
+    return (None, None)
 
 
 class EssCsc(salobj.ConfigurableCsc):
