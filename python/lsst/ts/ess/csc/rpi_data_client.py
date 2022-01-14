@@ -28,6 +28,7 @@ import math
 import types
 from typing import Any, Dict, Optional, Sequence, Union
 
+import jsonschema
 import yaml
 
 from lsst.ts import salobj, tcpip
@@ -267,7 +268,6 @@ additionalProperties: false
         )
         configuration = {"devices": self.config.devices}
         await self.run_command(command="configure", configuration=configuration)
-        await self.run_command(command="start")
 
     async def disconnect(self) -> None:
         """Disconnect from the RPi.
@@ -275,26 +275,60 @@ additionalProperties: false
         Always safe to call, though it may raise asyncio.CancelledError
         if the writer is currently being closed.
         """
-        try:
-            if self.connected:
-                await self.run_command(command="stop")
-            if self.connected:
-                await self.run_command(command="exit")
-        except ConnectionError:
-            # The connection was lost.
-            # This is not worth getting upset about.
-            self.log.debug("Connection lost in disconnect")
-        finally:
-            if self.connected:
-                await asyncio.wait_for(
-                    tcpip.close_stream_writer(self.writer), timeout=CONNECT_TIMEOUT
-                )
-            if self.mock_server is not None:
-                await self.mock_server.close()
+        if self.connected:
+            await asyncio.wait_for(
+                tcpip.close_stream_writer(self.writer), timeout=CONNECT_TIMEOUT
+            )
+        if self.mock_server is not None:
+            await self.mock_server.close()
+
+    @classmethod
+    def get_telemetry_schema(cls) -> Dict[str, Any]:
+        return json.loads(
+            """
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Schema for Sensor Telemetry",
+  "type": "object",
+  "properties": {
+    "telemetry": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Name of the sensor.",
+          "type": "string"
+        },
+        "timestamp": {
+          "description": "Timestamp of the telemetry.",
+          "type": "number"
+        },
+        "response_code": {
+          "description": "Response code indicating if all is OK or if there is an error.",
+          "type": "number"
+        },
+        "sensor_telemetry": {
+          "description": "The sensor telemetry.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        }
+      },
+      "required": ["name", "timestamp", "response_code", "sensor_telemetry"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["telemetry"],
+  "additionalProperties": false
+}
+            """
+        )
 
     async def run(self) -> None:
         """Read and process data from the RPi."""
         try:
+            validator = jsonschema.Draft7Validator(schema=self.get_telemetry_schema())
             while self.connected:
                 async with self.stream_lock:
                     data = await self.read()
@@ -302,41 +336,16 @@ additionalProperties: false
                     self.log.warning("Read a command response with no command pending")
                 elif common.Key.TELEMETRY in data:
                     self.log.debug(f"Processing data {data}")
+                    try:
+                        validator.validate(data)
+                    except Exception as e:
+                        raise RuntimeError(e)
                     telemetry_data = data[common.Key.TELEMETRY]
-                    if len(telemetry_data) <= 4:
-                        self.log.warning(
-                            f"Ignoring telemetry data with fewer than 4 fields: {telemetry_data}."
-                        )
-                        continue
-                    sensor_name = telemetry_data[0]
-                    if not isinstance(sensor_name, str):
-                        self.log.warning(
-                            f"Ignoring data with non-str sensor_name: {sensor_name!r}."
-                        )
-                        continue
-                    timestamp = telemetry_data[1]
-                    if not isinstance(timestamp, float):
-                        self.log.warning(
-                            f"Ignoring data with non-float timestamp: {timestamp!r}."
-                        )
-                        continue
-                    response_code = telemetry_data[2]
-                    if not isinstance(response_code, int):
-                        self.log.warning(
-                            f"Ignoring data with non-int response_code: {response_code!r}."
-                        )
-                        continue
-                    sensor_data = telemetry_data[3:]
-                    if not all(isinstance(value, float) for value in sensor_data):
-                        self.log.warning(
-                            f"Ignoring data with non-float sensor_data: {sensor_data!r}."
-                        )
-                        continue
                     await self.process_telemetry(
-                        sensor_name=sensor_name,
-                        timestamp=timestamp,
-                        response_code=response_code,
-                        sensor_data=sensor_data,
+                        sensor_name=telemetry_data[common.Key.NAME],
+                        timestamp=telemetry_data[common.Key.TIMESTAMP],
+                        response_code=telemetry_data[common.Key.RESPONSE_CODE],
+                        sensor_data=telemetry_data[common.Key.SENSOR_TELEMETRY],
                     )
                 else:
                     self.log.warning(f"Ignoring unparsable data: {data}.")
@@ -461,13 +470,14 @@ additionalProperties: false
 
         Parameters
         ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
+        sensor_name : `str`
+            The name of the sensor.
+        timestamp : `float`
+            The timestamp of the data.
+        response_code : `int`
+            The ResponseCode
+        sensor_data : each of type `float`
+            A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
         telemetry = {
@@ -499,13 +509,14 @@ additionalProperties: false
 
         Parameters
         ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
+        sensor_name : `str`
+            The name of the sensor.
+        timestamp : `float`
+            The timestamp of the data.
+        response_code : `int`
+            The ResponseCode
+        sensor_data : each of type `float`
+            A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
         telemetry = {
@@ -529,13 +540,14 @@ additionalProperties: false
 
         Parameters
         ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
+        sensor_name : `str`
+            The name of the sensor.
+        timestamp : `float`
+            The timestamp of the data.
+        response_code : `int`
+            The ResponseCode
+        sensor_data : each of type `float`
+            A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
         telemetry = {
@@ -560,13 +572,14 @@ additionalProperties: false
 
         Parameters
         ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
+        sensor_name : `str`
+            The name of the sensor.
+        timestamp : `float`
+            The timestamp of the data.
+        response_code : `int`
+            The ResponseCode
+        sensor_data : each of type `float`
+            A Sequence of float representing the sensor telemetry data.
 
         Raises
         ------

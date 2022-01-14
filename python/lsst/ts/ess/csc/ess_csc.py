@@ -170,7 +170,7 @@ class EssCsc(salobj.ConfigurableCsc):
                 client = self.data_clients[index]
                 if any(
                     isinstance(task_exception, etype)
-                    for etype in (ConnectionError, asyncio.IncompleteReadError)
+                    for etype in (ConnectionError, asyncio.IncompleteReadError, OSError)
                 ):
                     code = ErrorCode.ConnectionFailed
                     report = f"{client} could not connect to its data server: {task_exception}"
