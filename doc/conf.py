@@ -25,6 +25,7 @@ This configuration only affects single-package Sphinx documentation builds.
 """
 
 from documenteer.conf.pipelinespkg import *  # noqa
+
 import lsst.ts.ess.csc  # noqa
 
 project = "ts_ess_csc"

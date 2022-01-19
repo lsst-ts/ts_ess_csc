@@ -31,5 +31,6 @@ else:
     except ImportError:
         __version__ = "?"
 
-from .ess_csc import EssCsc
+from .rpi_data_client import *
 from .config_schema import CONFIG_SCHEMA
+from .ess_csc import EssCsc

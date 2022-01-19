@@ -22,26 +22,63 @@
 __all__ = ["EssCsc"]
 
 import asyncio
-import json
-import math
-from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Union
+import enum
+import traceback
+import types
+from typing import List, Optional, Sequence, Tuple, Union
+
+import jsonschema
 
 from .config_schema import CONFIG_SCHEMA
 from . import __version__
-from lsst.ts import salobj, tcpip, utils
+from lsst.ts import salobj, utils
 from lsst.ts.ess import common
-from lsst.ts.idl.enums.ESS import ErrorCode
 
-SOCKET_TIMEOUT = 5
-"""Standard timeout in seconds for socket connections."""
+# TODO DM-32972 uncomment the following line,
+# and remove the custom ErrorCode class below:
+# from lsst.ts.idl.enums.ESS import ErrorCode
 
-NUMBER_OF_TEMPERATURE_CHANNELS = 16
-"""The number of temperature channels expected in the telemetry."""
 
-TEMPERATURE_NANS = [math.nan] * NUMBER_OF_TEMPERATURE_CHANNELS
-"""Initial array with NaN values in which the temperature values of
-the sensors will be stored."""
+class ErrorCode(enum.IntEnum):
+    """Error codes that can be used by the ESS CSC.
+
+    Values:
+
+    * ConnectionFailed: a model could not connect its data server.
+      Perhaps the model configuration is wrong or the server is down.
+    * ConnectionLost: a model lost its connection to its data server.
+    * StartFailed: one or more models failed to start.
+    * RunFailed: one or more models failed while running.
+    """
+
+    ConnectionFailed = 1
+    ConnectionLost = 2
+    StartFailed = 3
+    RunFailed = 4
+
+
+def get_task_index_exception(
+    tasks: Sequence[asyncio.Future],
+) -> Union[Tuple[int, Exception], Tuple[None, None]]:
+    """Return (index, exception) of the first task with an exception.
+
+    Parameters
+    ----------
+    tasks : `List` [`asyncio.Future`]
+        A list of tasks.
+
+    Returns
+    -------
+    info : `Tuple`
+        Return (index, exception) of the first task with an exception.
+        Return (None, None) if no tasks have an exception.
+    """
+    for index, task in enumerate(tasks):
+        if task.done() and not task.cancelled() and task.exception() is not None:
+            # Mypy thinks task.exception() could be None,
+            # so block type checking
+            return (index, task.exception())  # type: ignore
+    return (None, None)
 
 
 class EssCsc(salobj.ConfigurableCsc):
@@ -75,9 +112,12 @@ class EssCsc(salobj.ConfigurableCsc):
         simulation_mode: int = 0,
         settings_to_apply: str = "",
     ) -> None:
-        self.config: Optional[SimpleNamespace] = None
-        self.device_configurations: Dict[str, common.DeviceConfig] = {}
-        self._config_dir = config_dir
+        self.config: Optional[types.SimpleNamespace] = None
+        self.data_clients: List[common.BaseDataClient] = list()
+        self.start_data_clients_task = utils.make_done_future()
+        self.run_data_clients_task = utils.make_done_future()
+        self.stop_data_clients_tasks: List[asyncio.Task] = []
+
         super().__init__(
             name="ESS",
             index=index,
@@ -87,300 +127,124 @@ class EssCsc(salobj.ConfigurableCsc):
             simulation_mode=simulation_mode,
             settings_to_apply=settings_to_apply,
         )
-
-        self.reader: Optional[asyncio.StreamReader] = None
-        self.writer: Optional[asyncio.StreamWriter] = None
-        self.host = None
-        self.port = None
-        self.telemetry_loop: asyncio.Future = utils.make_done_future()
-        self.last_commands: List[str] = []
-
         self.log.info("ESS CSC created.")
 
-    async def _read_loop(self) -> None:
-        """Execute a loop that reads incoming data from the SocketServer."""
-        try:
-            while True:
-                data = await self.read()
-                if common.Key.RESPONSE in data:
-                    response = data[common.Key.RESPONSE]
-                    if response != common.ResponseCode.OK:
-                        try:
-                            oldest_last_command = self.last_commands.pop(0)
-                            self.log.error(
-                                f"Command {oldest_last_command} received response {response}. Continuing."
-                            )
-                        except IndexError:
-                            self.log.error(
-                                f"Received response {data} while no command was waiting for a reply."
-                            )
-                elif common.Key.TELEMETRY in data:
-                    sensor_data = data[common.Key.TELEMETRY]
-                    await self.process_telemetry(data=sensor_data)
-                else:
-                    self.log.error(f"Unknown data {data!r} received. Ignoring.")
-        except Exception as e:
-            self.log.exception("_read_loop failed")
-            self.fault(code=ErrorCode.ReadLoopFailed, report=f"{e}")
-
-    async def read(self) -> dict:
-        """Utility function to read a string from the reader and unmarshal it
-
-        Returns
-        -------
-        data : `dict`
-            A dictionary with objects representing the string read.
-        """
-        if not self.reader or not self.connected:
-            self.fault(code=ErrorCode.NotConnected, report="Not connected.")
-            return
-
-        read_bytes = await asyncio.wait_for(
-            self.reader.readuntil(tcpip.TERMINATOR), timeout=SOCKET_TIMEOUT
-        )
-        data = json.loads(read_bytes.decode())
-        return data
-
-    async def write(self, command: str, **data: Any) -> None:
-        """Write the command and data appended with a newline character.
-
-        Parameters
-        ----------
-        command : `str`
-            The command to write.
-        data : `dict`
-            The data to write.
-        """
-        if not self.writer or not self.connected:
-            self.fault(code=ErrorCode.NotConnected, report="Not connected.")
-            return
-
-        st = json.dumps({"command": command, **data})
-        self.last_commands.append(st)
-        self.writer.write(st.encode() + tcpip.TERMINATOR)
-        await self.writer.drain()
-
-    async def process_temperature_telemetry(
-        self, data: List[Union[str, int, float]]
-    ) -> None:
-        """Process the temperature telemetry and send to EFD.
-
-        Parameters
-        ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
-        """
-        sensor_name = data[0]
-        timestamp = data[1]
-        sensor_data = data[3:]
-        device_configuration = self.device_configurations[sensor_name]
-        telemetry = {
-            "sensorName": sensor_name,
-            "timestamp": timestamp,
-            "numChannels": device_configuration.num_channels,
-            "location": device_configuration.location,
-        }
-
-        if len(sensor_data) != device_configuration.num_channels:
-            raise RuntimeError(
-                f"Expected {device_configuration.num_channels} temperatures "
-                f"but received {len(sensor_data)}."
-            )
-        temperature = TEMPERATURE_NANS[:]
-        temperature[: device_configuration.num_channels] = sensor_data
-        telemetry["temperature"] = temperature
-        self.log.debug(f"Sending telemetry {telemetry}")
-        self.tel_temperature.set_put(**telemetry)
-
-    async def process_hx85a_telemetry(self, data: List[Union[str, int, float]]) -> None:
-        """Process the HX85A humidity sensor telemetry and send to EFD.
-
-        Parameters
-        ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
-        """
-        sensor_name = data[0]
-        timestamp = data[1]
-        device_configuration = self.device_configurations[sensor_name]
-        telemetry = {
-            "sensorName": sensor_name,
-            "timestamp": timestamp,
-            "relativeHumidity": data[3],
-            "temperature": data[4],
-            "dewPoint": data[5],
-            "location": device_configuration.location,
-        }
-        self.tel_hx85a.set_put(**telemetry)
-
-    async def process_hx85ba_telemetry(
-        self, data: List[Union[str, int, float]]
-    ) -> None:
-        """Process the HX85BA humidity sensor telemetry and send to EFD.
-
-        Parameters
-        ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
-        """
-        sensor_name = data[0]
-        timestamp = data[1]
-        device_configuration = self.device_configurations[sensor_name]
-        telemetry = {
-            "sensorName": sensor_name,
-            "timestamp": timestamp,
-            "relativeHumidity": data[3],
-            "temperature": data[4],
-            "barometricPressure": data[5],
-            "dewPoint": data[6],
-            "location": device_configuration.location,
-        }
-        self.tel_hx85ba.set_put(**telemetry)
-
-    async def process_telemetry(self, data: List[Union[str, int, float]]) -> None:
-        """Process the sensor telemetry
-
-        Parameters
-        ----------
-        data : `list`
-            A list containing the timestamp, error and sensor data. The order
-            of the items in the list is:
-            - Sensor name : `str`
-            - Timestamp : `float`
-            - Response code : `int`
-            - One or more sensor data : each of type `float`
-        """
-        try:
-            self.log.debug(f"Processing data {data}")
-            sensor_name = data[0]
-            error_code = data[2]
-            device_configuration = self.device_configurations[sensor_name]
-            if error_code == common.ResponseCode.OK:
-                if device_configuration.sens_type == common.SensorType.TEMPERATURE:
-                    await self.process_temperature_telemetry(data=data)
-                elif device_configuration.sens_type == common.SensorType.HX85A:
-                    await self.process_hx85a_telemetry(data=data)
-                elif device_configuration.sens_type == common.SensorType.HX85BA:
-                    await self.process_hx85ba_telemetry(data=data)
-            elif error_code == common.ResponseCode.DEVICE_READ_ERROR:
-                self.fault(
-                    code=ErrorCode.HardwareError,
-                    report=f"Error reading sensor {sensor_name}. Please check the hardware.",
-                )
-        except Exception as e:
-            self.fault(code=ErrorCode.TelemetryError, report=f"Telemetry error: {e}")
-
-    async def connect(self) -> None:
-        """Determine if running in local or remote mode and dispatch to the
-        corresponding connect coroutine.
-        """
-        self.log.info("Connecting")
-        self.log.info(self.config)
-        self.log.info(f"self.simulation_mode = {self.simulation_mode}")
-        if self.config is None:
-            self.fault(code=ErrorCode.NotConfigured, report="Not configured.")
-            return
-        if self.connected:
-            self.fault(code=ErrorCode.AlreadyConnected, report="Already connected.")
-            return
-
-        if not self.host:
-            self.host = self.config.host
-        if not self.port:
-            self.port = self.config.port
-        rw_coro = asyncio.open_connection(host=self.host, port=self.port)
-        self.reader, self.writer = await asyncio.wait_for(
-            rw_coro, timeout=SOCKET_TIMEOUT
-        )
-        configuration = {"devices": self.config.devices}
-        await self.write(
-            command="configure",
-            parameters={"configuration": configuration},
-        )
-
-        # Start a loop to read incoming data from the SocketServer.
-        self.telemetry_loop = asyncio.create_task(self._read_loop())
-
-    async def begin_enable(self, id_data) -> None:
+    async def begin_enable(self, data: salobj.BaseDdsDataType) -> None:
         """Begin do_enable; called before state changes.
 
-        This method sends a CMD_INPROGRESS signal.
+        This override sends a CMD_INPROGRESS signal.
 
         Parameters
         ----------
-        id_data : `CommandIdData`
-            Command ID and data
+        data : `salobj.BaseDdsDataType`
+            Command data
 
         """
-        await super().begin_enable(id_data)
-        self.cmd_enable.ack_in_progress(id_data, timeout=60)
+        await super().begin_enable(data)
+        self.cmd_enable.ack_in_progress(data, timeout=60)
 
-    async def end_enable(self, id_data) -> None:
-        """End do_enable; called after state changes but before command
-        acknowledged.
+    async def handle_summary_state(self) -> None:
+        if self.summary_state == salobj.State.ENABLED:
+            await self.start_data_clients()
+        else:
+            await self.stop_data_clients()
 
-        This method connects to the ESS Instrument and starts it.
+    async def start_data_clients(self) -> None:
+        """Start the data clients."""
+        tasks = [asyncio.create_task(client.start()) for client in self.data_clients]
+        try:
+            self.start_data_clients_task = asyncio.gather(*tasks)
+            await self.start_data_clients_task
+            self.run_data_clients_task = asyncio.create_task(self.run_data_clients())
+        except Exception as main_exception:
+            index, task_exception = get_task_index_exception(tasks)
+            traceback_arg = None
+            if index is None:
+                code = ErrorCode.StartFailed
+                report = (
+                    "start failed but no start task failed; "
+                    f"please report as a bug: {main_exception}"
+                )
+                traceback_arg = traceback.format_exc()
+            else:
+                client = self.data_clients[index]
+                if any(
+                    isinstance(task_exception, etype)
+                    for etype in (ConnectionError, asyncio.IncompleteReadError, OSError)
+                ):
+                    code = ErrorCode.ConnectionFailed
+                    report = f"{client} could not connect to its data server: {task_exception}"
+                elif isinstance(task_exception, asyncio.TimeoutError):
+                    code = ErrorCode.ConnectionFailed
+                    report = f"{client} could not connect to its data server in time"
+                else:
+                    code = ErrorCode.StartFailed
+                    report = f"{client} failed to start: {task_exception!r}"
+            self.fault(code=code, report=report, traceback=traceback_arg)
+            raise
 
-        Parameters
-        ----------
-        id_data : `CommandIdData`
-            Command ID and data
-        """
-        if not self.connected:
-            await self.connect()
+    async def run_data_clients(self) -> None:
+        """Run the data clients, to read and publish environmental data."""
+        tasks = [client.run_task for client in self.data_clients]
+        try:
+            self.run_data_clients_task = asyncio.gather(*tasks)
+            await self.run_data_clients_task
+        except Exception as main_exception:
+            index, task_exception = get_task_index_exception(tasks)
+            traceback_arg = None
+            if index is None:
+                code = ErrorCode.RunFailed
+                report = (
+                    "run_data_clients failed, but no run task failed; "
+                    f"please report as a bug: {main_exception}"
+                )
+                traceback_arg = traceback.format_exc()
+            else:
+                client = self.data_clients[index]
+                if any(
+                    isinstance(task_exception, etype)
+                    for etype in (ConnectionError, asyncio.IncompleteReadError)
+                ):
+                    code = ErrorCode.ConnectionLost
+                    report = (
+                        f"{client} lost connection to its data server: {task_exception}"
+                    )
+                elif isinstance(task_exception, asyncio.TimeoutError):
+                    code = ErrorCode.ConnectionLost
+                    report = f"{client} timed out waiting for data"
+                else:
+                    code = ErrorCode.RunFailed
+                    report = f"{client} failed while running: {task_exception!r}"
+            self.fault(code=code, report=report, traceback=traceback_arg)
+            raise
 
-        self.log.info("Start periodic polling of the sensor data.")
-        await self.write(command="start", parameters={})
-        await super().end_enable(id_data)
+    async def stop_data_clients(self) -> None:
+        """Stop the data clients."""
+        self.start_data_clients_task.cancel()
+        self.run_data_clients_task.cancel()
+        for task in self.stop_data_clients_tasks:
+            task.cancel()
 
-    async def begin_disable(self, id_data) -> None:
-        """Begin do_disable; called before state changes.
+        self.stop_data_clients_tasks = [
+            asyncio.create_task(client.stop()) for client in self.data_clients
+        ]
+        await asyncio.gather(*self.stop_data_clients_tasks, return_exceptions=True)
+        failed_task_strs = [
+            str(client)
+            for client, task in zip(self.data_clients, self.stop_data_clients_tasks)
+            if task.done() and not task.cancelled() and task.exception() is not None
+        ]
+        if failed_task_strs:
+            failed_summary = ", ".join(failed_task_strs)
+            self.log.warning(
+                f"Failed to stop one or more data clients: {failed_summary}; continuing"
+            )
 
-        This method will try to gracefully stop the ESS Instrument and then
-        disconnect from it.
+    async def stop_tasks(self) -> None:
+        await super().stop_tasks()
+        await self.stop_data_clients()
 
-        Parameters
-        ----------
-        id_data : `CommandIdData`
-            Command ID and data
-        """
-        self.cmd_disable.ack_in_progress(id_data, timeout=60)
-
-        await self.write(command="stop", parameters={})
-        self.telemetry_loop.cancel()
-        await self.write(command="disconnect", parameters={})
-
-        self.writer.close()
-        await self.writer.wait_closed()
-        self.writer = None
-        self.reader = None
-
-        await super().begin_disable(id_data)
-
-    def fault(self, code, report, traceback=""):
-        if self.connected:
-            asyncio.create_task(self.write(command="stop", parameters={}))
-        self.telemetry_loop.cancel()
-        if self.connected:
-            asyncio.create_task(self.write(command="disconnect", parameters={}))
-        super().fault(code=code, report=report, traceback=traceback)
-
-    async def configure(self, config) -> None:
+    async def configure(self, config: types.SimpleNamespace) -> None:
         """Configure the CSC.
 
         Also store the device configurations for easier access when receiving
@@ -392,39 +256,38 @@ class EssCsc(salobj.ConfigurableCsc):
             The configuration as described by the schema at
             `lsst.ts.ess.csc.CONFIG_SCHEMA`, as a struct-like object.
         """
-        self.config = config
-        for device in config.devices:
-            if device[common.Key.DEVICE_TYPE] == common.DeviceType.FTDI:
-                dev_id = common.Key.FTDI_ID
-            elif device[common.Key.DEVICE_TYPE] == common.DeviceType.SERIAL:
-                dev_id = common.Key.SERIAL_PORT
-            else:
-                self.fault(
-                    code=ErrorCode.BadConfiguration,
-                    report=f"Unknown device type {device[common.Key.DEVICE_TYPE]} encountered.",
+        for instance in config.instances:
+            if instance["sal_index"] == self.salinfo.index:
+                break
+        else:
+            raise RuntimeError(f"No config found for sal_index={self.salinfo.index}")
+        for client_index, client_data in enumerate(instance["data_clients"]):
+            client_class = common.get_data_client_class(client_data["client_class"])
+            config_schema = client_class.get_config_schema()
+            validator = salobj.DefaultingValidator(config_schema)
+            client_config_dict = client_data["config"]
+            client_config_dict = validator.validate(client_config_dict)
+            if not isinstance(client_config_dict, dict):
+                raise RuntimeError(
+                    f"config for data_clients[{client_index}] class {client_class} invalid: not a dict"
                 )
-                return
-            num_channels = 0
-            sensor_type = device[common.Key.SENSOR_TYPE]
-            if sensor_type == common.SensorType.TEMPERATURE:
-                num_channels = device[common.Key.CHANNELS]
-            self.device_configurations[device[common.Key.NAME]] = common.DeviceConfig(
-                name=device[common.Key.NAME],
-                num_channels=num_channels,
-                dev_type=device[common.Key.DEVICE_TYPE],
-                dev_id=device[dev_id],
-                sens_type=device[common.Key.SENSOR_TYPE],
-                location=device[common.Key.LOCATION],
-            )
-
-    @property
-    def connected(self) -> bool:
-        return not (
-            self.reader is None
-            or self.writer is None
-            or self.reader.at_eof()
-            or self.writer.is_closing()
-        )
+            client_config = types.SimpleNamespace(**client_config_dict)
+            try:
+                client = client_class(
+                    config=client_config,
+                    topics=self,
+                    log=self.log,
+                    simulation_mode=self.simulation_mode,
+                )
+            except jsonschema.ValidationError as e:
+                raise RuntimeError(
+                    f"config for data_clients[{client_index}] class {client_class} invalid: {e}"
+                )
+            except Exception as e:
+                raise RuntimeError(
+                    f"Could not construct data_clients[{client_index}] class {client_class}: {e}"
+                )
+            self.data_clients.append(client)
 
     @staticmethod
     def get_config_pkg() -> str:
