@@ -95,9 +95,9 @@ class EssCsc(salobj.ConfigurableCsc):
         The initial state of the CSC
     simulation_mode : `int`
         Simulation mode (1) or not (0)
-    settings_to_apply : `str`, optional
-        Settings to apply if ``initial_state`` is `State.DISABLED`
-        or `State.ENABLED`.
+    override : `str`, optional
+        Configuration override file to apply if ``initial_state`` is
+        `State.DISABLED` or `State.ENABLED`.
     """
 
     enable_cmdline_state = True
@@ -110,7 +110,7 @@ class EssCsc(salobj.ConfigurableCsc):
         config_dir: str = None,
         initial_state: salobj.State = salobj.State.STANDBY,
         simulation_mode: int = 0,
-        settings_to_apply: str = "",
+        override: str = "",
     ) -> None:
         self.config: Optional[types.SimpleNamespace] = None
         self.data_clients: List[common.BaseDataClient] = list()
@@ -125,7 +125,7 @@ class EssCsc(salobj.ConfigurableCsc):
             config_dir=config_dir,
             initial_state=initial_state,
             simulation_mode=simulation_mode,
-            settings_to_apply=settings_to_apply,
+            override=override,
         )
         self.log.info("ESS CSC created.")
 
@@ -141,7 +141,7 @@ class EssCsc(salobj.ConfigurableCsc):
 
         """
         await super().begin_enable(data)
-        self.cmd_enable.ack_in_progress(data, timeout=60)
+        await self.cmd_enable.ack_in_progress(data, timeout=60)
 
     async def handle_summary_state(self) -> None:
         if self.summary_state == salobj.State.ENABLED:
@@ -180,7 +180,7 @@ class EssCsc(salobj.ConfigurableCsc):
                 else:
                     code = ErrorCode.StartFailed
                     report = f"{client} failed to start: {task_exception!r}"
-            self.fault(code=code, report=report, traceback=traceback_arg)
+            await self.fault(code=code, report=report, traceback=traceback_arg)
             raise
 
     async def run_data_clients(self) -> None:
@@ -215,7 +215,7 @@ class EssCsc(salobj.ConfigurableCsc):
                 else:
                     code = ErrorCode.RunFailed
                     report = f"{client} failed while running: {task_exception!r}"
-            self.fault(code=code, report=report, traceback=traceback_arg)
+            await self.fault(code=code, report=report, traceback=traceback_arg)
             raise
 
     async def stop_data_clients(self) -> None:
