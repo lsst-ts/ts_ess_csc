@@ -34,13 +34,12 @@ import yaml
 from lsst.ts import salobj, tcpip
 from lsst.ts.ess import common
 
-# Time limit for connecting to the RPi (seconds)
-CONNECT_TIMEOUT = 5
+# Time limit for connecting to the RPi (seconds).
+CONNECT_TIMEOUT = 20
 
-# Time limit for communicating with the RPi (seconds)
-# This includes writing a command and reading the response
-# and reading telemetry (seconds)
-COMMUNICATE_TIMEOUT = 5
+# Time limit for communicating with the RPi (seconds). This includes writing a
+# command and reading the response and reading telemetry (seconds)
+COMMUNICATE_TIMEOUT = 60
 
 
 class RPiDataClient(common.BaseDataClient):

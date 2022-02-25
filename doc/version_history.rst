@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.7.1
+======
+
+* Increase the connect and communication time outs.
+
+Requires:
+
+* ts_salobj 6.8
+* ts_idl 3.7 strongly recommended, but 3.5 or 3.6 will do
+* IDL file for ESS from ts_xml 10.1
+* ts_ess_common 0.7
+* ts_tcpip
+* ts_utils 1.0
+
+
 v0.7.0
 ======
 
