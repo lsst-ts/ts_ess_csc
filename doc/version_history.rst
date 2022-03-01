@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v0.8.0
+======
+
+* Update for ts_salobj 7 and ts_xml 11, both of which are required.
+
 v0.7.0
 ======
 

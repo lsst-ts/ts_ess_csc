@@ -496,7 +496,7 @@ additionalProperties: false
         temperature[: device_configuration.num_channels] = sensor_data  # type: ignore
         telemetry["temperature"] = temperature
         self.log.debug(f"Sending telemetry {telemetry}")
-        self.topics.tel_temperature.set_put(**telemetry)
+        await self.topics.tel_temperature.set_write(**telemetry)
 
     async def process_hx85a_telemetry(
         self,
@@ -527,7 +527,7 @@ additionalProperties: false
             "dewPoint": sensor_data[2],
             "location": device_configuration.location,
         }
-        self.topics.tel_hx85a.set_put(**telemetry)
+        await self.topics.tel_hx85a.set_write(**telemetry)
 
     async def process_hx85ba_telemetry(
         self,
@@ -559,7 +559,7 @@ additionalProperties: false
             "dewPoint": sensor_data[3],
             "location": device_configuration.location,
         }
-        self.topics.tel_hx85ba.set_put(**telemetry)
+        await self.topics.tel_hx85ba.set_write(**telemetry)
 
     async def process_telemetry(
         self,

@@ -79,7 +79,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         config_dir: Union[str, pathlib.Path, None],
         index: int = 1,
         simulation_mode: int = 1,
-        settings_to_apply: str = "",
+        override: str = "",
     ) -> salobj.BaseCsc:
         logging.info("basic_make_csc")
         ess_csc = csc.EssCsc(
@@ -87,7 +87,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=config_dir,
             simulation_mode=simulation_mode,
             index=index,
-            settings_to_apply=settings_to_apply,
+            override=override,
         )
         return ess_csc
 
@@ -95,12 +95,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         logging.info("test_standard_state_transitions")
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
-            config_dir=None,
+            config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
         ):
-            await self.check_standard_state_transitions(
-                enabled_commands=(), settingsToApply="default.yaml"
-            )
+            await self.check_standard_state_transitions(enabled_commands=())
 
     async def test_version(self) -> None:
         logging.info("test_version")
@@ -185,7 +183,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.ENABLED,
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
-            settings_to_apply="test_all_sensors.yaml",
+            override="test_all_sensors.yaml",
         ):
             await self.assert_next_summary_state(salobj.State.ENABLED, timeout=2)
             assert len(self.csc.data_clients) == 3
@@ -211,7 +209,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.ENABLED,
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
-            settings_to_apply="test_all_sensors.yaml",
+            override="test_all_sensors.yaml",
         ):
             await self.assert_next_summary_state(salobj.State.ENABLED)
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
@@ -237,7 +235,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.DISABLED,
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
-            settings_to_apply="test_all_sensors.yaml",
+            override="test_all_sensors.yaml",
         ):
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
             await self.assert_next_summary_state(salobj.State.DISABLED)
