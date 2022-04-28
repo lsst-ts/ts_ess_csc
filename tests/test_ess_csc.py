@@ -27,16 +27,11 @@ from typing import List, Union
 
 import numpy as np
 
-# TODO DM-32972 uncomment the following line,
-# and remove `ErrorCode = csc.ess_csc.ErrorCode` below:
-# from lsst.ts.idl.enums.ESS import ErrorCode
+from lsst.ts.idl.enums.ESS import ErrorCode
 from lsst.ts.ess import common, csc
 from lsst.ts import salobj
 from lsst.ts import utils
 from lsst.ts.ess.common.test_utils import MockTestTools
-
-
-ErrorCode = csc.ess_csc.ErrorCode
 
 logging.basicConfig(
     format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
