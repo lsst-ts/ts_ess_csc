@@ -1,5 +1,5 @@
 .sconsign.dblite
-config.log
+*.log
 .sconf_temp
 *.o
 *.os
@@ -15,10 +15,10 @@ version.py
 # Pytest
 tests/.tests
 pytest_session.txt
-.cache/
+.cache
+.hypothesis
 .pytest_cache
 .coverage
-ospl-error.log
-ospl-info.log
 
-.idea/
+.idea
+.vscode

@@ -22,7 +22,6 @@
 __all__ = ["EssCsc"]
 
 import asyncio
-import enum
 import traceback
 import types
 from typing import List, Optional, Sequence, Tuple, Union
@@ -34,27 +33,7 @@ from . import __version__
 from lsst.ts import salobj, utils
 from lsst.ts.ess import common
 
-# TODO DM-32972 uncomment the following line,
-# and remove the custom ErrorCode class below:
-# from lsst.ts.idl.enums.ESS import ErrorCode
-
-
-class ErrorCode(enum.IntEnum):
-    """Error codes that can be used by the ESS CSC.
-
-    Values:
-
-    * ConnectionFailed: a model could not connect its data server.
-      Perhaps the model configuration is wrong or the server is down.
-    * ConnectionLost: a model lost its connection to its data server.
-    * StartFailed: one or more models failed to start.
-    * RunFailed: one or more models failed while running.
-    """
-
-    ConnectionFailed = 1
-    ConnectionLost = 2
-    StartFailed = 3
-    RunFailed = 4
+from lsst.ts.idl.enums.ESS import ErrorCode
 
 
 def get_task_index_exception(
