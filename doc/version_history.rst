@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.9.1
+======
+
+* Modernize pre-commit config versions.
+* Introduce a mechanism to recover from communication failures instead of going to FAULT immediately.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 11
+* ts_ess_common 0.7
+* ts_tcpip
+* ts_utils 1.0
+
 v0.9.0
 ======
 
