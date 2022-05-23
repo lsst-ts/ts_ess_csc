@@ -34,16 +34,19 @@ import yaml
 from lsst.ts import salobj, tcpip
 from lsst.ts.ess import common
 
-# Time limit for connecting to the RPi (seconds)
+# Time limit for connecting to the RPi (seconds).
 CONNECT_TIMEOUT = 5
 
-# Time limit for communicating with the RPi (seconds)
-# This includes writing a command and reading the response
-# and reading telemetry (seconds)
-COMMUNICATE_TIMEOUT = 5
+# The number of timeouts to allow before raising a TimeoutError.
+NUM_ALLOWED_TIMEOUTS = 5
 
 
 class RPiDataClient(common.BaseDataClient):
+    # Timeout limit for communicating with the RPi (seconds). This includes
+    # writing a command and reading the response and reading telemetry. Unit
+    # tests can set this to a lower value to speed up the test.
+    communicate_timeout = 60
+
     """Get environmental data from a Raspberry Pi with custom hat.
 
     Parameters
@@ -95,6 +98,9 @@ class RPiDataClient(common.BaseDataClient):
 
         # Mock server for simulation mode
         self.mock_server = None
+
+        # Number of consecutive timeouts encountered.
+        self.num_consecutive_timeouts = 0
 
         super().__init__(
             config=config, topics=topics, log=log, simulation_mode=simulation_mode
@@ -327,9 +333,11 @@ additionalProperties: false
 
     async def run(self) -> None:
         """Read and process data from the RPi."""
-        try:
-            validator = jsonschema.Draft7Validator(schema=self.get_telemetry_schema())
-            while self.connected:
+        while self.connected:
+            try:
+                validator = jsonschema.Draft7Validator(
+                    schema=self.get_telemetry_schema()
+                )
                 async with self.stream_lock:
                     data = await self.read()
                 if common.Key.RESPONSE in data:
@@ -350,21 +358,26 @@ additionalProperties: false
                 else:
                     self.log.warning(f"Ignoring unparsable data: {data}.")
 
-            err_msg = "Connection lost."
-            self.log.error(err_msg)
-            raise ConnectionError("Connection lost")
-        except asyncio.CancelledError:
-            self.log.debug("read_loop cancelled")
-            raise
-        except asyncio.TimeoutError:
-            self.log.error("Read timed out")
-            raise
-        except RuntimeError as e:
-            self.log.error(f"read_loop failed: {e}")
-            raise
-        except Exception:
-            self.log.exception("read_loop failed")
-            raise
+                # Reset the number of consecutive timouts since no timeout
+                # happend.
+                self.num_consecutive_timeouts = 0
+            except asyncio.CancelledError:
+                self.log.debug("read_loop cancelled")
+                raise
+            except asyncio.TimeoutError:
+                self.log.warning("Read timed out")
+                self.num_consecutive_timeouts += 1
+                if self.num_consecutive_timeouts >= NUM_ALLOWED_TIMEOUTS:
+                    self.log.error(
+                        f"Encountered at least {NUM_ALLOWED_TIMEOUTS} timeouts. Raising error."
+                    )
+                    raise
+            except RuntimeError as e:
+                self.log.error(f"read_loop failed: {e}")
+                raise
+            except Exception:
+                self.log.exception("read_loop failed")
+                raise
 
     async def read(self) -> dict:
         """Read and unmarshal a json-encoded dict.
@@ -383,7 +396,8 @@ additionalProperties: false
         assert self.reader is not None  # make mypy happy
 
         read_bytes = await asyncio.wait_for(
-            self.reader.readuntil(tcpip.TERMINATOR), timeout=COMMUNICATE_TIMEOUT
+            self.reader.readuntil(tcpip.TERMINATOR),
+            timeout=RPiDataClient.communicate_timeout,
         )
         try:
             data = json.loads(read_bytes.decode())
@@ -417,7 +431,7 @@ additionalProperties: false
         """
         json_str = json.dumps({"command": command, "parameters": parameters})
         await asyncio.wait_for(
-            self._basic_run_command(json_str), timeout=COMMUNICATE_TIMEOUT
+            self._basic_run_command(json_str), timeout=RPiDataClient.communicate_timeout
         )
 
     async def _basic_run_command(self, json_str: str) -> None:
