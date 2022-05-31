@@ -1,5 +1,4 @@
 {% set data= load_setup_py_data() %}
-
 package:
   name: "ts-ess-csc"
   version: {{ data.get('version') }}
@@ -10,6 +9,8 @@ source:
 build:
   noarch: generic
   script: python -m pip install --no-deps --ignore-installed .
+  entry_points:
+    - run_ess_csc = lsst.ts.ess.csc.cli:execute_csc
   script_env:
     - PATH
     - PYTHONPATH
@@ -35,6 +36,7 @@ test:
     - bin
     - tests
     - setup.cfg
+    - pyproject.toml
   commands:
     - py.test
 
