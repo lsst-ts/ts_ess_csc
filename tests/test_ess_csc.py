@@ -22,8 +22,10 @@
 import logging
 import math
 import pathlib
-import unittest
 from typing import List, Union
+import unittest
+from unittest import mock
+
 
 import numpy as np
 
@@ -40,6 +42,13 @@ logging.basicConfig(
 
 STD_TIMEOUT = 10  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parents[1].joinpath("tests", "data", "config")
+
+# The communicate timeout to use in the RpiDataClient timeout test (second).
+COMMUNICATE_TIMEOUT = 2
+# Long wait time for timeout tests (second).
+LONG_WAIT_TIME = 8
+# Too long wait time for timeout tests (second).
+TOO_LONG_WAIT_TIME = 12
 
 
 def create_reply_dict(
@@ -212,7 +221,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             for data_client in self.csc.data_clients:
                 assert data_client.mock_server.connected
 
-            # Disconnect one of the mock server
+            # Disconnect one of the mock servers
             await self.csc.data_clients[1].mock_server.exit()
 
             await self.assert_next_summary_state(salobj.State.FAULT)
@@ -246,4 +255,46 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_summary_state(salobj.State.FAULT)
             await self.assert_next_sample(
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.ConnectionFailed
+            )
+
+    @mock.patch(
+        "lsst.ts.ess.csc.rpi_data_client.COMMUNICATE_TIMEOUT", COMMUNICATE_TIMEOUT
+    )
+    async def test_rpi_data_client_timeout(self) -> None:
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=1,
+        ):
+            await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
+            assert len(self.csc.data_clients) == 1
+            for data_client in self.csc.data_clients:
+                assert data_client.mock_server.connected
+
+            await self.validate_telemetry()
+
+            # Set the wait time for the device to SHORT_WAIT_TIME, which is a
+            # higher value than the default (see
+            # lsst.ts.ess.common.device.MockDevice).
+            common.device.MockDevice.telemetry_interval = LONG_WAIT_TIME
+
+            # Here the default wait time still is used.
+            await self.validate_telemetry()
+
+            # Here SHORT_WAIT_TIME is used. This should NOT time out.
+            await self.validate_telemetry()
+
+            # Set the wait time for the device to LONG_WAIT_TIME, which is an
+            # even higher value than the default (see
+            # lsst.ts.ess.common.device.MockDevice).
+            common.device.MockDevice.telemetry_interval = TOO_LONG_WAIT_TIME
+
+            # Here SHORT_WAIT_TIME still is used.
+            await self.validate_telemetry()
+
+            # Here LONG_WAIT_TIME is used. This should time out.
+            await self.assert_next_summary_state(salobj.State.FAULT)
+            await self.assert_next_sample(
+                topic=self.remote.evt_errorCode, errorCode=ErrorCode.ConnectionLost
             )
