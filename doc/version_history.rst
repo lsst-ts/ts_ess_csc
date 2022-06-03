@@ -11,6 +11,8 @@ v0.9.1
 
 * Modernize pre-commit config versions.
 * Introduce a mechanism to recover from communication failures instead of going to FAULT immediately.
+* Switch to pyproject.toml.
+* Use entry_points instead of bin scripts.
 
 Requires:
 
