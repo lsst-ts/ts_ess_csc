@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # This file is part of ts_ess_csc.
 #
 # Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
@@ -21,9 +19,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+__all__ = ["execute_csc"]
+
 import asyncio
 
-from lsst.ts.ess import csc
+from .ess_csc import EssCsc
 
 
-asyncio.run(csc.EssCsc.amain(index=True))
+def execute_csc() -> None:
+    asyncio.run(EssCsc.amain(index=True))
