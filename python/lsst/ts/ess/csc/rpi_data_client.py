@@ -221,6 +221,7 @@ additionalProperties: false
                 dev_type=device[common.Key.DEVICE_TYPE],
                 dev_id=device[dev_id],
                 sens_type=device[common.Key.SENSOR_TYPE],
+                baud_rate=device[common.Key.BAUD_RATE],
                 location=device[common.Key.LOCATION],
             )
 

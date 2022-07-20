@@ -10,6 +10,7 @@ instances:
               device_type: FTDI
               ftdi_id: ABC
               sensor_type: Temperature
+              baud_rate: 19200
               location: Test1
       - client_class: RPiDataClient
         config:
@@ -19,6 +20,7 @@ instances:
               device_type: FTDI
               ftdi_id: ABC
               sensor_type: HX85A
+              baud_rate: 19200
               location: Test2
       - client_class: RPiDataClient
         config:
@@ -28,4 +30,5 @@ instances:
               device_type: FTDI
               ftdi_id: ABC
               sensor_type: HX85BA
+              baud_rate: 19200
               location: Test3
