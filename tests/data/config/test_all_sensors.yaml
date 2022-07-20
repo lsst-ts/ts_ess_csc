@@ -32,3 +32,13 @@ instances:
               sensor_type: HX85BA
               baud_rate: 19200
               location: Test3
+      - client_class: RPiDataClient
+        config:
+          host: 127.0.0.1
+          devices:
+            - name: CSAT3B
+              device_type: FTDI
+              ftdi_id: ABC
+              sensor_type: CSAT3B
+              baud_rate: 151200
+              location: Test4
