@@ -154,6 +154,7 @@ properties:
         baud_rate:
           description: Baud rate of the sensor.
           type: integer
+          default: 19200
         location:
           description: >-
             The location of the device. In case of a multi-channel device with
