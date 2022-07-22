@@ -176,6 +176,24 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         ],
                     )
                     mtt.check_hx85ba_reply(reply=reply, name=name)
+                elif device_config.sens_type == common.SensorType.CSAT3B:
+                    data = await self.remote.tel_airTurbulence.next(flush=False)
+                    assert data.location == device_config.location
+                    input_str = f"{data.ux}{data.uy}{data.uz},{data.ts},{data.diagWord},{data.recordCounter}"
+                    signature = common.sensor.compute_signature(input_str, ",")
+                    reply = create_reply_dict(
+                        sensor_name=data.sensorName,
+                        additional_data=[
+                            data.ux,
+                            data.uy,
+                            data.uz,
+                            data.ts,
+                            data.diagWord,
+                            data.recordCounter,
+                            signature,
+                        ],
+                    )
+                    mtt.check_csat3b_reply(reply=reply, name=name)
                 else:
                     raise ValueError(
                         f"Unsupported sensor type {device_config.sens_type} encountered."
@@ -190,7 +208,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             override="test_all_sensors.yaml",
         ):
             await self.assert_next_summary_state(salobj.State.ENABLED, timeout=2)
-            assert len(self.csc.data_clients) == 3
+            assert len(self.csc.data_clients) == 4
             for data_client in self.csc.data_clients:
                 assert isinstance(data_client, csc.RPiDataClient)
                 assert data_client.mock_server.connected
@@ -217,7 +235,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await self.assert_next_summary_state(salobj.State.ENABLED)
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
-            assert len(self.csc.data_clients) == 3
+            assert len(self.csc.data_clients) == 4
             for data_client in self.csc.data_clients:
                 assert data_client.mock_server.connected
 
@@ -246,7 +264,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             # Prevent one of the data_clients from connecting,
             # then try to enable the CSC.
-            assert len(self.csc.data_clients) == 3
+            assert len(self.csc.data_clients) == 4
             for data_client in self.csc.data_clients:
                 assert data_client.enable_mock_server
             self.csc.data_clients[1].enable_mock_server = False

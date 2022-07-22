@@ -94,6 +94,7 @@ class RPiDataClient(common.BaseDataClient):
             common.SensorType.TEMPERATURE: self.process_temperature_telemetry,
             common.SensorType.HX85A: self.process_hx85a_telemetry,
             common.SensorType.HX85BA: self.process_hx85ba_telemetry,
+            common.SensorType.CSAT3B: self.process_csat3b_telemetry,
         }
 
         # Mock server for simulation mode
@@ -136,6 +137,7 @@ properties:
           description: Type of the sensor.
           type: string
           enum:
+          - CSAT3B
           - HX85A
           - HX85BA
           - Temperature
@@ -149,6 +151,10 @@ properties:
           enum:
           - FTDI
           - Serial
+        baud_rate:
+          description: Baud rate of the sensor.
+          type: integer
+          default: 19200
         location:
           description: >-
             The location of the device. In case of a multi-channel device with
@@ -179,6 +185,7 @@ properties:
         - name
         - sensor_type
         - device_type
+        - baud_rate
         - location
 required:
   - host
@@ -221,6 +228,7 @@ additionalProperties: false
                 dev_type=device[common.Key.DEVICE_TYPE],
                 dev_id=device[dev_id],
                 sens_type=device[common.Key.SENSOR_TYPE],
+                baud_rate=device[common.Key.BAUD_RATE],
                 location=device[common.Key.LOCATION],
             )
 
@@ -495,23 +503,15 @@ additionalProperties: false
             A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
-        telemetry = {
-            "sensorName": sensor_name,
-            "timestamp": timestamp,
-            "numChannels": device_configuration.num_channels,
-            "location": device_configuration.location,
-        }
-
-        if len(sensor_data) != device_configuration.num_channels:
-            raise RuntimeError(
-                f"Expected {device_configuration.num_channels} temperatures "
-                f"but received {len(sensor_data)}."
-            )
         temperature = self.temperature_nans[:]
         temperature[: device_configuration.num_channels] = sensor_data  # type: ignore
-        telemetry["temperature"] = temperature
-        self.log.debug(f"Sending telemetry {telemetry}")
-        await self.topics.tel_temperature.set_write(**telemetry)
+        await self.topics.tel_temperature.set_write(
+            sensorName=sensor_name,
+            timestamp=timestamp,
+            numChannels=device_configuration.num_channels,
+            temperature=temperature,
+            location=device_configuration.location,
+        )
 
     async def process_hx85a_telemetry(
         self,
@@ -534,15 +534,14 @@ additionalProperties: false
             A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
-        telemetry = {
-            "sensorName": sensor_name,
-            "timestamp": timestamp,
-            "relativeHumidity": sensor_data[0],
-            "temperature": sensor_data[1],
-            "dewPoint": sensor_data[2],
-            "location": device_configuration.location,
-        }
-        await self.topics.tel_hx85a.set_write(**telemetry)
+        await self.topics.tel_hx85a.set_write(
+            sensorName=sensor_name,
+            timestamp=timestamp,
+            relativeHumidity=sensor_data[0],
+            temperature=sensor_data[1],
+            dewPoint=sensor_data[2],
+            location=device_configuration.location,
+        )
 
     async def process_hx85ba_telemetry(
         self,
@@ -565,16 +564,48 @@ additionalProperties: false
             A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
-        telemetry = {
-            "sensorName": sensor_name,
-            "timestamp": timestamp,
-            "relativeHumidity": sensor_data[0],
-            "temperature": sensor_data[1],
-            "barometricPressure": sensor_data[2],
-            "dewPoint": sensor_data[3],
-            "location": device_configuration.location,
-        }
-        await self.topics.tel_hx85ba.set_write(**telemetry)
+        await self.topics.tel_hx85ba.set_write(
+            sensorName=sensor_name,
+            timestamp=timestamp,
+            relativeHumidity=sensor_data[0],
+            temperature=sensor_data[1],
+            barometricPressure=sensor_data[2],
+            dewPoint=sensor_data[3],
+            location=device_configuration.location,
+        )
+
+    async def process_csat3b_telemetry(
+        self,
+        sensor_name: str,
+        timestamp: float,
+        response_code: int,
+        sensor_data: Sequence[float],
+    ) -> None:
+        """Process the CSAT3B anemometer telemetry and send to EFD.
+
+        Parameters
+        ----------
+        sensor_name : `str`
+            The name of the sensor.
+        timestamp : `float`
+            The timestamp of the data.
+        response_code : `int`
+            The ResponseCode
+        sensor_data : each of type `float`
+            A Sequence of float representing the sensor telemetry data.
+        """
+        device_configuration = self.device_configurations[sensor_name]
+        await self.topics.tel_airTurbulence.set_write(
+            sensorName=sensor_name,
+            timestamp=timestamp,
+            ux=sensor_data[0],
+            uy=sensor_data[1],
+            uz=sensor_data[2],
+            ts=sensor_data[3],
+            diagWord=sensor_data[4],
+            recordCounter=sensor_data[5],
+            location=device_configuration.location,
+        )
 
     async def process_telemetry(
         self,
