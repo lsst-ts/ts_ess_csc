@@ -30,7 +30,6 @@ from typing import Any, Dict, Optional, Sequence, Union
 
 import jsonschema
 import yaml
-
 from lsst.ts import salobj, tcpip
 from lsst.ts.ess import common
 

@@ -22,18 +22,15 @@
 import logging
 import math
 import pathlib
-from typing import List, Union
 import unittest
+from typing import List, Union
 from unittest import mock
 
-
 import numpy as np
-
-from lsst.ts.idl.enums.ESS import ErrorCode
+from lsst.ts import salobj, utils
 from lsst.ts.ess import common, csc
-from lsst.ts import salobj
-from lsst.ts import utils
 from lsst.ts.ess.common.test_utils import MockTestTools
+from lsst.ts.idl.enums.ESS import ErrorCode
 
 logging.basicConfig(
     format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
