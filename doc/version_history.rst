@@ -6,6 +6,22 @@
 Version History
 ###############
 
+v0.11.0
+=======
+
+* Add support for multiple Python versions for conda.
+* Sort imports with isort.
+* Install new pre-commit hooks.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 11
+* ts_ess_common 0.8
+* ts_tcpip
+* ts_utils 1.0
+
 v0.10.0
 =======
 
@@ -17,7 +33,7 @@ Requires:
 * ts_salobj 7
 * ts_idl 3.7
 * IDL file for ESS from ts_xml 11
-* ts_ess_common 0.7
+* ts_ess_common 0.8
 * ts_tcpip
 * ts_utils 1.0
 

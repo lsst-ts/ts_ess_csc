@@ -24,9 +24,8 @@
 This configuration only affects single-package Sphinx documentation builds.
 """
 
-from documenteer.conf.pipelinespkg import *  # noqa
-
 import lsst.ts.ess.csc  # noqa
+from documenteer.conf.pipelinespkg import *  # noqa
 
 project = "ts_ess_csc"
 html_theme_options["logotext"] = project  # type: ignore # noqa
