@@ -23,5 +23,4 @@
 
 from lsst.ts.ess.csc.cli import execute_csc
 
-
 execute_csc()

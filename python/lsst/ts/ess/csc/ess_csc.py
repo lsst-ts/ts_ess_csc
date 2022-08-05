@@ -27,13 +27,12 @@ import types
 from typing import List, Optional, Sequence, Tuple, Union
 
 import jsonschema
-
-from .config_schema import CONFIG_SCHEMA
-from . import __version__
 from lsst.ts import salobj, utils
 from lsst.ts.ess import common
-
 from lsst.ts.idl.enums.ESS import ErrorCode
+
+from . import __version__
+from .config_schema import CONFIG_SCHEMA
 
 
 def get_task_index_exception(
