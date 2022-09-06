@@ -37,5 +37,5 @@ instances:
               device_type: FTDI
               ftdi_id: ABC
               sensor_type: CSAT3B
-              baud_rate: 151200
+              baud_rate: 115200
               location: Test4
