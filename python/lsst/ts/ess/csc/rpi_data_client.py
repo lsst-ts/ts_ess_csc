@@ -601,8 +601,7 @@ additionalProperties: false
             uy=sensor_data[1],
             uz=sensor_data[2],
             ts=sensor_data[3],
-            diagWord=sensor_data[4],
-            recordCounter=sensor_data[5],
+            status=sensor_data[5],
             location=device_configuration.location,
         )
 
