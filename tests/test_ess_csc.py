@@ -119,7 +119,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await self.check_bin_script(name="ESS", index=1, exe_name="run_ess_csc")
 
     async def validate_telemetry(self) -> None:
-        print("validate telemetry")
         mtt = MockTestTools()
         for data_client in self.csc.data_clients:
             for sensor_name, device_config in data_client.device_configurations.items():
@@ -176,7 +175,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 elif device_config.sens_type == common.SensorType.CSAT3B:
                     data = await self.remote.tel_airTurbulence.next(flush=False)
                     assert data.location == device_config.location
-                    input_str = f"{data.ux}{data.uy}{data.uz},{data.ts},{data.diagWord},{data.recordCounter}"
+                    input_str = f"{data.ux}{data.uy}{data.uz},{data.ts},,{data.status}"
                     signature = common.sensor.compute_signature(input_str, ",")
                     reply = create_reply_dict(
                         sensor_name=data.sensorName,
@@ -185,8 +184,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                             data.uy,
                             data.uz,
                             data.ts,
-                            data.diagWord,
-                            data.recordCounter,
+                            data.status,
                             signature,
                         ],
                     )
