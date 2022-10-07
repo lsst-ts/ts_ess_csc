@@ -183,7 +183,18 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         flush=False, timeout=STD_TIMEOUT
                     )
                     assert data.location == device_config.location
-                    input_str = f"{data.ux}{data.uy}{data.uz},{data.ts},,{data.status}"
+                    # TODO DM-36498: remove this "if" and assume data.status
+                    # is present once ts_xml 12.1 is released.
+                    if hasattr(data, "diagWord"):
+                        input_str = (
+                            f"{data.ux}{data.uy}{data.uz},{data.ts},"
+                            f"{data.diagWord},{data.recordCounter}"
+                        )
+                        status = data.diagWord
+                    else:
+                        recordCounter = 1  # arbitrary value in range [0, 63]
+                        input_str = f"{data.ux}{data.uy}{data.uz},{data.ts},{data.status},{recordCounter}"
+                        status = data.status
                     signature = common.sensor.compute_signature(input_str, ",")
                     reply = create_reply_dict(
                         sensor_name=data.sensorName,
@@ -192,7 +203,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                             data.uy,
                             data.uz,
                             data.ts,
-                            data.status,
+                            status,
                             signature,
                         ],
                     )
