@@ -125,7 +125,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 name = sensor_name
                 if device_config.sens_type == common.SensorType.TEMPERATURE:
                     num_channels = device_config.num_channels
-                    data = await self.remote.tel_temperature.next(flush=False)
+                    data = await self.remote.tel_temperature.next(
+                        flush=False, timeout=STD_TIMEOUT
+                    )
 
                     # First make sure that the temperature data contain the
                     # expected number of NaN values.
@@ -148,7 +150,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         reply=reply, name=name, num_channels=num_channels
                     )
                 elif device_config.sens_type == common.SensorType.HX85A:
-                    data = await self.remote.tel_hx85a.next(flush=False)
+                    data = await self.remote.tel_hx85a.next(
+                        flush=False, timeout=STD_TIMEOUT
+                    )
                     assert data.location == device_config.location
                     reply = create_reply_dict(
                         sensor_name=data.sensorName,
@@ -160,7 +164,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     )
                     mtt.check_hx85a_reply(reply=reply, name=name)
                 elif device_config.sens_type == common.SensorType.HX85BA:
-                    data = await self.remote.tel_hx85ba.next(flush=False)
+                    data = await self.remote.tel_hx85ba.next(
+                        flush=False, timeout=STD_TIMEOUT
+                    )
                     assert data.location == device_config.location
                     reply = create_reply_dict(
                         sensor_name=data.sensorName,
@@ -173,7 +179,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     )
                     mtt.check_hx85ba_reply(reply=reply, name=name)
                 elif device_config.sens_type == common.SensorType.CSAT3B:
-                    data = await self.remote.tel_airTurbulence.next(flush=False)
+                    data = await self.remote.tel_airTurbulence.next(
+                        flush=False, timeout=STD_TIMEOUT
+                    )
                     assert data.location == device_config.location
                     input_str = f"{data.ux}{data.uy}{data.uz},{data.ts},,{data.status}"
                     signature = common.sensor.compute_signature(input_str, ",")
