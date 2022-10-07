@@ -80,6 +80,12 @@ class RPiDataClient(common.BaseDataClient):
         self.reader: Optional[asyncio.StreamReader] = None
         self.writer: Optional[asyncio.StreamWriter] = None
 
+        # TODO DM-36498: remove this flag and the code that uses it
+        # once ts_xml 12.1 is released
+        self.old_air_turbulence = hasattr(
+            topics.tel_airTurbulence.DataType(), "diagWord"
+        )
+
         # Set this attribute false before calling `start` to test failure
         # to connect to the server. Ignored if not simulating.
         self.enable_mock_server = True
@@ -594,6 +600,10 @@ additionalProperties: false
             A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
+        if self.old_air_turbulence:
+            kwargs = dict(diagWord=sensor_data[4])
+        else:
+            kwargs = dict(status=sensor_data[4])
         await self.topics.tel_airTurbulence.set_write(
             sensorName=sensor_name,
             timestamp=timestamp,
@@ -601,8 +611,8 @@ additionalProperties: false
             uy=sensor_data[1],
             uz=sensor_data[2],
             ts=sensor_data[3],
-            status=sensor_data[5],
             location=device_configuration.location,
+            **kwargs,
         )
 
     async def process_telemetry(

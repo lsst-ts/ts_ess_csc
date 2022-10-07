@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.11.3
+=======
+
+* Make airTurbulence telemetry handling backwards compatible with ts_xml 12.
+  Also publish the correct field as ``status`` with ts_xml 12.1.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 12
+* ts_ess_common 0.9.3
+* ts_tcpip
+* ts_utils 1.0
+
 v0.11.2
 =======
 
