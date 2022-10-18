@@ -19,6 +19,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import asyncio
+import collections
+import functools
 import logging
 import math
 import pathlib
@@ -47,6 +50,8 @@ LONG_WAIT_TIME = 8
 # Too long wait time for timeout tests (second).
 TOO_LONG_WAIT_TIME = 12
 
+PASCALS_PER_MILLIBAR = 100
+
 
 def create_reply_dict(
     sensor_name: str, additional_data: List[float]
@@ -74,6 +79,16 @@ def create_reply_dict(
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        # Dict of topic attr_name: dict of sensor_name: data
+        # Set by topic_callback and read by next_data.
+        self.data_dict: dict[
+            str, dict[str, salobj.BaseMsgType]
+        ] = collections.defaultdict(dict)
+        # Event that is set by topic_callback and awaited by
+        # next_data.
+        self.data_event = asyncio.Event()
+
     def basic_make_csc(
         self,
         initial_state: Union[salobj.State, int],
@@ -91,6 +106,45 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             override=override,
         )
         return ess_csc
+
+    async def next_data(
+        self,
+        topic: salobj.topics.ReadTopic,
+        sensor_name: str,
+        timeout: float = STD_TIMEOUT,
+    ) -> salobj.BaseMsgType:
+        """Get data for a given topic with a given value of sensorName.
+
+        Wait for the data if not already available. The data is managed
+        by topic_callback, so you must assign topic_callback as the callback
+        for each topic for which you want data.
+
+        Parameters
+        ----------
+        topic : `salobj.topics.ReadTopic`
+            The topic to wait for. It must have a ``sensorName`` field
+            and have its callback set to `self.topic_callback`.
+        sensor_name : `str`
+            Required value of ``sensorName`` in the returned data.
+        timeout : `float`
+            Maximum time to wait, in seconds.
+        """
+        return await asyncio.wait_for(
+            self._next_data_impl(topic=topic, sensor_name=sensor_name),
+            timeout=timeout,
+        )
+
+    async def _next_data_impl(
+        self, topic: salobj.topics.ReadTopic, sensor_name: str
+    ) -> salobj.BaseMsgType:
+        """Implementation of next_data, without the timeout."""
+        while True:
+            data_dict = self.data_dict.get(topic.attr_name, dict())
+            data = data_dict.get(sensor_name)
+            if data is not None:
+                return data
+            self.data_event.clear()
+            await self.data_event.wait()
 
     async def test_standard_state_transitions(self) -> None:
         logging.info("test_standard_state_transitions")
@@ -120,13 +174,22 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def validate_telemetry(self) -> None:
         mtt = MockTestTools()
+        for topic in (
+            self.remote.tel_relativeHumidity,
+            self.remote.tel_temperature,
+            self.remote.tel_dewPoint,
+            self.remote.tel_pressure,
+        ):
+            topic.callback = functools.partial(
+                self.topic_callback, attr_name=topic.attr_name
+            )
         for data_client in self.csc.data_clients:
             for sensor_name, device_config in data_client.device_configurations.items():
                 name = sensor_name
                 if device_config.sens_type == common.SensorType.TEMPERATURE:
                     num_channels = device_config.num_channels
-                    data = await self.remote.tel_temperature.next(
-                        flush=False, timeout=STD_TIMEOUT
+                    data = await self.next_data(
+                        topic=self.remote.tel_temperature, sensor_name=sensor_name
                     )
 
                     # First make sure that the temperature data contain the
@@ -150,31 +213,47 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         reply=reply, name=name, num_channels=num_channels
                     )
                 elif device_config.sens_type == common.SensorType.HX85A:
-                    data = await self.remote.tel_hx85a.next(
-                        flush=False, timeout=STD_TIMEOUT
+                    humidity_data = await self.next_data(
+                        self.remote.tel_relativeHumidity, sensor_name=sensor_name
                     )
-                    assert data.location == device_config.location
+                    temperature_data = await self.next_data(
+                        self.remote.tel_temperature, sensor_name=sensor_name
+                    )
+                    assert temperature_data.numChannels == 1
+                    dew_point_data = await self.next_data(
+                        self.remote.tel_dewPoint, sensor_name=sensor_name
+                    )
                     reply = create_reply_dict(
-                        sensor_name=data.sensorName,
+                        sensor_name=sensor_name,
                         additional_data=[
-                            data.relativeHumidity,
-                            data.temperature,
-                            data.dewPoint,
+                            humidity_data.relativeHumidity,
+                            temperature_data.temperature[0],
+                            dew_point_data.dewPoint,
                         ],
                     )
                     mtt.check_hx85a_reply(reply=reply, name=name)
                 elif device_config.sens_type == common.SensorType.HX85BA:
-                    data = await self.remote.tel_hx85ba.next(
-                        flush=False, timeout=STD_TIMEOUT
+                    humidity_data = await self.next_data(
+                        self.remote.tel_relativeHumidity, sensor_name=sensor_name
                     )
-                    assert data.location == device_config.location
+                    temperature_data = await self.next_data(
+                        self.remote.tel_temperature, sensor_name=sensor_name
+                    )
+                    assert temperature_data.numChannels == 1
+                    pressure_data = await self.next_data(
+                        self.remote.tel_pressure, sensor_name=sensor_name
+                    )
+                    assert pressure_data.numChannels == 1
+                    dew_point_data = await self.next_data(
+                        self.remote.tel_dewPoint, sensor_name=sensor_name
+                    )
                     reply = create_reply_dict(
-                        sensor_name=data.sensorName,
+                        sensor_name=sensor_name,
                         additional_data=[
-                            data.relativeHumidity,
-                            data.temperature,
-                            data.barometricPressure,
-                            data.dewPoint,
+                            humidity_data.relativeHumidity,
+                            temperature_data.temperature[0],
+                            pressure_data.pressure[0] / PASCALS_PER_MILLIBAR,
+                            dew_point_data.dewPoint,
                         ],
                     )
                     mtt.check_hx85ba_reply(reply=reply, name=name)
@@ -330,3 +409,18 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.ConnectionLost
             )
+
+    def topic_callback(self, data: salobj.BaseMsgType, attr_name: str) -> None:
+        """Callback for read topics.
+
+        Assign to all topics for which you want to call next_data.
+
+        Parameters
+        ----------
+        data : `salobj.BaseMsgType`
+            Data from a topic. Must have a sensorName field.
+        attr_name : `str`
+            Topic attribute name.
+        """
+        self.data_dict[attr_name][data.sensorName] = data
+        self.data_event.set()

@@ -44,6 +44,8 @@ MAX_ALLOWED_READ_TIMEOUTS = 5
 # tests can set this to a lower value to speed up the test.
 COMMUNICATE_TIMEOUT = 60
 
+PASCALS_PER_MILLIBAR = 100
+
 
 class RPiDataClient(common.BaseDataClient):
     """Get environmental data from a Raspberry Pi with custom hat.
@@ -518,6 +520,77 @@ additionalProperties: false
             location=device_configuration.location,
         )
 
+    async def write_humidity_etc(
+        self,
+        sensor_name: str,
+        timestamp: float,
+        dewPoint: float | None,
+        pressure: float | None,
+        relativeHumidity: float | None,
+        temperature: float | None,
+        status: int,
+    ) -> None:
+        """Write relative humidity and related quantities.
+
+        Parameters
+        ----------
+        sensor_name : `str`
+            Sensor name
+        timestamp : `float` | `None`
+            Time at which the data was measured (TAI, unix seconds)
+        dewPoint : `float` | `None`
+            Dew point (C)
+        pressure : `float` | `None`
+            Parometric pressure (Pa)
+        relativeHumidity : `float` | `None`
+            Relative humidity (%)
+        temperature : `float` | `None`
+            Air temperature (C)
+        status : `int`
+            Device status.
+        """
+        device_configuration = self.device_configurations[sensor_name]
+        if dewPoint is not None:
+            await self.topics.tel_dewPoint.set_write(
+                sensorName=sensor_name,
+                timestamp=timestamp,
+                dewPoint=dewPoint,
+                status=status,
+                location=device_configuration.location,
+            )
+        if pressure is not None:
+            nelts = len(self.topics.tel_pressure.DataType().pressure)
+            pressure_array = [math.nan] * nelts
+            pressure_array[0] = pressure
+            await self.topics.tel_pressure.set_write(
+                sensorName=sensor_name,
+                timestamp=timestamp,
+                pressure=pressure_array,
+                numChannels=1,
+                status=status,
+                location=device_configuration.location,
+            )
+        if relativeHumidity is not None:
+            await self.topics.tel_relativeHumidity.set_write(
+                sensorName=sensor_name,
+                timestamp=timestamp,
+                relativeHumidity=relativeHumidity,
+                status=status,
+                location=device_configuration.location,
+            )
+        if temperature is not None:
+            nelts = len(self.topics.tel_temperature.DataType().temperature)
+            temperature_array = [math.nan] * nelts
+            temperature_array[0] = temperature
+            await self.topics.tel_temperature.set_write(
+                sensorName=sensor_name,
+                timestamp=timestamp,
+                temperature=temperature_array,
+                numChannels=1,
+                status=status,
+                location=device_configuration.location,
+            )
+
     async def process_hx85a_telemetry(
         self,
         sensor_name: str,
@@ -536,16 +609,22 @@ additionalProperties: false
         response_code : `int`
             The ResponseCode
         sensor_data : each of type `float`
-            A Sequence of float representing the sensor telemetry data.
+            A Sequence of floats representing the sensor telemetry data:
+
+            * 0: relative humidity (%)
+            * 1: air temperature (C)
+            * 2: dew point (C)
         """
-        device_configuration = self.device_configurations[sensor_name]
-        await self.topics.tel_hx85a.set_write(
-            sensorName=sensor_name,
+        if response_code != 0:
+            sensor_data = [math.nan] * 3
+        await self.write_humidity_etc(
+            sensor_name=sensor_name,
             timestamp=timestamp,
+            dewPoint=sensor_data[2],
+            pressure=None,
             relativeHumidity=sensor_data[0],
             temperature=sensor_data[1],
-            dewPoint=sensor_data[2],
-            location=device_configuration.location,
+            status=response_code,
         )
 
     async def process_hx85ba_telemetry(
@@ -566,17 +645,23 @@ additionalProperties: false
         response_code : `int`
             The ResponseCode
         sensor_data : each of type `float`
-            A Sequence of float representing the sensor telemetry data.
+            A Sequence of floats representing the sensor telemetry data:
+
+            * 0: relative humidity (%)
+            * 1: air temperature (C)
+            * 2: air pressure (mbar)
+            * 3: dew point (C)
         """
-        device_configuration = self.device_configurations[sensor_name]
-        await self.topics.tel_hx85ba.set_write(
-            sensorName=sensor_name,
+        if response_code != 0:
+            sensor_data = [math.nan] * 4
+        await self.write_humidity_etc(
+            sensor_name=sensor_name,
             timestamp=timestamp,
+            dewPoint=sensor_data[3],
+            pressure=sensor_data[2] * PASCALS_PER_MILLIBAR,
             relativeHumidity=sensor_data[0],
             temperature=sensor_data[1],
-            barometricPressure=sensor_data[2],
-            dewPoint=sensor_data[3],
-            location=device_configuration.location,
+            status=response_code,
         )
 
     async def process_csat3b_telemetry(
