@@ -27,7 +27,7 @@ import logging
 import math
 import types
 from collections.abc import Sequence
-from typing import Any, Dict, Optional, Union
+from typing import Any
 
 import jsonschema
 import numpy as np
@@ -189,19 +189,19 @@ class RPiDataClient(common.BaseDataClient):
     def __init__(
         self,
         config: types.SimpleNamespace,
-        topics: Union[salobj.Controller, types.SimpleNamespace],
+        topics: salobj.Controller | types.SimpleNamespace,
         log: logging.Logger,
         simulation_mode: int = 0,
     ) -> None:
         # Dict of sensor_name: device configuration
-        self.device_configurations: Dict[str, common.DeviceConfig] = dict()
+        self.device_configurations: dict[str, common.DeviceConfig] = dict()
 
         # Lock for TCP/IP communication
         self.stream_lock = asyncio.Lock()
 
         # TCP/IP stream reader and writer
-        self.reader: Optional[asyncio.StreamReader] = None
-        self.writer: Optional[asyncio.StreamWriter] = None
+        self.reader: asyncio.StreamReader | None = None
+        self.writer: asyncio.StreamWriter | None = None
 
         # Set this attribute false before calling `start` to test failure
         # to connect to the server. Ignored if not simulating.
@@ -235,7 +235,7 @@ class RPiDataClient(common.BaseDataClient):
         self.configure()
 
     @classmethod
-    def get_config_schema(cls) -> Dict[str, Any]:
+    def get_config_schema(cls) -> dict[str, Any]:
         return yaml.safe_load(
             """
 $schema: http://json-schema.org/draft-07/schema#
@@ -433,7 +433,7 @@ additionalProperties: false
             await self.mock_server.close()
 
     @classmethod
-    def get_telemetry_schema(cls) -> Dict[str, Any]:
+    def get_telemetry_schema(cls) -> dict[str, Any]:
         return json.loads(
             """
 {

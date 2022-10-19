@@ -25,7 +25,6 @@ import logging
 import math
 import pathlib
 import unittest
-from typing import List, Union
 from unittest import mock
 
 import numpy as np
@@ -53,7 +52,7 @@ PASCALS_PER_MILLIBAR = 100
 
 
 def create_reply_dict(
-    sensor_name: str, additional_data: List[float]
+    sensor_name: str, additional_data: list[float]
 ) -> common.test_utils.SensorReply:
     """Create a list that represents a reply from a sensor.
 
@@ -90,8 +89,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     def basic_make_csc(
         self,
-        initial_state: Union[salobj.State, int],
-        config_dir: Union[str, pathlib.Path, None],
+        initial_state: salobj.State | int,
+        config_dir: str | pathlib.Path | None,
         index: int = 1,
         simulation_mode: int = 1,
         override: str = "",
