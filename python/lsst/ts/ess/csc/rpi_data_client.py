@@ -26,9 +26,11 @@ import json
 import logging
 import math
 import types
-from typing import Any, Dict, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any, Dict, Optional, Union
 
 import jsonschema
+import numpy as np
 import yaml
 from lsst.ts import salobj, tcpip
 from lsst.ts.ess import common
@@ -45,6 +47,125 @@ MAX_ALLOWED_READ_TIMEOUTS = 5
 COMMUNICATE_TIMEOUT = 60
 
 PASCALS_PER_MILLIBAR = 100
+
+
+class AirTurbulenceAccumulator:
+    """Accumulate air turbulence data from a 3-d anemometer.
+
+    Attributes
+    ----------
+    num_samples : `int`
+        The number of samples to process for one telemetry message.
+    timestamp : list[float]
+        List of timestamps (TAI unix seconds)
+    speed : list[float]
+        List of wind speed in x, y, z (km/s)
+    sonic_temperature : list[float]
+        List of sonic temperature (deg C)
+    num_bad_samples : int
+        Number of invalid samples.
+    """
+
+    def __init__(self, num_samples: int) -> None:
+        self.num_samples = num_samples
+        self.timestamp: list[float] = list()
+        self.speed: list[Sequence[float]] = list()
+        self.sonic_temperature: list[float] = list()
+        self.num_bad_samples = 0
+
+    @property
+    def do_report(self) -> bool:
+        """Do we have enough data to report good or bad data?"""
+        return max(len(self.speed), self.num_bad_samples) >= self.num_samples
+
+    def add_sample(
+        self,
+        timestamp: float,
+        speed: Sequence[float],
+        sonic_temperature: float,
+        isok: bool,
+    ) -> None:
+        """Add a sample and return a flag indicating if we have all samples.
+
+        Parameters
+        ----------
+        timestamp : `float`
+            Time at which data was taken (TAI unix seconds)
+        speed : `list[float]`
+            Wind speed in x, y, z (km/s)
+        sonic_temperature : `float`
+            Sonic temperature (deg C)
+        isok : `bool`
+            Is the data valid?
+        """
+        if len(speed) != 3:
+            raise ValueError(f"{speed=} must have 3 elements")
+        if isok:
+            self.timestamp.append(timestamp)
+            self.speed.append(speed)
+            self.sonic_temperature.append(sonic_temperature)
+        else:
+            self.num_bad_samples += 1
+
+    def clear(self) -> None:
+        """Clear the cached data."""
+        self.timestamp = list()
+        self.speed = list()
+        self.sonic_temperature = list()
+        self.num_bad_samples = 0
+
+    def get_topic_kwargs(self) -> dict[str, float | list[float] | bool]:
+        """Return data for the airTurbulence telemetry topic,
+        and clear cached data.
+
+        Returns
+        -------
+        topic_kwargs : `dict` [`str`, `float`]
+            Data for the airTurbulence telemetry topic as a keyword
+            arguments dict with these keys:
+
+            * ux, uy, uz
+            * uxStdDev, uyStdDev, uzStdDev
+            * magnitude, maximumMagnitude
+
+        Raises
+        ------
+        RuntimeError
+            If do_report false (not enough samples to report the data).
+        """
+        if len(self.speed) >= self.num_samples:
+            # Return good data
+            timestamp = self.timestamp[-1]
+            speed_arr = np.column_stack((self.speed))
+            speed_median_arr = np.median(speed_arr, axis=1)
+            speed_std_arr = np.std(speed_arr, axis=1)
+            magnitude_arr = np.linalg.norm(speed_arr, axis=1)
+            sonic_temperature_arr = np.array(self.sonic_temperature)
+            self.clear()
+            return dict(
+                timestamp=timestamp,
+                speed=speed_median_arr,
+                speedStdDev=speed_std_arr,
+                speedMagnitude=np.median(magnitude_arr),
+                speedMaxMagnitude=np.max(magnitude_arr),
+                sonicTemperature=np.median(sonic_temperature_arr),
+                sonicTemperatureStdDev=np.std(sonic_temperature_arr),
+            )
+
+        if self.num_bad_samples >= self.num_samples:
+            # Return bad data
+            self.clear()
+            return dict(
+                timestamp=math.nan,
+                speed=[math.nan] * 3,
+                speedStdDev=[math.nan] * 3,
+                speedMagnitude=math.nan,
+                speedMaxMagnitude=math.nan,
+                sonicTemperature=math.nan,
+                sonicTemperatureStdDev=math.nan,
+            )
+
+        raise RuntimeError("Not enough samples to report data")
 
 
 class RPiDataClient(common.BaseDataClient):
@@ -82,12 +203,6 @@ class RPiDataClient(common.BaseDataClient):
         self.reader: Optional[asyncio.StreamReader] = None
         self.writer: Optional[asyncio.StreamWriter] = None
 
-        # TODO DM-36498: remove this flag and the code that uses it
-        # once ts_xml 12.1 is released
-        self.old_air_turbulence = hasattr(
-            topics.tel_airTurbulence.DataType(), "diagWord"
-        )
-
         # Set this attribute false before calling `start` to test failure
         # to connect to the server. Ignored if not simulating.
         self.enable_mock_server = True
@@ -103,6 +218,10 @@ class RPiDataClient(common.BaseDataClient):
             common.SensorType.HX85BA: self.process_hx85ba_telemetry,
             common.SensorType.CSAT3B: self.process_csat3b_telemetry,
         }
+
+        # Cache of data maintained by process_csat3b_telemetry.
+        # a dict of sensor_name: AirTurbulenceAccumulator.
+        self.air_turbulence_cache: dict[str, AirTurbulenceAccumulator] = dict()
 
         # Mock server for simulation mode
         self.mock_server = None
@@ -169,6 +288,14 @@ properties:
             can be used to give the location of each probe. In that case the
             locations should be given in the order of the channels.
           type: string
+        num_samples:
+          description: >-
+            Number of samples per telemetry sample. Only relevant for
+            certain kinds of data, such as wind speed and direction.
+            Ignored for other kinds of data.
+          type: integer
+          default: 25
+          minimum: 2
       anyOf:
       - if:
           properties:
@@ -194,6 +321,7 @@ properties:
         - device_type
         - baud_rate
         - location
+        - num_samples
 required:
   - host
   - port
@@ -237,6 +365,7 @@ additionalProperties: false
                 sens_type=device[common.Key.SENSOR_TYPE],
                 baud_rate=device[common.Key.BAUD_RATE],
                 location=device[common.Key.LOCATION],
+                num_samples=device[common.Key.NUM_SAMPLES],
             )
 
     def descr(self) -> str:
@@ -496,7 +625,7 @@ additionalProperties: false
         response_code: int,
         sensor_data: Sequence[float],
     ) -> None:
-        """Process the temperature telemetry and send to EFD.
+        """Process temperature telemetry.
 
         Parameters
         ----------
@@ -511,7 +640,9 @@ additionalProperties: false
         """
         device_configuration = self.device_configurations[sensor_name]
         temperature = self.temperature_nans[:]
-        temperature[: device_configuration.num_channels] = sensor_data  # type: ignore
+        isok = response_code == 0
+        if isok:
+            temperature[: device_configuration.num_channels] = sensor_data  # type: ignore
         await self.topics.tel_temperature.set_write(
             sensorName=sensor_name,
             timestamp=timestamp,
@@ -519,77 +650,9 @@ additionalProperties: false
             temperature=temperature,
             location=device_configuration.location,
         )
-
-    async def write_humidity_etc(
-        self,
-        sensor_name: str,
-        timestamp: float,
-        dewPoint: float | None,
-        pressure: float | None,
-        relativeHumidity: float | None,
-        temperature: float | None,
-        status: int,
-    ) -> None:
-        """Write relative humidity and related quantities.
-
-        Parameters
-        ----------
-        sensor_name : `str`
-            Sensor name
-        timestamp : `float` | `None`
-            Time at which the data was measured (TAI, unix seconds)
-        dewPoint : `float` | `None`
-            Dew point (C)
-        pressure : `float` | `None`
-            Parometric pressure (Pa)
-        relativeHumidity : `float` | `None`
-            Relative humidity (%)
-        temperature : `float` | `None`
-            Air temperature (C)
-        status : `int`
-            Device status.
-        """
-        device_configuration = self.device_configurations[sensor_name]
-        if dewPoint is not None:
-            await self.topics.tel_dewPoint.set_write(
-                sensorName=sensor_name,
-                timestamp=timestamp,
-                dewPoint=dewPoint,
-                status=status,
-                location=device_configuration.location,
-            )
-        if pressure is not None:
-            nelts = len(self.topics.tel_pressure.DataType().pressure)
-            pressure_array = [math.nan] * nelts
-            pressure_array[0] = pressure
-            await self.topics.tel_pressure.set_write(
-                sensorName=sensor_name,
-                timestamp=timestamp,
-                pressure=pressure_array,
-                numChannels=1,
-                status=status,
-                location=device_configuration.location,
-            )
-        if relativeHumidity is not None:
-            await self.topics.tel_relativeHumidity.set_write(
-                sensorName=sensor_name,
-                timestamp=timestamp,
-                relativeHumidity=relativeHumidity,
-                status=status,
-                location=device_configuration.location,
-            )
-        if temperature is not None:
-            nelts = len(self.topics.tel_temperature.DataType().temperature)
-            temperature_array = [math.nan] * nelts
-            temperature_array[0] = temperature
-            await self.topics.tel_temperature.set_write(
-                sensorName=sensor_name,
-                timestamp=timestamp,
-                temperature=temperature_array,
-                numChannels=1,
-                status=status,
-                location=device_configuration.location,
-            )
+        await self.topics.evt_sensorStatus.set_write(
+            sensorName=sensor_name, sensorStatus=0, serverStatus=response_code
+        )
 
     async def process_hx85a_telemetry(
         self,
@@ -598,7 +661,7 @@ additionalProperties: false
         response_code: int,
         sensor_data: Sequence[float],
     ) -> None:
-        """Process the HX85A humidity sensor telemetry and send to EFD.
+        """Process HX85A humidity sensor telemetry.
 
         Parameters
         ----------
@@ -615,8 +678,6 @@ additionalProperties: false
             * 1: air temperature (C)
             * 2: dew point (C)
         """
-        if response_code != 0:
-            sensor_data = [math.nan] * 3
         await self.write_humidity_etc(
             sensor_name=sensor_name,
             timestamp=timestamp,
@@ -624,7 +685,10 @@ additionalProperties: false
             pressure=None,
             relativeHumidity=sensor_data[0],
             temperature=sensor_data[1],
-            status=response_code,
+            isok=response_code == 0,
+        )
+        await self.topics.evt_sensorStatus.set_write(
+            sensorName=sensor_name, sensorStatus=0, serverStatus=response_code
         )
 
     async def process_hx85ba_telemetry(
@@ -634,7 +698,7 @@ additionalProperties: false
         response_code: int,
         sensor_data: Sequence[float],
     ) -> None:
-        """Process the HX85BA humidity sensor telemetry and send to EFD.
+        """Process HX85BA humidity sensor telemetry.
 
         Parameters
         ----------
@@ -652,8 +716,6 @@ additionalProperties: false
             * 2: air pressure (mbar)
             * 3: dew point (C)
         """
-        if response_code != 0:
-            sensor_data = [math.nan] * 4
         await self.write_humidity_etc(
             sensor_name=sensor_name,
             timestamp=timestamp,
@@ -661,7 +723,10 @@ additionalProperties: false
             pressure=sensor_data[2] * PASCALS_PER_MILLIBAR,
             relativeHumidity=sensor_data[0],
             temperature=sensor_data[1],
-            status=response_code,
+            isok=response_code == 0,
+        )
+        await self.topics.evt_sensorStatus.set_write(
+            sensorName=sensor_name, sensorStatus=0, serverStatus=response_code
         )
 
     async def process_csat3b_telemetry(
@@ -671,7 +736,10 @@ additionalProperties: false
         response_code: int,
         sensor_data: Sequence[float],
     ) -> None:
-        """Process the CSAT3B anemometer telemetry and send to EFD.
+        """Process CSAT3B 3-D anemometer telemetry.
+
+        Accumulate a specified number of samples before writing
+        the telemetry topic.
 
         Parameters
         ----------
@@ -685,19 +753,31 @@ additionalProperties: false
             A Sequence of float representing the sensor telemetry data.
         """
         device_configuration = self.device_configurations[sensor_name]
-        if self.old_air_turbulence:
-            kwargs = dict(diagWord=sensor_data[4])
-        else:
-            kwargs = dict(status=sensor_data[4])
+        if sensor_name not in self.air_turbulence_cache:
+            self.air_turbulence_cache[sensor_name] = AirTurbulenceAccumulator(
+                num_samples=device_configuration.num_samples,
+            )
+        accumulator = self.air_turbulence_cache[sensor_name]
+
+        accumulator.add_sample(
+            timestamp=timestamp,
+            speed=sensor_data[0:3],
+            sonic_temperature=sensor_data[3],
+            isok=sensor_data[4] == 0 and response_code == 0,
+        )
+        if not accumulator.do_report:
+            return
+
+        topic_kwargs = accumulator.get_topic_kwargs()
         await self.topics.tel_airTurbulence.set_write(
             sensorName=sensor_name,
-            timestamp=timestamp,
-            ux=sensor_data[0],
-            uy=sensor_data[1],
-            uz=sensor_data[2],
-            ts=sensor_data[3],
             location=device_configuration.location,
-            **kwargs,
+            **topic_kwargs,
+        )
+        await self.topics.evt_sensorStatus.set_write(
+            sensorName=sensor_name,
+            sensorStatus=sensor_data[4],
+            serverStatus=response_code,
         )
 
     async def process_telemetry(
@@ -749,4 +829,73 @@ additionalProperties: false
         else:
             self.log.warning(
                 f"Ignoring telemetry for sensor {sensor_name} with unknown response code {response_code}"
+            )
+
+    async def write_humidity_etc(
+        self,
+        sensor_name: str,
+        timestamp: float,
+        dewPoint: float | None,
+        pressure: float | None,
+        relativeHumidity: float | None,
+        temperature: float | None,
+        isok: bool,
+    ) -> None:
+        """Write relative humidity and related quantities.
+
+        Parameters
+        ----------
+        sensor_name : `str`
+            Sensor name
+        timestamp : `float` | `None`
+            Time at which the data was measured (TAI, unix seconds)
+        dewPoint : `float` | `None`
+            Dew point (C)
+        pressure : `float` | `None`
+            Parometric pressure (Pa)
+        relativeHumidity : `float` | `None`
+            Relative humidity (%)
+        temperature : `float` | `None`
+            Air temperature (C)
+        isok : `bool`
+            Is the data valid?
+        """
+        device_configuration = self.device_configurations[sensor_name]
+        if dewPoint is not None:
+            await self.topics.tel_dewPoint.set_write(
+                sensorName=sensor_name,
+                timestamp=timestamp,
+                dewPoint=dewPoint if isok else math.nan,
+                location=device_configuration.location,
+            )
+        if pressure is not None:
+            nelts = len(self.topics.tel_pressure.DataType().pressure)
+            pressure_array = [math.nan] * nelts
+            if isok:
+                pressure_array[0] = pressure
+            await self.topics.tel_pressure.set_write(
+                sensorName=sensor_name,
+                timestamp=timestamp,
+                pressure=pressure_array,
+                numChannels=1,
+                location=device_configuration.location,
+            )
+        if relativeHumidity is not None:
+            await self.topics.tel_relativeHumidity.set_write(
+                sensorName=sensor_name,
+                timestamp=timestamp,
+                relativeHumidity=relativeHumidity if isok else math.nan,
+                location=device_configuration.location,
+            )
+        if temperature is not None:
+            nelts = len(self.topics.tel_temperature.DataType().temperature)
+            temperature_array = [math.nan] * nelts
+            if isok:
+                temperature_array[0] = temperature
+            await self.topics.tel_temperature.set_write(
+                sensorName=sensor_name,
+                timestamp=timestamp,
+                temperature=temperature_array,
+                numChannels=1,
+                location=device_configuration.location,
             )

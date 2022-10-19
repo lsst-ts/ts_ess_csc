@@ -20,7 +20,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
-import collections
 import functools
 import logging
 import math
@@ -80,11 +79,11 @@ def create_reply_dict(
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        # Dict of topic attr_name: dict of sensor_name: data
+        # Dict of topic attr_name: attr_data, where:
+        # * attr_data is a dict of sensor_name: sensor_data
+        # * sensor_data is a dict of timestamp: data
         # Set by topic_callback and read by next_data.
-        self.data_dict: dict[
-            str, dict[str, salobj.BaseMsgType]
-        ] = collections.defaultdict(dict)
+        self.data_dict: dict[str, dict[str, dict[float, salobj.BaseMsgType]]] = dict()
         # Event that is set by topic_callback and awaited by
         # next_data.
         self.data_event = asyncio.Event()
@@ -109,11 +108,15 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def next_data(
         self,
-        topic: salobj.topics.ReadTopic,
+        topics: list[salobj.topics.ReadTopic],
         sensor_name: str,
         timeout: float = STD_TIMEOUT,
-    ) -> salobj.BaseMsgType:
-        """Get data for a given topic with a given value of sensorName.
+    ) -> dict[str, salobj.BaseMsgType]:
+        """Get data for a given set of topics.
+
+        The data will all have the same sensor_name and timestamp
+        (which is set to the timestamp of the most recent data found
+        for the first topic).
 
         Wait for the data if not already available. The data is managed
         by topic_callback, so you must assign topic_callback as the callback
@@ -121,30 +124,64 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
         Parameters
         ----------
-        topic : `salobj.topics.ReadTopic`
-            The topic to wait for. It must have a ``sensorName`` field
+        topics : `salobj.topics.ReadTopic`
+            The topics to wait for. Each must have a ``sensorName`` field
             and have its callback set to `self.topic_callback`.
         sensor_name : `str`
             Required value of ``sensorName`` in the returned data.
         timeout : `float`
             Maximum time to wait, in seconds.
+
+        Returns
+        -------
+        topic_data : `dict[str, salobj.BaseMsgType]`
+            Data for each topic, as a dict of [topic attr_name: data].
         """
         return await asyncio.wait_for(
-            self._next_data_impl(topic=topic, sensor_name=sensor_name),
+            self._next_data_impl(topics=topics, sensor_name=sensor_name),
             timeout=timeout,
         )
 
     async def _next_data_impl(
-        self, topic: salobj.topics.ReadTopic, sensor_name: str
-    ) -> salobj.BaseMsgType:
+        self, topics: list[salobj.topics.ReadTopic], sensor_name: str
+    ) -> dict[str, salobj.BaseMsgType]:
         """Implementation of next_data, without the timeout."""
+        topics_data: dict[str, salobj.BaseMsgType] = dict()
+        timestamp = None
+        is_first = True
         while True:
-            data_dict = self.data_dict.get(topic.attr_name, dict())
-            data = data_dict.get(sensor_name)
-            if data is not None:
-                return data
-            self.data_event.clear()
-            await self.data_event.wait()
+            if len(topics_data) == len(topics):
+                return topics_data
+            if is_first:
+                is_first = False
+            else:
+                self.data_event.clear()
+                await self.data_event.wait()
+
+            for topic in topics:
+                attr_data = self.data_dict.get(topic.attr_name, dict())
+                if attr_data is None:
+                    # No data seen for this topic yet
+                    continue
+                sensor_data = attr_data.get(sensor_name)
+                if sensor_data is None:
+                    # No data seen for this sensor yet
+                    continue
+                if timestamp is None:
+                    # This is the first topic read;
+                    # set timestamp to the timestamp of the
+                    # most recent data
+                    data = list(sensor_data.values())[-1]
+                    timestamp = data.timestamp
+                    topics_data[topic.attr_name] = data
+                else:
+                    # Find data with the same timestamp
+                    # as the first topic read
+                    data = sensor_data.get(timestamp)
+                    if data is None:
+                        # No data seen for this topic at the timestamp
+                        continue
+                    topics_data[topic.attr_name] = data
 
     async def test_standard_state_transitions(self) -> None:
         logging.info("test_standard_state_transitions")
@@ -188,9 +225,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 name = sensor_name
                 if device_config.sens_type == common.SensorType.TEMPERATURE:
                     num_channels = device_config.num_channels
-                    data = await self.next_data(
-                        topic=self.remote.tel_temperature, sensor_name=sensor_name
+                    topics_data = await self.next_data(
+                        topics=[self.remote.tel_temperature], sensor_name=sensor_name
                     )
+                    data = topics_data["tel_temperature"]
 
                     # First make sure that the temperature data contain the
                     # expected number of NaN values.
@@ -213,47 +251,43 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         reply=reply, name=name, num_channels=num_channels
                     )
                 elif device_config.sens_type == common.SensorType.HX85A:
-                    humidity_data = await self.next_data(
-                        self.remote.tel_relativeHumidity, sensor_name=sensor_name
-                    )
-                    temperature_data = await self.next_data(
-                        self.remote.tel_temperature, sensor_name=sensor_name
-                    )
-                    assert temperature_data.numChannels == 1
-                    dew_point_data = await self.next_data(
-                        self.remote.tel_dewPoint, sensor_name=sensor_name
+                    topics_data = await self.next_data(
+                        topics=[
+                            self.remote.tel_relativeHumidity,
+                            self.remote.tel_temperature,
+                            self.remote.tel_dewPoint,
+                        ],
+                        sensor_name=sensor_name,
                     )
                     reply = create_reply_dict(
                         sensor_name=sensor_name,
                         additional_data=[
-                            humidity_data.relativeHumidity,
-                            temperature_data.temperature[0],
-                            dew_point_data.dewPoint,
+                            topics_data["tel_relativeHumidity"].relativeHumidity,
+                            topics_data["tel_temperature"].temperature[0],
+                            topics_data["tel_dewPoint"].dewPoint,
                         ],
                     )
                     mtt.check_hx85a_reply(reply=reply, name=name)
                 elif device_config.sens_type == common.SensorType.HX85BA:
-                    humidity_data = await self.next_data(
-                        self.remote.tel_relativeHumidity, sensor_name=sensor_name
+                    topics_data = await self.next_data(
+                        topics=[
+                            self.remote.tel_relativeHumidity,
+                            self.remote.tel_temperature,
+                            self.remote.tel_pressure,
+                            self.remote.tel_dewPoint,
+                        ],
+                        sensor_name=sensor_name,
                     )
-                    temperature_data = await self.next_data(
-                        self.remote.tel_temperature, sensor_name=sensor_name
-                    )
-                    assert temperature_data.numChannels == 1
-                    pressure_data = await self.next_data(
-                        self.remote.tel_pressure, sensor_name=sensor_name
-                    )
-                    assert pressure_data.numChannels == 1
-                    dew_point_data = await self.next_data(
-                        self.remote.tel_dewPoint, sensor_name=sensor_name
-                    )
+                    for attr_name in ("tel_temperature", "tel_pressure"):
+                        assert topics_data[attr_name].numChannels == 1
                     reply = create_reply_dict(
                         sensor_name=sensor_name,
                         additional_data=[
-                            humidity_data.relativeHumidity,
-                            temperature_data.temperature[0],
-                            pressure_data.pressure[0] / PASCALS_PER_MILLIBAR,
-                            dew_point_data.dewPoint,
+                            topics_data["tel_relativeHumidity"].relativeHumidity,
+                            topics_data["tel_temperature"].temperature[0],
+                            topics_data["tel_pressure"].pressure[0]
+                            / PASCALS_PER_MILLIBAR,
+                            topics_data["tel_dewPoint"].dewPoint,
                         ],
                     )
                     mtt.check_hx85ba_reply(reply=reply, name=name)
@@ -262,26 +296,20 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                         flush=False, timeout=STD_TIMEOUT
                     )
                     assert data.location == device_config.location
-                    # TODO DM-36498: remove this "if" and assume data.status
-                    # is present once ts_xml 12.1 is released.
-                    if hasattr(data, "diagWord"):
-                        input_str = (
-                            f"{data.ux}{data.uy}{data.uz},{data.ts},"
-                            f"{data.diagWord},{data.recordCounter}"
-                        )
-                        status = data.diagWord
-                    else:
-                        recordCounter = 1  # arbitrary value in range [0, 63]
-                        input_str = f"{data.ux}{data.uy}{data.uz},{data.ts},{data.status},{recordCounter}"
-                        status = data.status
+                    recordCounter = 1  # arbitrary value in range [0, 63]
+                    status = 0
+                    input_str = (
+                        f"{data.speed[0]}{data.speed[1]}{data.speed[2]},"
+                        f"{data.sonicTemperature},{status},{recordCounter}"
+                    )
                     signature = common.sensor.compute_signature(input_str, ",")
                     reply = create_reply_dict(
                         sensor_name=data.sensorName,
                         additional_data=[
-                            data.ux,
-                            data.uy,
-                            data.uz,
-                            data.ts,
+                            data.speed[0],
+                            data.speed[1],
+                            data.speed[2],
+                            data.sonicTemperature,
                             status,
                             signature,
                         ],
@@ -422,5 +450,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         attr_name : `str`
             Topic attribute name.
         """
-        self.data_dict[attr_name][data.sensorName] = data
+        attr_data = self.data_dict.get(attr_name)
+        if attr_data is None:
+            self.data_dict[attr_name] = {data.sensorName: {data.timestamp: data}}
+        else:
+            sensor_data = attr_data.get(data.sensorName)
+            if sensor_data is None:
+                attr_data[data.sensorName] = {data.timestamp: data}
+            else:
+                sensor_data[data.timestamp] = data
         self.data_event.set()
