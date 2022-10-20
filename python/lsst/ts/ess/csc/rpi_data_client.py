@@ -30,10 +30,11 @@ from collections.abc import Sequence
 from typing import Any
 
 import jsonschema
-import numpy as np
 import yaml
 from lsst.ts import salobj, tcpip
 from lsst.ts.ess import common
+
+from .air_turbulence_accumulator import AirTurbulenceAccumulator
 
 # Time limit for connecting to the RPi (seconds).
 CONNECT_TIMEOUT = 5
@@ -47,125 +48,6 @@ MAX_ALLOWED_READ_TIMEOUTS = 5
 COMMUNICATE_TIMEOUT = 60
 
 PASCALS_PER_MILLIBAR = 100
-
-
-class AirTurbulenceAccumulator:
-    """Accumulate air turbulence data from a 3-d anemometer.
-
-    Attributes
-    ----------
-    num_samples : `int`
-        The number of samples to process for one telemetry message.
-    timestamp : list[float]
-        List of timestamps (TAI unix seconds)
-    speed : list[float]
-        List of wind speed in x, y, z (km/s)
-    sonic_temperature : list[float]
-        List of sonic temperature (deg C)
-    num_bad_samples : int
-        Number of invalid samples.
-    """
-
-    def __init__(self, num_samples: int) -> None:
-        self.num_samples = num_samples
-        self.timestamp: list[float] = list()
-        self.speed: list[Sequence[float]] = list()
-        self.sonic_temperature: list[float] = list()
-        self.num_bad_samples = 0
-
-    @property
-    def do_report(self) -> bool:
-        """Do we have enough data to report good or bad data?"""
-        return max(len(self.speed), self.num_bad_samples) >= self.num_samples
-
-    def add_sample(
-        self,
-        timestamp: float,
-        speed: Sequence[float],
-        sonic_temperature: float,
-        isok: bool,
-    ) -> None:
-        """Add a sample and return a flag indicating if we have all samples.
-
-        Parameters
-        ----------
-        timestamp : `float`
-            Time at which data was taken (TAI unix seconds)
-        speed : `list[float]`
-            Wind speed in x, y, z (km/s)
-        sonic_temperature : `float`
-            Sonic temperature (deg C)
-        isok : `bool`
-            Is the data valid?
-        """
-        if len(speed) != 3:
-            raise ValueError(f"{speed=} must have 3 elements")
-        if isok:
-            self.timestamp.append(timestamp)
-            self.speed.append(speed)
-            self.sonic_temperature.append(sonic_temperature)
-        else:
-            self.num_bad_samples += 1
-
-    def clear(self) -> None:
-        """Clear the cached data."""
-        self.timestamp = list()
-        self.speed = list()
-        self.sonic_temperature = list()
-        self.num_bad_samples = 0
-
-    def get_topic_kwargs(self) -> dict[str, float | list[float] | bool]:
-        """Return data for the airTurbulence telemetry topic,
-        and clear cached data.
-
-        Returns
-        -------
-        topic_kwargs : `dict` [`str`, `float`]
-            Data for the airTurbulence telemetry topic as a keyword
-            arguments dict with these keys:
-
-            * ux, uy, uz
-            * uxStdDev, uyStdDev, uzStdDev
-            * magnitude, maximumMagnitude
-
-        Raises
-        ------
-        RuntimeError
-            If do_report false (not enough samples to report the data).
-        """
-        if len(self.speed) >= self.num_samples:
-            # Return good data
-            timestamp = self.timestamp[-1]
-            speed_arr = np.column_stack((self.speed))
-            speed_median_arr = np.median(speed_arr, axis=1)
-            speed_std_arr = np.std(speed_arr, axis=1)
-            magnitude_arr = np.linalg.norm(speed_arr, axis=1)
-            sonic_temperature_arr = np.array(self.sonic_temperature)
-            self.clear()
-            return dict(
-                timestamp=timestamp,
-                speed=speed_median_arr,
-                speedStdDev=speed_std_arr,
-                speedMagnitude=np.median(magnitude_arr),
-                speedMaxMagnitude=np.max(magnitude_arr),
-                sonicTemperature=np.median(sonic_temperature_arr),
-                sonicTemperatureStdDev=np.std(sonic_temperature_arr),
-            )
-
-        if self.num_bad_samples >= self.num_samples:
-            # Return bad data
-            self.clear()
-            return dict(
-                timestamp=math.nan,
-                speed=[math.nan] * 3,
-                speedStdDev=[math.nan] * 3,
-                speedMagnitude=math.nan,
-                speedMaxMagnitude=math.nan,
-                sonicTemperature=math.nan,
-                sonicTemperatureStdDev=math.nan,
-            )
-
-        raise RuntimeError("Not enough samples to report data")
 
 
 class RPiDataClient(common.BaseDataClient):
@@ -765,10 +647,10 @@ additionalProperties: false
             sonic_temperature=sensor_data[3],
             isok=sensor_data[4] == 0 and response_code == 0,
         )
-        if not accumulator.do_report:
+        topic_kwargs = accumulator.get_topic_kwargs()
+        if not topic_kwargs:
             return
 
-        topic_kwargs = accumulator.get_topic_kwargs()
         await self.topics.tel_airTurbulence.set_write(
             sensorName=sensor_name,
             location=device_configuration.location,
