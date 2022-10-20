@@ -176,7 +176,6 @@ properties:
             certain kinds of data, such as wind speed and direction.
             Ignored for other kinds of data.
           type: integer
-          default: 25
           minimum: 2
       anyOf:
       - if:
@@ -203,7 +202,6 @@ properties:
         - device_type
         - baud_rate
         - location
-        - num_samples
 required:
   - host
   - port
@@ -247,7 +245,7 @@ additionalProperties: false
                 sens_type=device[common.Key.SENSOR_TYPE],
                 baud_rate=device[common.Key.BAUD_RATE],
                 location=device[common.Key.LOCATION],
-                num_samples=device[common.Key.NUM_SAMPLES],
+                num_samples=device.get(common.Key.NUM_SAMPLES, 0),
             )
 
     def descr(self) -> str:

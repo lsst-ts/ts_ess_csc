@@ -31,6 +31,7 @@ import numpy as np
 from lsst.ts import salobj, utils
 from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.test_utils import MockTestTools
+from lsst.ts.ess.csc.rpi_data_client import PASCALS_PER_MILLIBAR
 from lsst.ts.idl.enums.ESS import ErrorCode
 
 logging.basicConfig(
@@ -47,8 +48,6 @@ COMMUNICATE_TIMEOUT = 2
 LONG_WAIT_TIME = 8
 # Too long wait time for timeout tests (second).
 TOO_LONG_WAIT_TIME = 12
-
-PASCALS_PER_MILLIBAR = 100
 
 
 def create_reply_dict(
