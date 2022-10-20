@@ -218,8 +218,8 @@ class EssCsc(salobj.ConfigurableCsc):
                 f"Failed to stop one or more data clients: {failed_summary}; continuing"
             )
 
-    async def stop_tasks(self) -> None:
-        await super().stop_tasks()
+    async def close_tasks(self) -> None:
+        await super().close_tasks()
         await self.stop_data_clients()
 
     async def configure(self, config: types.SimpleNamespace) -> None:
