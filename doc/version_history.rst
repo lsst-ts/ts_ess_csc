@@ -12,6 +12,7 @@ v0.12.0
 * Update for ts_xml 13, which is required.
 * Modernize type annotations.
 * Add class `AirTurbulenceAccumulator`.
+* Fix reconnection issue.
 
 Requires:
 

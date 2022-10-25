@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["RPiDataClient"]
+__all__ = ["RPiDataClient", "PASCALS_PER_MILLIBAR"]
 
 import asyncio
 import json
@@ -561,9 +561,9 @@ additionalProperties: false
         await self.write_humidity_etc(
             sensor_name=sensor_name,
             timestamp=timestamp,
-            dewPoint=sensor_data[2],
+            dew_point=sensor_data[2],
             pressure=None,
-            relativeHumidity=sensor_data[0],
+            relative_humidity=sensor_data[0],
             temperature=sensor_data[1],
             isok=response_code == 0,
         )
@@ -599,9 +599,9 @@ additionalProperties: false
         await self.write_humidity_etc(
             sensor_name=sensor_name,
             timestamp=timestamp,
-            dewPoint=sensor_data[3],
+            dew_point=sensor_data[3],
             pressure=sensor_data[2] * PASCALS_PER_MILLIBAR,
-            relativeHumidity=sensor_data[0],
+            relative_humidity=sensor_data[0],
             temperature=sensor_data[1],
             isok=response_code == 0,
         )
@@ -715,9 +715,9 @@ additionalProperties: false
         self,
         sensor_name: str,
         timestamp: float,
-        dewPoint: float | None,
+        dew_point: float | None,
         pressure: float | None,
-        relativeHumidity: float | None,
+        relative_humidity: float | None,
         temperature: float | None,
         isok: bool,
     ) -> None:
@@ -729,11 +729,11 @@ additionalProperties: false
             Sensor name
         timestamp : `float` | `None`
             Time at which the data was measured (TAI, unix seconds)
-        dewPoint : `float` | `None`
+        dew_point : `float` | `None`
             Dew point (C)
         pressure : `float` | `None`
             Parometric pressure (Pa)
-        relativeHumidity : `float` | `None`
+        relative_humidity : `float` | `None`
             Relative humidity (%)
         temperature : `float` | `None`
             Air temperature (C)
@@ -741,11 +741,11 @@ additionalProperties: false
             Is the data valid?
         """
         device_configuration = self.device_configurations[sensor_name]
-        if dewPoint is not None:
+        if dew_point is not None:
             await self.topics.tel_dewPoint.set_write(
                 sensorName=sensor_name,
                 timestamp=timestamp,
-                dewPoint=dewPoint if isok else math.nan,
+                dewPoint=dew_point if isok else math.nan,
                 location=device_configuration.location,
             )
         if pressure is not None:
@@ -760,11 +760,11 @@ additionalProperties: false
                 numChannels=1,
                 location=device_configuration.location,
             )
-        if relativeHumidity is not None:
+        if relative_humidity is not None:
             await self.topics.tel_relativeHumidity.set_write(
                 sensorName=sensor_name,
                 timestamp=timestamp,
-                relativeHumidity=relativeHumidity if isok else math.nan,
+                relativeHumidity=relative_humidity if isok else math.nan,
                 location=device_configuration.location,
             )
         if temperature is not None:
