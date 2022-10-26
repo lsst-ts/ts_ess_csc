@@ -24,7 +24,7 @@ __all__ = ["EssCsc"]
 import asyncio
 import traceback
 import types
-from typing import List, Optional, Sequence, Tuple, Union
+from collections.abc import Sequence
 
 import jsonschema
 from lsst.ts import salobj, utils
@@ -37,17 +37,17 @@ from .config_schema import CONFIG_SCHEMA
 
 def get_task_index_exception(
     tasks: Sequence[asyncio.Future],
-) -> Union[Tuple[int, Exception], Tuple[None, None]]:
+) -> tuple[int, Exception] | tuple[None, None]:
     """Return (index, exception) of the first task with an exception.
 
     Parameters
     ----------
-    tasks : `List` [`asyncio.Future`]
+    tasks : `list` [`asyncio.Future`]
         A list of tasks.
 
     Returns
     -------
-    info : `Tuple`
+    info : `tuple`
         Return (index, exception) of the first task with an exception.
         Return (None, None) if no tasks have an exception.
     """
@@ -90,11 +90,11 @@ class EssCsc(salobj.ConfigurableCsc):
         simulation_mode: int = 0,
         override: str = "",
     ) -> None:
-        self.config: Optional[types.SimpleNamespace] = None
-        self.data_clients: List[common.BaseDataClient] = list()
+        self.config: types.SimpleNamespace | None = None
+        self.data_clients: list[common.BaseDataClient] = list()
         self.start_data_clients_task = utils.make_done_future()
         self.run_data_clients_task = utils.make_done_future()
-        self.stop_data_clients_tasks: List[asyncio.Task] = []
+        self.stop_data_clients_tasks: list[asyncio.Task] = []
 
         super().__init__(
             name="ESS",
@@ -218,8 +218,8 @@ class EssCsc(salobj.ConfigurableCsc):
                 f"Failed to stop one or more data clients: {failed_summary}; continuing"
             )
 
-    async def stop_tasks(self) -> None:
-        await super().stop_tasks()
+    async def close_tasks(self) -> None:
+        await super().close_tasks()
         await self.stop_data_clients()
 
     async def configure(self, config: types.SimpleNamespace) -> None:
@@ -234,6 +234,7 @@ class EssCsc(salobj.ConfigurableCsc):
             The configuration as described by the schema at
             `lsst.ts.ess.csc.CONFIG_SCHEMA`, as a struct-like object.
         """
+        self.data_clients = list()
         for instance in config.instances:
             if instance["sal_index"] == self.salinfo.index:
                 break

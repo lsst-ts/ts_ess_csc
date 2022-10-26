@@ -39,3 +39,6 @@ instances:
               sensor_type: CSAT3B
               baud_rate: 115200
               location: Test4
+              # 4 samples is enough to compute standard deviation and
+              # to disambiguate the number of axes (3) from the number of samples
+              num_samples: 4

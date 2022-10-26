@@ -1,0 +1,177 @@
+# This file is part of ts_ess_csc.
+#
+# Developed for the Vera C. Rubin Observatory Telescope and Site Systems.
+# This product includes software developed by the LSST Project
+# (https://www.lsst.org).
+# See the COPYRIGHT file at the top-level directory of this distribution
+# for details of code ownership.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+__all__ = ["AirTurbulenceAccumulator"]
+
+import math
+from collections.abc import Sequence
+
+import numpy as np
+
+
+class AirTurbulenceAccumulator:
+    """Accumulate air turbulence data from a 3-d anemometer.
+
+    This supports writing the airTurbulence telemetry topic,
+    whose fields are statistics measured on a set of data.
+
+    Parameters
+    ----------
+    num_samples : `int`
+        The number of samples to read before producing aggregate data.
+
+    Attributes
+    ----------
+    num_samples : `int`
+        The number of samples to read before producing aggregate data.
+    timestamp : list[float]
+        List of timestamps (TAI unix seconds)
+    speed : list[float]
+        List of wind speed in x, y, z (km/s)
+    sonic_temperature : list[float]
+        List of sonic temperature (deg C)
+    num_bad_samples : int
+        Number of invalid samples.
+
+    Notes
+    -----
+    *To Use*
+
+    For each data sample read, call ``add_sample``.
+    The call `get_topic_kwargs``. If it returns a non-empty dict, write
+    the airTurbulence topic using the returned dict as keyword arguments.
+
+    ``get_topic_kwargs`` also clears the accumulated data,
+    so you can repeat this indefinitely. You need not call ``clear``
+    yourself.
+
+    *Bad Data*
+
+    Samples with ``isok=False`` are ignored, other than to increment
+    the ``num_bad_samples`` counter. In the unlikely event that we accumulate
+    ``num_samples`` of bad data before that many good samples,
+    ``do_report`` will be true, but ``get_topic_kwargs`` will return ``nan``
+    for all statistical values. The point is to publish *something*,
+    since this is telemetry and it should be output at semi-regular intervals.
+    Note that the accumulated good data will be lost.
+    """
+
+    def __init__(self, num_samples: int) -> None:
+        if num_samples < 2:
+            raise ValueError(f"{num_samples=} must be > 1")
+        self.num_samples = num_samples
+        self.timestamp: list[float] = list()
+        self.speed: list[Sequence[float]] = list()
+        self.sonic_temperature: list[float] = list()
+        self.num_bad_samples = 0
+
+    @property
+    def do_report(self) -> bool:
+        """Do we have enough data to report good or bad data?"""
+        return max(len(self.speed), self.num_bad_samples) >= self.num_samples
+
+    def add_sample(
+        self,
+        timestamp: float,
+        speed: Sequence[float],
+        sonic_temperature: float,
+        isok: bool,
+    ) -> None:
+        """Add a sample.
+
+        Parameters
+        ----------
+        timestamp : `float`
+            Time at which data was taken (TAI unix seconds)
+        speed : `list[float]`
+            Wind speed in x, y, z (km/s)
+        sonic_temperature : `float`
+            Sonic temperature (deg C)
+        isok : `bool`
+            Is the data valid?
+        """
+        if len(speed) != 3:
+            raise ValueError(f"{speed=} must have 3 elements")
+        if isok:
+            self.timestamp.append(timestamp)
+            self.speed.append(speed)
+            self.sonic_temperature.append(sonic_temperature)
+        else:
+            self.num_bad_samples += 1
+
+    def clear(self) -> None:
+        """Clear the accumulated data.
+
+        Note that get_topic_kwargs automatically calls this,
+        so you typically will not have to.
+        """
+        self.timestamp = list()
+        self.speed = list()
+        self.sonic_temperature = list()
+        self.num_bad_samples = 0
+
+    def get_topic_kwargs(self) -> dict[str, float | list[float] | bool]:
+        """Return data for the airTurbulence telemetry topic.
+
+        Returns
+        -------
+        topic_kwargs : `dict` [`str`, `float`]
+            Data for the airTurbulence telemetry topic as a keyword,
+            arguments, or an empty dict if there are not enough samples yet.
+            A dict with data will have these keys:
+
+            * ux, uy, uz
+            * uxStdDev, uyStdDev, uzStdDev
+            * magnitude, maximumMagnitude
+        """
+        if len(self.speed) >= self.num_samples:
+            # Return good data
+            timestamp = self.timestamp[-1]
+            speed_arr = np.column_stack((self.speed))
+            speed_median_arr = np.median(speed_arr, axis=1)
+            speed_std_arr = np.std(speed_arr, axis=1)
+            magnitude_arr = np.linalg.norm(speed_arr, axis=1)
+            sonic_temperature_arr = np.array(self.sonic_temperature)
+            self.clear()
+            return dict(
+                timestamp=timestamp,
+                speed=speed_median_arr,
+                speedStdDev=speed_std_arr,
+                speedMagnitude=np.median(magnitude_arr),
+                speedMaxMagnitude=np.max(magnitude_arr),
+                sonicTemperature=np.median(sonic_temperature_arr),
+                sonicTemperatureStdDev=np.std(sonic_temperature_arr),
+            )
+
+        if self.num_bad_samples >= self.num_samples:
+            # Return bad data
+            self.clear()
+            return dict(
+                timestamp=math.nan,
+                speed=[math.nan] * 3,
+                speedStdDev=[math.nan] * 3,
+                speedMagnitude=math.nan,
+                speedMaxMagnitude=math.nan,
+                sonicTemperature=math.nan,
+                sonicTemperatureStdDev=math.nan,
+            )
+
+        return dict()

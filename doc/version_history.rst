@@ -6,17 +6,19 @@
 Version History
 ###############
 
-v0.11.3
+v0.12.0
 =======
 
-* Make airTurbulence telemetry handling backwards compatible with ts_xml 12.
-  Also publish the correct field as ``status`` with ts_xml 12.1.
+* Update for ts_xml 13, which is required.
+* Modernize type annotations.
+* Add class `AirTurbulenceAccumulator`.
+* Fix reconnection issue.
 
 Requires:
 
 * ts_salobj 7
 * ts_idl 3.7
-* IDL file for ESS from ts_xml 12
+* IDL file for ESS from ts_xml 13
 * ts_ess_common 0.9.3
 * ts_tcpip
 * ts_utils 1.0
@@ -25,12 +27,14 @@ v0.11.2
 =======
 
 * Modernize airTurbulence telemetry.
+  This was potentially compatible with ts_xml 12.1 but there will be no such release.
+  This version is not compatible with ts_xml 13.
 
 Requires:
 
 * ts_salobj 7
 * ts_idl 3.7
-* IDL file for ESS from ts_xml 12.1
+* IDL file for ESS from ts_xml 12.
 * ts_ess_common 0.9.3
 * ts_tcpip
 * ts_utils 1.0
