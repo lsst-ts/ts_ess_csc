@@ -28,7 +28,7 @@ import unittest
 from unittest import mock
 
 import numpy as np
-from lsst.ts import salobj, utils
+from lsst.ts import salobj, tcpip, utils
 from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.test_utils import MockTestTools
 from lsst.ts.ess.csc.rpi_data_client import PASCALS_PER_MILLIBAR
@@ -458,3 +458,91 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             else:
                 sensor_data[data.timestamp] = data
         self.data_event.set()
+
+    async def test_restart_csc(self) -> None:
+        """The CSC should NOT fault when the CSC is set to STANDBY and then to
+        ENABLED again..
+        """
+        # Start the MockServer for manual control.
+        await self.start_mock_server()
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+            override="test_one_temp_sensor.yaml",
+        ):
+            await self.assert_next_summary_state(salobj.State.ENABLED)
+
+            await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
+            assert len(self.csc.data_clients) == 1
+
+            await salobj.set_summary_state(
+                remote=self.remote, state=salobj.State.STANDBY
+            )
+            await self.assert_next_summary_state(salobj.State.DISABLED)
+            await self.assert_next_summary_state(salobj.State.STANDBY)
+
+            await salobj.set_summary_state(
+                remote=self.remote, state=salobj.State.ENABLED
+            )
+            await self.assert_next_summary_state(salobj.State.DISABLED)
+            await self.assert_next_summary_state(salobj.State.ENABLED)
+
+        # Stop the MockServer to clean up after ourselves.
+        await self.stop_mock_server()
+
+    async def test_rpi_data_client_loses_connection(self) -> None:
+        """The CSC should fault when the RPiDataClient loses its connection
+        to the server and the RpiDataClient should reconnect when the CSC is
+        set to ENABLED again.
+        """
+        # Start the MockServer for manual control.
+        await self.start_mock_server()
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=0,
+            override="test_one_temp_sensor.yaml",
+        ):
+            await self.assert_next_summary_state(salobj.State.ENABLED)
+
+            await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
+            assert len(self.csc.data_clients) == 1
+
+            # Stop the MockServer.
+            await self.stop_mock_server()
+            await self.assert_next_summary_state(salobj.State.FAULT)
+
+            await salobj.set_summary_state(
+                remote=self.remote, state=salobj.State.STANDBY
+            )
+            await self.assert_next_summary_state(salobj.State.STANDBY)
+
+            # Start the MockServer again.
+            await self.start_mock_server()
+
+            await salobj.set_summary_state(
+                remote=self.remote, state=salobj.State.ENABLED
+            )
+            await self.assert_next_summary_state(salobj.State.DISABLED)
+            await self.assert_next_summary_state(salobj.State.ENABLED)
+
+        # Stop the MockServer to clean up after ourselves.
+        await self.stop_mock_server()
+
+    async def start_mock_server(self) -> None:
+        self.mock_server = common.SocketServer(
+            name="MockServer",
+            host=tcpip.LOCAL_HOST,
+            port=5000,
+            simulation_mode=1,
+        )
+        mock_command_handler = common.MockCommandHandler(
+            callback=self.mock_server.write,
+            simulation_mode=1,
+        )
+        self.mock_server.set_command_handler(mock_command_handler)
+        await asyncio.wait_for(self.mock_server.start_task, timeout=STD_TIMEOUT)
+
+    async def stop_mock_server(self) -> None:
+        await self.mock_server.close()

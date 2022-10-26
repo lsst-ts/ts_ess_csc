@@ -234,6 +234,7 @@ class EssCsc(salobj.ConfigurableCsc):
             The configuration as described by the schema at
             `lsst.ts.ess.csc.CONFIG_SCHEMA`, as a struct-like object.
         """
+        self.data_clients = list()
         for instance in config.instances:
             if instance["sal_index"] == self.salinfo.index:
                 break
