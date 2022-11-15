@@ -395,7 +395,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     @mock.patch(
-        "lsst.ts.ess.csc.rpi_data_client.COMMUNICATE_TIMEOUT", COMMUNICATE_TIMEOUT
+        "lsst.ts.ess.csc.controller_data_client.COMMUNICATE_TIMEOUT",
+        COMMUNICATE_TIMEOUT,
     )
     async def test_rpi_data_client_timeout(self) -> None:
         async with self.make_csc(
