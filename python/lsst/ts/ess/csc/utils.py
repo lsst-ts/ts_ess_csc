@@ -19,20 +19,28 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-import typing
+__all__ = ["get_median"]
 
-# For an explanation why these next lines are so complicated, see
-# https://confluence.lsstcorp.org/pages/viewpage.action?spaceKey=LTS&title=Enabling+Mypy+in+Pytest
-if typing.TYPE_CHECKING:
-    __version__ = "?"
-else:
-    try:
-        from .version import *
-    except ImportError:
-        __version__ = "?"
+import numpy as np
 
-from .cli import *
-from .config_schema import CONFIG_SCHEMA
-from .ess_csc import EssCsc
-from .rpi_data_client import *
-from .utils import *
+QUANTILE = [0.25, 0.5, 0.75]
+
+
+def get_median(data: np.ndarray, axis: int = None) -> float:
+    """Compute the median using quantiles and ignore the other return
+    values.
+
+    Parameters
+    ----------
+    data : `list` of `float`
+        The data to compute the median for.
+    axis : `int`
+        The axis of the data to use.
+
+    Returns
+    -------
+    median : `float`
+        The median.
+    """
+    _, median, _ = np.quantile(data, QUANTILE, axis=axis)
+    return median

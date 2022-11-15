@@ -21,10 +21,11 @@
 
 __all__ = ["AirTurbulenceAccumulator"]
 
-import math
 from collections.abc import Sequence
 
 import numpy as np
+
+from .utils import get_median
 
 
 class AirTurbulenceAccumulator:
@@ -142,22 +143,24 @@ class AirTurbulenceAccumulator:
             * uxStdDev, uyStdDev, uzStdDev
             * magnitude, maximumMagnitude
         """
+        timestamp = self.timestamp[-1]
         if len(self.speed) >= self.num_samples:
             # Return good data
-            timestamp = self.timestamp[-1]
-            speed_arr = np.column_stack((self.speed))
-            speed_median_arr = np.median(speed_arr, axis=1)
+            speed_arr = np.column_stack(self.speed)
+            speed_median_arr = get_median(data=speed_arr, axis=1)
             speed_std_arr = np.std(speed_arr, axis=1)
             magnitude_arr = np.linalg.norm(speed_arr, axis=1)
+            magnitude_median_arr = get_median(data=magnitude_arr)
             sonic_temperature_arr = np.array(self.sonic_temperature)
+            sonic_temperature_median_arr = get_median(data=sonic_temperature_arr)
             self.clear()
             return dict(
                 timestamp=timestamp,
                 speed=speed_median_arr,
                 speedStdDev=speed_std_arr,
-                speedMagnitude=np.median(magnitude_arr),
+                speedMagnitude=magnitude_median_arr,
                 speedMaxMagnitude=np.max(magnitude_arr),
-                sonicTemperature=np.median(sonic_temperature_arr),
+                sonicTemperature=sonic_temperature_median_arr,
                 sonicTemperatureStdDev=np.std(sonic_temperature_arr),
             )
 
@@ -165,13 +168,13 @@ class AirTurbulenceAccumulator:
             # Return bad data
             self.clear()
             return dict(
-                timestamp=math.nan,
-                speed=[math.nan] * 3,
-                speedStdDev=[math.nan] * 3,
-                speedMagnitude=math.nan,
-                speedMaxMagnitude=math.nan,
-                sonicTemperature=math.nan,
-                sonicTemperatureStdDev=math.nan,
+                timestamp=timestamp,
+                speed=[np.nan] * 3,
+                speedStdDev=[np.nan] * 3,
+                speedMagnitude=np.nan,
+                speedMaxMagnitude=np.nan,
+                sonicTemperature=np.nan,
+                sonicTemperatureStdDev=np.nan,
             )
 
         return dict()
