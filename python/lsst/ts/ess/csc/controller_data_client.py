@@ -50,8 +50,7 @@ class ControllerDataClient(common.BaseDataClient):
 
     Parameters
     ----------
-    name : str
-    config : types.SimpleNamespace
+    config : `types.SimpleNamespace`
         The configuration, after validation by the schema returned
         by `get_config_schema` and conversion to a types.SimpleNamespace.
     topics : `salobj.Controller` or `types.SimpleNamespace`
@@ -102,7 +101,7 @@ class ControllerDataClient(common.BaseDataClient):
 
     @abc.abstractmethod
     def get_telemetry_dispatch_dict(self) -> dict[str, Callable]:
-        raise NotImplementedError
+        raise NotImplementedError()
 
     @classmethod
     @abc.abstractmethod
@@ -137,10 +136,7 @@ class ControllerDataClient(common.BaseDataClient):
         "sensor_telemetry": {
           "description": "The sensor telemetry.",
           "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "number"
-          }
+          "minItems": 1
         }
       },
       "required": ["name", "timestamp", "response_code", "sensor_telemetry"],
@@ -187,8 +183,10 @@ class ControllerDataClient(common.BaseDataClient):
                 dev_id=device[dev_id],
                 sens_type=device[common.Key.SENSOR_TYPE],
                 baud_rate=device[common.Key.BAUD_RATE],
-                location=device[common.Key.LOCATION],
+                location=device.get(common.Key.LOCATION, "Location not specified."),
                 num_samples=device.get(common.Key.NUM_SAMPLES, 0),
+                safe_interval=device.get(common.Key.SAFE_INTERVAL, 0),
+                threshold=device.get(common.Key.THRESHOLD, 0),
             )
 
     def descr(self) -> str:
@@ -315,6 +313,12 @@ class ControllerDataClient(common.BaseDataClient):
         -------
         data : `dict`
             The read data, after json-decoding it.
+
+        Raises
+        ------
+        RuntimeError
+            In case of not being connected.
+            In case parsing gthe JSON data fails.
         """
         if not self.connected:
             raise RuntimeError("Not connected.")
@@ -349,7 +353,7 @@ class ControllerDataClient(common.BaseDataClient):
         Raises
         ------
         ConnectionError
-            If not connected
+            If not connected.
         asyncio.TimeoutError
             If it takes more than COMMUNICATE_TIMEOUT seconds
             to acquire the lock or write the data.
@@ -403,9 +407,9 @@ class ControllerDataClient(common.BaseDataClient):
         sensor_name: str,
         timestamp: float,
         response_code: int,
-        sensor_data: Sequence[float],
+        sensor_data: Sequence[float | int | str],
     ) -> None:
-        """Process the sensor telemetry
+        """Process the sensor telemetry.
 
         Parameters
         ----------
@@ -414,7 +418,7 @@ class ControllerDataClient(common.BaseDataClient):
         timestamp : `float`
             The timestamp of the data.
         response_code : `int`
-            The ResponseCode
+            The response code.
         sensor_data : each of type `float`
             A Sequence of float representing the sensor telemetry data.
 

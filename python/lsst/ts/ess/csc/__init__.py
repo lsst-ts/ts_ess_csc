@@ -35,5 +35,6 @@ from .cli import *
 from .config_schema import CONFIG_SCHEMA
 from .controller_data_client import *
 from .ess_csc import EssCsc
+from .lightning_data_client import *
 from .rpi_data_client import *
 from .utils import *
