@@ -1,0 +1,19 @@
+instances:
+  - sal_index: 1
+    data_clients:
+      - client_class: LightningDataClient
+        config:
+          host: 127.0.0.1
+          devices:
+            - name: EssElectricField
+              device_type: FTDI
+              ftdi_id: ABC
+              sensor_type: EFM100C
+              safe_interval: 2
+              num_samples: 2
+              threshold: 1.0
+            - name: EssLightning
+              device_type: FTDI
+              ftdi_id: ABC
+              sensor_type: LD250
+              safe_interval: 2

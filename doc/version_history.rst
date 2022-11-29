@@ -6,6 +6,24 @@
 Version History
 ###############
 
+v0.13.0
+=======
+
+* Update for ts_xml 14, which is required.
+* Switch from py.test to pytest.
+* Improve the way medians are computed.
+* Extract base class for data clients connecting to an ESS Controller.
+* Add a data client (and support classes) for processing electric field and lightning telemetry.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 14
+* ts_ess_common 0.10
+* ts_tcpip
+* ts_utils 1.0
+
 v0.12.0
 =======
 

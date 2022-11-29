@@ -19,19 +19,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["AirTurbulenceAccumulator"]
-
-from collections.abc import Sequence
+__all__ = ["ElectricFieldStrengthAccumulator"]
 
 import numpy as np
 
 from .utils import get_median
 
 
-class AirTurbulenceAccumulator:
-    """Accumulate air turbulence data from a 3-d anemometer.
+class ElectricFieldStrengthAccumulator:
+    """Accumulate electric field data from a detector.
 
-    This supports writing the airTurbulence telemetry topic,
+    This supports writing the electricFieldStrength telemetry topic,
     whose fields are statistics measured on a set of data.
 
     Parameters
@@ -43,22 +41,25 @@ class AirTurbulenceAccumulator:
     ----------
     num_samples : `int`
         The number of samples to read before producing aggregate data.
-    timestamp : list[float]
-        List of timestamps (TAI unix seconds)
-    speed : list[float]
-        List of wind speed in x, y, z (km/s)
-    sonic_temperature : list[float]
-        List of sonic temperature (deg C)
-    num_bad_samples : int
+    timestamp : `list` of `float`
+        List of timestamps (TAI unix seconds).
+    strength : `list` of `float`
+        List of electric field strength (kV / m).
+    num_bad_samples : `int`
         Number of invalid samples.
+
+    Raises
+    ------
+    ValueError
+        In case the value of ``num_samples`` is smaller than 2.
 
     Notes
     -----
     *To Use*
 
     For each data sample read, call ``add_sample``.
-    The call `get_topic_kwargs``. If it returns a non-empty dict, write
-    the airTurbulence topic using the returned dict as keyword arguments.
+    Then call `get_topic_kwargs``. If it returns a non-empty dict, write the
+    electricFieldStrength topic using the returned dict as keyword arguments.
 
     ``get_topic_kwargs`` also clears the accumulated data,
     so you can repeat this indefinitely. You need not call ``clear``
@@ -69,8 +70,8 @@ class AirTurbulenceAccumulator:
     Samples with ``isok=False`` are ignored, other than to increment
     the ``num_bad_samples`` counter. In the unlikely event that we accumulate
     ``num_samples`` of bad data before that many good samples,
-    ``do_report`` will be true, but ``get_topic_kwargs`` will return ``nan``
-    for all statistical values. The point is to publish *something*,
+    ``do_report()`` will be true, but ``get_topic_kwargs()`` will return
+    ``nan`` for all statistical values. The point is to publish *something*,
     since this is telemetry and it should be output at semi-regular intervals.
     Note that the accumulated good data will be lost.
     """
@@ -80,20 +81,18 @@ class AirTurbulenceAccumulator:
             raise ValueError(f"{num_samples=} must be > 1")
         self.num_samples = num_samples
         self.timestamp: list[float] = list()
-        self.speed: list[Sequence[float]] = list()
-        self.sonic_temperature: list[float] = list()
+        self.strength: list[float] = list()
         self.num_bad_samples = 0
 
     @property
     def do_report(self) -> bool:
         """Do we have enough data to report good or bad data?"""
-        return max(len(self.speed), self.num_bad_samples) >= self.num_samples
+        return max(len(self.strength), self.num_bad_samples) >= self.num_samples
 
     def add_sample(
         self,
         timestamp: float,
-        speed: Sequence[float],
-        sonic_temperature: float,
+        strength: float,
         isok: bool,
     ) -> None:
         """Add a sample.
@@ -101,67 +100,54 @@ class AirTurbulenceAccumulator:
         Parameters
         ----------
         timestamp : `float`
-            Time at which data was taken (TAI unix seconds)
-        speed : `list[float]`
-            Wind speed in x, y, z (km/s)
-        sonic_temperature : `float`
-            Sonic temperature (deg C)
+            Time at which data was taken (TAI unix seconds).
+        strength : `float`
+            Electric field strength (kV / m).
         isok : `bool`
             Is the data valid?
         """
-        if len(speed) != 3:
-            raise ValueError(f"{speed=} must have 3 elements")
         if isok:
             self.timestamp.append(timestamp)
-            self.speed.append(speed)
-            self.sonic_temperature.append(sonic_temperature)
+            self.strength.append(strength)
         else:
             self.num_bad_samples += 1
 
     def clear(self) -> None:
         """Clear the accumulated data.
 
-        Note that get_topic_kwargs automatically calls this,
+        Note that ``get_topic_kwargs()`` automatically calls this,
         so you typically will not have to.
         """
         self.timestamp = list()
-        self.speed = list()
-        self.sonic_temperature = list()
+        self.strength = list()
         self.num_bad_samples = 0
 
     def get_topic_kwargs(self) -> dict[str, float | list[float] | bool]:
-        """Return data for the airTurbulence telemetry topic.
+        """Return data for the electricFieldStrength telemetry topic.
 
         Returns
         -------
         topic_kwargs : `dict` [`str`, `float`]
-            Data for the airTurbulence telemetry topic as a keyword,
+            Data for the electricFieldStrength telemetry topic as a keyword,
             arguments, or an empty dict if there are not enough samples yet.
             A dict with data will have these keys:
 
-            * ux, uy, uz
-            * uxStdDev, uyStdDev, uzStdDev
-            * magnitude, maximumMagnitude
+            * strength
+            * strengthStdDev
+            * strengthMax
         """
         timestamp = self.timestamp[-1]
-        if len(self.speed) >= self.num_samples:
+        if len(self.strength) >= self.num_samples:
             # Return good data
-            speed_arr = np.column_stack(self.speed)
-            speed_median_arr = get_median(data=speed_arr, axis=1)
-            speed_std_arr = np.std(speed_arr, axis=1)
-            magnitude_arr = np.linalg.norm(speed_arr, axis=1)
-            magnitude_median_arr = get_median(data=magnitude_arr)
-            sonic_temperature_arr = np.array(self.sonic_temperature)
-            sonic_temperature_median_arr = get_median(data=sonic_temperature_arr)
+            strength_arr = np.array(self.strength)
+            strength_median = get_median(data=strength_arr)
+            strength_std = np.std(strength_arr)
             self.clear()
             return dict(
                 timestamp=timestamp,
-                speed=speed_median_arr,
-                speedStdDev=speed_std_arr,
-                speedMagnitude=magnitude_median_arr,
-                speedMaxMagnitude=np.max(magnitude_arr),
-                sonicTemperature=sonic_temperature_median_arr,
-                sonicTemperatureStdDev=np.std(sonic_temperature_arr),
+                strength=strength_median,
+                strengthStdDev=strength_std,
+                strengthMax=np.max(strength_arr),
             )
 
         if self.num_bad_samples >= self.num_samples:
@@ -169,12 +155,9 @@ class AirTurbulenceAccumulator:
             self.clear()
             return dict(
                 timestamp=timestamp,
-                speed=[np.nan] * 3,
-                speedStdDev=[np.nan] * 3,
-                speedMagnitude=np.nan,
-                speedMaxMagnitude=np.nan,
-                sonicTemperature=np.nan,
-                sonicTemperatureStdDev=np.nan,
+                strength=np.nan,
+                strengthStdDev=np.nan,
+                strengthMax=np.nan,
             )
 
         return dict()
