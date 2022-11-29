@@ -22,12 +22,12 @@
 import asyncio
 import functools
 import logging
-import math
 import pathlib
 import unittest
 from unittest import mock
 
 import numpy as np
+import yaml
 from lsst.ts import salobj, tcpip, utils
 from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.test_utils import MockTestTools
@@ -233,7 +233,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     expected_num_nans = (
                         len(data.temperature) - device_config.num_channels
                     )
-                    nan_array = [math.nan] * expected_num_nans
+                    nan_array = [np.nan] * expected_num_nans
                     np.testing.assert_array_equal(
                         nan_array, data.temperature[device_config.num_channels :]
                     )
@@ -395,7 +395,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     @mock.patch(
-        "lsst.ts.ess.csc.rpi_data_client.COMMUNICATE_TIMEOUT", COMMUNICATE_TIMEOUT
+        "lsst.ts.ess.csc.controller_data_client.COMMUNICATE_TIMEOUT",
+        COMMUNICATE_TIMEOUT,
     )
     async def test_rpi_data_client_timeout(self) -> None:
         async with self.make_csc(
@@ -546,3 +547,63 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
     async def stop_mock_server(self) -> None:
         await self.mock_server.close()
+
+    async def get_config_for_device(self, name: str) -> dict:
+        config_file = TEST_CONFIG_DIR / "test_lightning_sensors.yaml"
+        with open(config_file, "r") as f:
+            config_raw_data = f.read()
+            config = yaml.safe_load(config_raw_data)
+            device_configs = config["instances"][0]["data_clients"][0]["config"][
+                "devices"
+            ]
+            for device_config in device_configs:
+                if device_config["name"] == name:
+                    return device_config
+        return dict()
+
+    async def test_lightning_data_client_nominal(self) -> None:
+        """The CSC should fault when an RPiDataClient loses its connection
+        to the server.
+        """
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=1,
+            override="test_lightning_sensors.yaml",
+        ):
+            await self.assert_next_summary_state(salobj.State.ENABLED)
+
+            # Verify that strike events and telemetry have been sent.
+            await self.assert_next_sample(
+                topic=self.remote.evt_lightningStrike,
+                sensorName="EssLightning",
+                correctedDistance=-1,
+                uncorrectedDistance=-1,
+                bearing=0,
+            )
+            await self.assert_next_sample(
+                topic=self.remote.tel_lightningStrikeStatus,
+                sensorName="EssLightning",
+            )
+            await self.assert_next_sample(
+                topic=self.remote.evt_sensorStatus,
+                sensorName="EssLightning",
+            )
+
+            # Verify that electric field events and telemetry have been sent.
+            # Due to the accumulator and the device config, it takes a little
+            # while until these events and telemetry get emitted.
+            data = await self.assert_next_sample(
+                topic=self.remote.tel_electricFieldStrength,
+                sensorName="EssElectricField",
+            )
+            config = await self.get_config_for_device("EssElectricField")
+            if np.abs(data.strengthMax) > config["threshold"]:
+                await self.assert_next_sample(
+                    topic=self.remote.evt_highElectricField,
+                    sensorName="EssElectricField",
+                )
+            await self.assert_next_sample(
+                topic=self.remote.evt_sensorStatus,
+                sensorName="EssElectricField",
+            )
