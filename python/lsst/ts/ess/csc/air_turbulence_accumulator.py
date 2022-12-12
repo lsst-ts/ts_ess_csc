@@ -150,6 +150,10 @@ class AirTurbulenceAccumulator:
         timestamp = self.timestamp[-1]
         dict_to_return = dict()
 
+        self.log.debug(
+            f"{len(self.speed)=!s}, {self.num_bad_samples=!s}, {self.num_samples}"
+        )
+
         try:
             if len(self.speed) >= self.num_samples:
                 # Return good data
