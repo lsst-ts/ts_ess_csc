@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.13.2
+=======
+
+* Update type annotations for newer MyPy.
+* Add debug statements.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 14
+* ts_ess_common 0.10
+* ts_tcpip
+* ts_utils 1.0
+
 v0.13.1
 =======
 
