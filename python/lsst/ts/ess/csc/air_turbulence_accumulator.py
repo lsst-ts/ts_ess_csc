@@ -21,6 +21,7 @@
 
 __all__ = ["AirTurbulenceAccumulator"]
 
+import logging
 from collections.abc import Sequence
 
 import numpy as np
@@ -36,6 +37,8 @@ class AirTurbulenceAccumulator:
 
     Parameters
     ----------
+    log : `logging.Logger`
+        The logger for which to create a child logger.
     num_samples : `int`
         The number of samples to read before producing aggregate data.
 
@@ -75,9 +78,10 @@ class AirTurbulenceAccumulator:
     Note that the accumulated good data will be lost.
     """
 
-    def __init__(self, num_samples: int) -> None:
+    def __init__(self, log: logging.Logger, num_samples: int) -> None:
         if num_samples < 2:
             raise ValueError(f"{num_samples=} must be > 1")
+        self.log = log.getChild(type(self).__name__)
         self.num_samples = num_samples
         self.timestamp: list[float] = list()
         self.speed: list[Sequence[float]] = list()
@@ -144,37 +148,46 @@ class AirTurbulenceAccumulator:
             * magnitude, maximumMagnitude
         """
         timestamp = self.timestamp[-1]
-        if len(self.speed) >= self.num_samples:
-            # Return good data
-            speed_arr = np.column_stack(self.speed)
-            speed_median_arr = get_median(data=speed_arr, axis=1)
-            speed_std_arr = np.std(speed_arr, axis=1)
-            magnitude_arr = np.linalg.norm(speed_arr, axis=1)
-            magnitude_median_arr = get_median(data=magnitude_arr)
-            sonic_temperature_arr = np.array(self.sonic_temperature)
-            sonic_temperature_median_arr = get_median(data=sonic_temperature_arr)
-            self.clear()
-            return dict(
-                timestamp=timestamp,
-                speed=speed_median_arr,
-                speedStdDev=speed_std_arr,
-                speedMagnitude=magnitude_median_arr,
-                speedMaxMagnitude=np.max(magnitude_arr),
-                sonicTemperature=sonic_temperature_median_arr,
-                sonicTemperatureStdDev=np.std(sonic_temperature_arr),
-            )
+        dict_to_return = dict()
 
-        if self.num_bad_samples >= self.num_samples:
-            # Return bad data
-            self.clear()
-            return dict(
-                timestamp=timestamp,
-                speed=[np.nan] * 3,
-                speedStdDev=[np.nan] * 3,
-                speedMagnitude=np.nan,
-                speedMaxMagnitude=np.nan,
-                sonicTemperature=np.nan,
-                sonicTemperatureStdDev=np.nan,
-            )
+        self.log.debug(
+            f"{len(self.speed)=!s}, {self.num_bad_samples=!s}, {self.num_samples}"
+        )
 
-        return dict()
+        try:
+            if len(self.speed) >= self.num_samples:
+                # Return good data
+                speed_arr = np.column_stack(self.speed)
+                speed_median_arr = get_median(data=speed_arr, axis=1)
+                speed_std_arr = np.std(speed_arr, axis=1)
+                magnitude_arr = np.linalg.norm(speed_arr, axis=1)
+                magnitude_median_arr = get_median(data=magnitude_arr)
+                sonic_temperature_arr = np.array(self.sonic_temperature)
+                sonic_temperature_median_arr = get_median(data=sonic_temperature_arr)
+                self.clear()
+                dict_to_return = dict(
+                    timestamp=timestamp,
+                    speed=speed_median_arr,
+                    speedStdDev=speed_std_arr,
+                    speedMagnitude=magnitude_median_arr,
+                    speedMaxMagnitude=np.max(magnitude_arr),
+                    sonicTemperature=sonic_temperature_median_arr,
+                    sonicTemperatureStdDev=np.std(sonic_temperature_arr),
+                )
+            elif self.num_bad_samples >= self.num_samples:
+                # Return bad data
+                self.clear()
+                dict_to_return = dict(
+                    timestamp=timestamp,
+                    speed=[np.nan] * 3,
+                    speedStdDev=[np.nan] * 3,
+                    speedMagnitude=np.nan,
+                    speedMaxMagnitude=np.nan,
+                    sonicTemperature=np.nan,
+                    sonicTemperatureStdDev=np.nan,
+                )
+        except Exception:
+            self.log.exception("Error parsing sensor data.")
+
+        self.log.debug(f"Returning {dict_to_return=!s}")
+        return dict_to_return
