@@ -26,7 +26,7 @@ import numpy as np
 QUANTILE = [0.25, 0.5, 0.75]
 
 
-def get_median(data: np.ndarray, axis: int = None) -> float:
+def get_median(data: np.ndarray, axis: int | None = None) -> float:
     """Compute the median using quantiles and ignore the other return
     values.
 

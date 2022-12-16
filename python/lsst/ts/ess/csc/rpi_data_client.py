@@ -305,7 +305,7 @@ additionalProperties: false
         device_configuration = self.device_configurations[sensor_name]
         if sensor_name not in self.air_turbulence_cache:
             self.air_turbulence_cache[sensor_name] = AirTurbulenceAccumulator(
-                num_samples=device_configuration.num_samples,
+                log=self.log, num_samples=device_configuration.num_samples
             )
         accumulator = self.air_turbulence_cache[sensor_name]
 
@@ -319,6 +319,9 @@ additionalProperties: false
         if not topic_kwargs:
             return
 
+        self.log.debug(
+            "Sending the tel_airTurbulence telemetry and evt_sensorStatus event."
+        )
         await self.topics.tel_airTurbulence.set_write(
             sensorName=sensor_name,
             location=device_configuration.location,

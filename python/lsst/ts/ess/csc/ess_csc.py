@@ -85,7 +85,7 @@ class EssCsc(salobj.ConfigurableCsc):
     def __init__(
         self,
         index: int,
-        config_dir: str = None,
+        config_dir: str | None = None,
         initial_state: salobj.State = salobj.State.STANDBY,
         simulation_mode: int = 0,
         override: str = "",
