@@ -31,8 +31,7 @@ import yaml
 from lsst.ts import salobj
 from lsst.ts.ess import common
 
-from .air_flow_accumulator import AirFlowAccumulator
-from .air_turbulence_accumulator import AirTurbulenceAccumulator
+from .accumulator import AirFlowAccumulator, AirTurbulenceAccumulator
 from .controller_data_client import ControllerDataClient
 
 PASCALS_PER_MILLIBAR = 100
