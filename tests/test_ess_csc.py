@@ -32,7 +32,6 @@ import yaml
 from lsst.ts import salobj, tcpip, utils
 from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.test_utils import MockTestTools
-from lsst.ts.ess.csc.rpi_data_client import PASCALS_PER_MILLIBAR
 from lsst.ts.idl.enums.ESS import ErrorCode
 
 logging.basicConfig(
@@ -312,7 +311,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             additional_data=[
                 topics_data["tel_relativeHumidity"].relativeHumidity,
                 topics_data["tel_temperature"].temperature[0],
-                topics_data["tel_pressure"].pressure[0] / PASCALS_PER_MILLIBAR,
+                topics_data["tel_pressure"].pressure[0] / csc.PASCALS_PER_MILLIBAR,
                 topics_data["tel_dewPoint"].dewPoint,
             ],
         )

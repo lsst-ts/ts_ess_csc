@@ -32,7 +32,7 @@ import yaml
 from lsst.ts import salobj, utils
 from lsst.ts.ess import common
 
-from .accumulator import ElectricFieldStrengthAccumulator
+from ..accumulator import ElectricFieldStrengthAccumulator
 from .controller_data_client import ControllerDataClient
 
 
