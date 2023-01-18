@@ -49,7 +49,7 @@ class AirTurbulenceAccumulator:
     timestamp : list[float]
         List of timestamps (TAI unix seconds)
     speed : list[float]
-        List of wind speed in x, y, z (km/s)
+        List of wind speed in x, y, z (m/s)
     sonic_temperature : list[float]
         List of sonic temperature (deg C)
     num_bad_samples : int
@@ -107,7 +107,7 @@ class AirTurbulenceAccumulator:
         timestamp : `float`
             Time at which data was taken (TAI unix seconds)
         speed : `list[float]`
-            Wind speed in x, y, z (km/s)
+            Wind speed in x, y, z (m/s)
         sonic_temperature : `float`
             Sonic temperature (deg C)
         isok : `bool`
