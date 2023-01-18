@@ -23,6 +23,7 @@ import asyncio
 import functools
 import logging
 import pathlib
+import types
 import unittest
 from unittest import mock
 
@@ -48,10 +49,12 @@ COMMUNICATE_TIMEOUT = 2
 LONG_WAIT_TIME = 8
 # Too long wait time for timeout tests (second).
 TOO_LONG_WAIT_TIME = 12
+# The number of sensors when all sensors are used in the test.
+NUM_ALL_SENSORS = 5
 
 
 def create_reply_dict(
-    sensor_name: str, additional_data: list[float]
+    sensor_name: str, additional_data: list[float | int]
 ) -> common.test_utils.SensorReply:
     """Create a list that represents a reply from a sensor.
 
@@ -85,6 +88,15 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         # Event that is set by topic_callback and awaited by
         # next_data.
         self.data_event = asyncio.Event()
+        self.validation_dispatch_dict = {
+            common.SensorType.TEMPERATURE: self.validate_temperature_telemetry,
+            common.SensorType.HX85A: self.validate_hx85a_telemetry,
+            common.SensorType.HX85BA: self.validate_hx85ba_telemetry,
+            common.SensorType.CSAT3B: self.validate_csat3b_telemetry,
+            common.SensorType.WINDSONIC: self.validate_windsonic_telemetry,
+        }
+
+        super().setUp()
 
     def basic_make_csc(
         self,
@@ -103,6 +115,29 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             override=override,
         )
         return ess_csc
+
+    def topic_callback(self, data: salobj.BaseMsgType, attr_name: str) -> None:
+        """Callback for read topics.
+
+        Assign to all topics for which you want to call next_data.
+
+        Parameters
+        ----------
+        data : `salobj.BaseMsgType`
+            Data from a topic. Must have a sensorName field.
+        attr_name : `str`
+            Topic attribute name.
+        """
+        attr_data = self.data_dict.get(attr_name)
+        if attr_data is None:
+            self.data_dict[attr_name] = {data.sensorName: {data.timestamp: data}}
+        else:
+            sensor_data = attr_data.get(data.sensorName)
+            if sensor_data is None:
+                attr_data[data.sensorName] = {data.timestamp: data}
+            else:
+                sensor_data[data.timestamp] = data
+        self.data_event.set()
 
     async def next_data(
         self,
@@ -207,8 +242,126 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         logging.info("test_bin_script")
         await self.check_bin_script(name="ESS", index=1, exe_name="run_ess_csc")
 
-    async def validate_telemetry(self) -> None:
+    async def validate_temperature_telemetry(
+        self, device_config: types.SimpleNamespace, sensor_name: str
+    ) -> None:
+        num_channels = device_config.num_channels
+        topics_data = await self.next_data(
+            topics=[self.remote.tel_temperature], sensor_name=sensor_name
+        )
+        data = topics_data["tel_temperature"]
+
+        # First make sure that the temperature data contain the
+        # expected number of NaN values.
+        expected_num_nans = len(data.temperature) - device_config.num_channels
+        nan_array = [np.nan] * expected_num_nans
+        np.testing.assert_array_equal(
+            nan_array, data.temperature[device_config.num_channels :]
+        )
+
+        # Next validate the rest of the data.
+        assert data.numChannels == device_config.num_channels
+        assert data.location == device_config.location
+        reply = create_reply_dict(
+            sensor_name=data.sensorName,
+            additional_data=data.temperature[: device_config.num_channels],
+        )
         mtt = MockTestTools()
+        mtt.check_temperature_reply(
+            reply=reply, name=sensor_name, num_channels=num_channels
+        )
+
+    async def validate_hx85a_telemetry(
+        self, device_config: types.SimpleNamespace, sensor_name: str
+    ) -> None:
+        topics_data = await self.next_data(
+            topics=[
+                self.remote.tel_relativeHumidity,
+                self.remote.tel_temperature,
+                self.remote.tel_dewPoint,
+            ],
+            sensor_name=sensor_name,
+        )
+        reply = create_reply_dict(
+            sensor_name=sensor_name,
+            additional_data=[
+                topics_data["tel_relativeHumidity"].relativeHumidity,
+                topics_data["tel_temperature"].temperature[0],
+                topics_data["tel_dewPoint"].dewPoint,
+            ],
+        )
+        mtt = MockTestTools()
+        mtt.check_hx85a_reply(reply=reply, name=sensor_name)
+
+    async def validate_hx85ba_telemetry(
+        self, device_config: types.SimpleNamespace, sensor_name: str
+    ) -> None:
+        topics_data = await self.next_data(
+            topics=[
+                self.remote.tel_relativeHumidity,
+                self.remote.tel_temperature,
+                self.remote.tel_pressure,
+                self.remote.tel_dewPoint,
+            ],
+            sensor_name=sensor_name,
+        )
+        for attr_name in ("tel_temperature", "tel_pressure"):
+            assert topics_data[attr_name].numChannels == 1
+        reply = create_reply_dict(
+            sensor_name=sensor_name,
+            additional_data=[
+                topics_data["tel_relativeHumidity"].relativeHumidity,
+                topics_data["tel_temperature"].temperature[0],
+                topics_data["tel_pressure"].pressure[0] / PASCALS_PER_MILLIBAR,
+                topics_data["tel_dewPoint"].dewPoint,
+            ],
+        )
+        mtt = MockTestTools()
+        mtt.check_hx85ba_reply(reply=reply, name=sensor_name)
+
+    async def validate_csat3b_telemetry(
+        self, device_config: types.SimpleNamespace, sensor_name: str
+    ) -> None:
+        data = await self.remote.tel_airTurbulence.next(
+            flush=False, timeout=STD_TIMEOUT
+        )
+        assert data.location == device_config.location
+        recordCounter = 1  # arbitrary value in range [0, 63]
+        status = 0
+        input_str = (
+            f"{data.speed[0]}{data.speed[1]}{data.speed[2]},"
+            f"{data.sonicTemperature},{status},{recordCounter}"
+        )
+        signature = common.sensor.compute_signature(input_str, ",")
+        reply = create_reply_dict(
+            sensor_name=data.sensorName,
+            additional_data=[
+                data.speed[0],
+                data.speed[1],
+                data.speed[2],
+                data.sonicTemperature,
+                status,
+                signature,
+            ],
+        )
+        mtt = MockTestTools()
+        mtt.check_csat3b_reply(reply=reply, name=sensor_name)
+
+    async def validate_windsonic_telemetry(
+        self, device_config: types.SimpleNamespace, sensor_name: str
+    ) -> None:
+        data = await self.remote.tel_airFlow.next(flush=False, timeout=STD_TIMEOUT)
+        assert data.location == device_config.location
+        # The check_windsonic_reply function in the ESS Common test utils only
+        # validates the speed and direction and not the other values.
+        reply = create_reply_dict(
+            sensor_name=data.sensorName,
+            additional_data=[data.speed, data.direction],
+        )
+        mtt = MockTestTools()
+        mtt.check_windsonic_reply(reply=reply, name=sensor_name)
+
+    async def validate_telemetry(self) -> None:
         for topic in (
             self.remote.tel_relativeHumidity,
             self.remote.tel_temperature,
@@ -220,103 +373,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
         for data_client in self.csc.data_clients:
             for sensor_name, device_config in data_client.device_configurations.items():
-                name = sensor_name
-                if device_config.sens_type == common.SensorType.TEMPERATURE:
-                    num_channels = device_config.num_channels
-                    topics_data = await self.next_data(
-                        topics=[self.remote.tel_temperature], sensor_name=sensor_name
-                    )
-                    data = topics_data["tel_temperature"]
-
-                    # First make sure that the temperature data contain the
-                    # expected number of NaN values.
-                    expected_num_nans = (
-                        len(data.temperature) - device_config.num_channels
-                    )
-                    nan_array = [np.nan] * expected_num_nans
-                    np.testing.assert_array_equal(
-                        nan_array, data.temperature[device_config.num_channels :]
-                    )
-
-                    # Next validate the rest of the data.
-                    assert data.numChannels == device_config.num_channels
-                    assert data.location == device_config.location
-                    reply = create_reply_dict(
-                        sensor_name=data.sensorName,
-                        additional_data=data.temperature[: device_config.num_channels],
-                    )
-                    mtt.check_temperature_reply(
-                        reply=reply, name=name, num_channels=num_channels
-                    )
-                elif device_config.sens_type == common.SensorType.HX85A:
-                    topics_data = await self.next_data(
-                        topics=[
-                            self.remote.tel_relativeHumidity,
-                            self.remote.tel_temperature,
-                            self.remote.tel_dewPoint,
-                        ],
-                        sensor_name=sensor_name,
-                    )
-                    reply = create_reply_dict(
-                        sensor_name=sensor_name,
-                        additional_data=[
-                            topics_data["tel_relativeHumidity"].relativeHumidity,
-                            topics_data["tel_temperature"].temperature[0],
-                            topics_data["tel_dewPoint"].dewPoint,
-                        ],
-                    )
-                    mtt.check_hx85a_reply(reply=reply, name=name)
-                elif device_config.sens_type == common.SensorType.HX85BA:
-                    topics_data = await self.next_data(
-                        topics=[
-                            self.remote.tel_relativeHumidity,
-                            self.remote.tel_temperature,
-                            self.remote.tel_pressure,
-                            self.remote.tel_dewPoint,
-                        ],
-                        sensor_name=sensor_name,
-                    )
-                    for attr_name in ("tel_temperature", "tel_pressure"):
-                        assert topics_data[attr_name].numChannels == 1
-                    reply = create_reply_dict(
-                        sensor_name=sensor_name,
-                        additional_data=[
-                            topics_data["tel_relativeHumidity"].relativeHumidity,
-                            topics_data["tel_temperature"].temperature[0],
-                            topics_data["tel_pressure"].pressure[0]
-                            / PASCALS_PER_MILLIBAR,
-                            topics_data["tel_dewPoint"].dewPoint,
-                        ],
-                    )
-                    mtt.check_hx85ba_reply(reply=reply, name=name)
-                elif device_config.sens_type == common.SensorType.CSAT3B:
-                    data = await self.remote.tel_airTurbulence.next(
-                        flush=False, timeout=STD_TIMEOUT
-                    )
-                    assert data.location == device_config.location
-                    recordCounter = 1  # arbitrary value in range [0, 63]
-                    status = 0
-                    input_str = (
-                        f"{data.speed[0]}{data.speed[1]}{data.speed[2]},"
-                        f"{data.sonicTemperature},{status},{recordCounter}"
-                    )
-                    signature = common.sensor.compute_signature(input_str, ",")
-                    reply = create_reply_dict(
-                        sensor_name=data.sensorName,
-                        additional_data=[
-                            data.speed[0],
-                            data.speed[1],
-                            data.speed[2],
-                            data.sonicTemperature,
-                            status,
-                            signature,
-                        ],
-                    )
-                    mtt.check_csat3b_reply(reply=reply, name=name)
-                else:
-                    raise ValueError(
-                        f"Unsupported sensor type {device_config.sens_type} encountered."
-                    )
+                func = self.validation_dispatch_dict[device_config.sens_type]
+                await func(device_config, sensor_name)
 
     async def test_receive_telemetry(self) -> None:
         logging.info("test_receive_telemetry")
@@ -327,7 +385,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             override="test_all_sensors.yaml",
         ):
             await self.assert_next_summary_state(salobj.State.ENABLED, timeout=2)
-            assert len(self.csc.data_clients) == 4
+            assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
                 assert isinstance(data_client, csc.RPiDataClient)
                 assert data_client.mock_server.connected
@@ -354,7 +412,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ):
             await self.assert_next_summary_state(salobj.State.ENABLED)
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
-            assert len(self.csc.data_clients) == 4
+            assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
                 assert data_client.mock_server.connected
 
@@ -383,7 +441,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             # Prevent one of the data_clients from connecting,
             # then try to enable the CSC.
-            assert len(self.csc.data_clients) == 4
+            assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
                 assert data_client.enable_mock_server
             self.csc.data_clients[1].enable_mock_server = False
@@ -436,29 +494,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.ConnectionLost
             )
-
-    def topic_callback(self, data: salobj.BaseMsgType, attr_name: str) -> None:
-        """Callback for read topics.
-
-        Assign to all topics for which you want to call next_data.
-
-        Parameters
-        ----------
-        data : `salobj.BaseMsgType`
-            Data from a topic. Must have a sensorName field.
-        attr_name : `str`
-            Topic attribute name.
-        """
-        attr_data = self.data_dict.get(attr_name)
-        if attr_data is None:
-            self.data_dict[attr_name] = {data.sensorName: {data.timestamp: data}}
-        else:
-            sensor_data = attr_data.get(data.sensorName)
-            if sensor_data is None:
-                attr_data[data.sensorName] = {data.timestamp: data}
-            else:
-                sensor_data[data.timestamp] = data
-        self.data_event.set()
 
     async def test_restart_csc(self) -> None:
         """The CSC should NOT fault when the CSC is set to STANDBY and then to
