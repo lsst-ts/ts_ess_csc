@@ -31,7 +31,7 @@ import yaml
 from lsst.ts import salobj
 from lsst.ts.ess import common
 
-from .air_turbulence_accumulator import AirTurbulenceAccumulator
+from ..accumulator import AirFlowAccumulator, AirTurbulenceAccumulator
 from .controller_data_client import ControllerDataClient
 
 PASCALS_PER_MILLIBAR = 100
@@ -65,6 +65,10 @@ class RPiDataClient(ControllerDataClient):
         # Array of NaNs used to initialize reported temperatures.
         num_temperatures = len(topics.tel_temperature.DataType().temperature)
         self.temperature_nans = [np.nan] * num_temperatures
+
+        # Cache of data maintained by process_windsonic_telemetry.
+        # a dict of sensor_name: AirFlowAccumulator.
+        self.air_flow_cache: dict[str, AirFlowAccumulator] = dict()
 
         # Cache of data maintained by process_csat3b_telemetry.
         # a dict of sensor_name: AirTurbulenceAccumulator.
@@ -107,7 +111,7 @@ properties:
           - HX85A
           - HX85BA
           - Temperature
-          - Wind
+          - Windsonic
         channels:
           description: Number of channels.
           type: integer
@@ -224,9 +228,9 @@ additionalProperties: false
         sensor_data : each of type `float`
             A Sequence of floats representing the sensor telemetry data:
 
-            * 0: relative humidity (%)
-            * 1: air temperature (C)
-            * 2: dew point (C)
+            * relative humidity (%)
+            * air temperature (C)
+            * dew point (C)
         """
         await self.write_humidity_etc(
             sensor_name=sensor_name,
@@ -261,10 +265,10 @@ additionalProperties: false
         sensor_data : each of type `float`
             A Sequence of floats representing the sensor telemetry data:
 
-            * 0: relative humidity (%)
-            * 1: air temperature (C)
-            * 2: air pressure (mbar)
-            * 3: dew point (C)
+            * relative humidity (%)
+            * air temperature (C)
+            * air pressure (mbar)
+            * dew point (C)
         """
         await self.write_humidity_etc(
             sensor_name=sensor_name,
@@ -402,10 +406,75 @@ additionalProperties: false
                 location=device_configuration.location,
             )
 
+    async def process_windsonic_telemetry(
+        self,
+        sensor_name: str,
+        timestamp: float,
+        response_code: int,
+        sensor_data: Sequence[float | int],
+    ) -> None:
+        """Process Gill Windsonic sensor telemetry.
+
+        Parameters
+        ----------
+        sensor_name : `str`
+            The name of the sensor.
+        timestamp : `float`
+            The timestamp of the data.
+        response_code : `int`
+            The ResponseCode
+        sensor_data : each of type `float`
+            A Sequence of floats representing the sensor telemetry data:
+
+            * wind speed (m/s)
+            * wind direction (deg)
+        """
+        device_configuration = self.device_configurations[sensor_name]
+
+        if sensor_name not in self.air_flow_cache:
+            self.air_flow_cache[sensor_name] = AirFlowAccumulator(
+                num_samples=device_configuration.num_samples
+            )
+        accumulator = self.air_flow_cache[sensor_name]
+
+        accumulator.add_sample(
+            timestamp=timestamp,
+            speed=sensor_data[0],
+            direction=int(sensor_data[1]),
+            isok=response_code == common.ResponseCode.OK,
+        )
+
+        topic_kwargs = accumulator.get_topic_kwargs()
+        if not topic_kwargs:
+            return
+
+        # TODO DM-37648: Remove these lines and use **topic_kwargs as soon as
+        #  ts_xml has been updated.
+        assert isinstance(topic_kwargs["direction"], float)
+        assert isinstance(topic_kwargs["directionStdDev"], float)
+        telemetry = {
+            "timestamp": topic_kwargs["timestamp"],
+            "direction": int(topic_kwargs["direction"]),
+            "directionStdDev": int(topic_kwargs["directionStdDev"]),
+            "speed": topic_kwargs["speed"],
+            "speedStdDev": topic_kwargs["speedStdDev"],
+            "maxSpeed": topic_kwargs["maxSpeed"],
+        }
+
+        await self.topics.tel_airFlow.set_write(
+            sensorName=sensor_name,
+            location=device_configuration.location,
+            **telemetry,
+        )
+        await self.topics.evt_sensorStatus.set_write(
+            sensorName=sensor_name, sensorStatus=0, serverStatus=response_code
+        )
+
     def get_telemetry_dispatch_dict(self) -> dict[str, Callable]:
         return {
             common.SensorType.TEMPERATURE: self.process_temperature_telemetry,
             common.SensorType.HX85A: self.process_hx85a_telemetry,
             common.SensorType.HX85BA: self.process_hx85ba_telemetry,
             common.SensorType.CSAT3B: self.process_csat3b_telemetry,
+            common.SensorType.WINDSONIC: self.process_windsonic_telemetry,
         }

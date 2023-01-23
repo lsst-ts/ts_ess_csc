@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["EssCsc"]
+__all__ = ["EssCsc", "run_ess_csc"]
 
 import asyncio
 import traceback
@@ -57,6 +57,10 @@ def get_task_index_exception(
             # so block type checking
             return (index, task.exception())  # type: ignore
     return (None, None)
+
+
+def run_ess_csc() -> None:
+    asyncio.run(EssCsc.amain(index=True))
 
 
 class EssCsc(salobj.ConfigurableCsc):

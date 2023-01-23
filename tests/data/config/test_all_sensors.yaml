@@ -39,6 +39,19 @@ instances:
               sensor_type: CSAT3B
               baud_rate: 115200
               location: Test4
-              # 4 samples is enough to compute standard deviation and
-              # to disambiguate the number of axes (3) from the number of samples
+              # 4 samples is enough to compute standard deviation and to
+              # disambiguate the number of axes (3) from the number of samples
+              num_samples: 4
+      - client_class: RPiDataClient
+        config:
+          host: 127.0.0.1
+          devices:
+            - name: EssWindsonic
+              device_type: FTDI
+              ftdi_id: ABC
+              sensor_type: Windsonic
+              baud_rate: 115200
+              location: Test5
+              # 4 samples is enough to compute standard deviation and to
+              # disambiguate the number of axes (3) from the number of samples
               num_samples: 4

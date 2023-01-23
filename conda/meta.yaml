@@ -9,8 +9,6 @@ source:
 build:
   noarch: generic
   script: {{ PYTHON }} -m pip install --no-deps --ignore-installed .
-  entry_points:
-    - run_ess_csc = lsst.ts.ess.csc.cli:execute_csc
   script_env:
     - PATH
     - LD_LIBRARY_PATH

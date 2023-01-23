@@ -19,28 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["get_median"]
-
-import numpy as np
-
-QUANTILE = [0.25, 0.5, 0.75]
-
-
-def get_median(data: np.ndarray, axis: int | None = None) -> float:
-    """Compute the median using quantiles and ignore the other return
-    values.
-
-    Parameters
-    ----------
-    data : `list` of `float`
-        The data to compute the median for.
-    axis : `int`
-        The axis of the data to use.
-
-    Returns
-    -------
-    median : `float`
-        The median.
-    """
-    _, median, _ = np.quantile(data, QUANTILE, axis=axis)
-    return median
+from .air_flow_accumulator import *
+from .air_turbulence_accumulator import *
+from .electric_field_strength_accumulator import *
+from .utils import *

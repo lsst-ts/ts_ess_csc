@@ -32,8 +32,8 @@ import yaml
 from lsst.ts import salobj, utils
 from lsst.ts.ess import common
 
+from ..accumulator import ElectricFieldStrengthAccumulator
 from .controller_data_client import ControllerDataClient
-from .electric_field_strength_accumulator import ElectricFieldStrengthAccumulator
 
 
 class LightningDataClient(ControllerDataClient):

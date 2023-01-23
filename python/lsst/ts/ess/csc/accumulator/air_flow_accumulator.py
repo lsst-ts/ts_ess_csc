@@ -19,17 +19,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["ElectricFieldStrengthAccumulator"]
+__all__ = ["AirFlowAccumulator"]
 
 import numpy as np
 
-from .utils import get_median
+from .utils import get_median_and_std_dev
 
 
-class ElectricFieldStrengthAccumulator:
-    """Accumulate electric field data from a detector.
+class AirFlowAccumulator:
+    """Accumulate air flow data from a 2-d anemometer.
 
-    This supports writing the electricFieldStrength telemetry topic,
+    This supports writing the airFlow telemetry topic,
     whose fields are statistics measured on a set of data.
 
     Parameters
@@ -43,8 +43,10 @@ class ElectricFieldStrengthAccumulator:
         The number of samples to read before producing aggregate data.
     timestamp : `list` of `float`
         List of timestamps (TAI unix seconds).
-    strength : `list` of `float`
-        List of electric field strength (kV / m).
+    speed : `list` of `float`
+        List of wind speed (m/s).
+    direction : `list` of `float`
+        List of wind direction (deg).
     num_bad_samples : `int`
         Number of invalid samples.
 
@@ -59,7 +61,7 @@ class ElectricFieldStrengthAccumulator:
 
     For each data sample read, call ``add_sample``.
     Then call `get_topic_kwargs``. If it returns a non-empty dict, write the
-    electricFieldStrength topic using the returned dict as keyword arguments.
+    airFlow topic using the returned dict as keyword arguments.
 
     ``get_topic_kwargs`` also clears the accumulated data,
     so you can repeat this indefinitely. You need not call ``clear``
@@ -81,18 +83,20 @@ class ElectricFieldStrengthAccumulator:
             raise ValueError(f"{num_samples=} must be > 1")
         self.num_samples = num_samples
         self.timestamp: list[float] = list()
-        self.strength: list[float] = list()
+        self.speed: list[float] = list()
+        self.direction: list[int] = list()
         self.num_bad_samples = 0
 
     @property
     def do_report(self) -> bool:
         """Do we have enough data to report good or bad data?"""
-        return max(len(self.strength), self.num_bad_samples) >= self.num_samples
+        return max(len(self.speed), self.num_bad_samples) >= self.num_samples
 
     def add_sample(
         self,
         timestamp: float,
-        strength: float,
+        speed: float,
+        direction: int,
         isok: bool,
     ) -> None:
         """Add a sample.
@@ -101,14 +105,17 @@ class ElectricFieldStrengthAccumulator:
         ----------
         timestamp : `float`
             Time at which data was taken (TAI unix seconds).
-        strength : `float`
-            Electric field strength (kV / m).
+        speed : `float`
+            Wind speed (m/s).
+        direction : `int`
+            Wind direction (deg).
         isok : `bool`
             Is the data valid?
         """
         if isok:
             self.timestamp.append(timestamp)
-            self.strength.append(strength)
+            self.speed.append(speed)
+            self.direction.append(direction)
         else:
             self.num_bad_samples += 1
 
@@ -119,7 +126,8 @@ class ElectricFieldStrengthAccumulator:
         so you typically will not have to.
         """
         self.timestamp = list()
-        self.strength = list()
+        self.speed = list()
+        self.direction = list()
         self.num_bad_samples = 0
 
     def get_topic_kwargs(self) -> dict[str, float | list[float] | bool]:
@@ -137,17 +145,20 @@ class ElectricFieldStrengthAccumulator:
             * strengthMax
         """
         timestamp = self.timestamp[-1]
-        if len(self.strength) >= self.num_samples:
+        if len(self.speed) >= self.num_samples:
             # Return good data
-            strength_arr = np.array(self.strength)
-            strength_median = get_median(data=strength_arr)
-            strength_std = np.std(strength_arr)
+            speed_arr = np.array(self.speed)
+            speed_median, speed_std = get_median_and_std_dev(data=speed_arr)
+            direction_arr = np.array(self.direction)
+            direction_median, direction_std = get_median_and_std_dev(data=direction_arr)
             self.clear()
             return dict(
                 timestamp=timestamp,
-                strength=strength_median,
-                strengthStdDev=strength_std,
-                strengthMax=np.max(strength_arr),
+                direction=direction_median,
+                directionStdDev=direction_std,
+                speed=speed_median,
+                speedStdDev=speed_std,
+                maxSpeed=np.max(speed_arr),
             )
 
         if self.num_bad_samples >= self.num_samples:
@@ -155,9 +166,11 @@ class ElectricFieldStrengthAccumulator:
             self.clear()
             return dict(
                 timestamp=timestamp,
-                strength=np.nan,
-                strengthStdDev=np.nan,
-                strengthMax=np.nan,
+                direction=-1,
+                directionStdDev=-1,
+                speed=np.nan,
+                speedStdDev=np.nan,
+                maxSpeed=np.nan,
             )
 
         return dict()
