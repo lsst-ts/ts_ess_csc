@@ -23,7 +23,7 @@ __all__ = ["ElectricFieldStrengthAccumulator"]
 
 import numpy as np
 
-from .utils import get_median
+from .utils import get_median_and_std_dev
 
 
 class ElectricFieldStrengthAccumulator:
@@ -140,8 +140,7 @@ class ElectricFieldStrengthAccumulator:
         if len(self.strength) >= self.num_samples:
             # Return good data
             strength_arr = np.array(self.strength)
-            strength_median = get_median(data=strength_arr)
-            strength_std = np.std(strength_arr)
+            strength_median, strength_std = get_median_and_std_dev(data=strength_arr)
             self.clear()
             return dict(
                 timestamp=timestamp,

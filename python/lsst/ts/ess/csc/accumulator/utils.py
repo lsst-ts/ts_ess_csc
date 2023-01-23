@@ -19,16 +19,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["get_median"]
+__all__ = ["get_median_and_std_dev"]
+
+from typing import Tuple
 
 import numpy as np
 
-QUANTILE = [0.25, 0.5, 0.75]
+_QUANTILE = [0.25, 0.5, 0.75]
+_STD_DEV_FACTOR = 0.741
 
 
-def get_median(data: np.ndarray, axis: int | None = None) -> float:
-    """Compute the median using quantiles and ignore the other return
-    values.
+def get_median_and_std_dev(
+    data: np.ndarray, axis: int | None = None
+) -> Tuple[float, float]:
+    """Compute the median and estimated standard deviation using quantiles.
 
     Parameters
     ----------
@@ -41,6 +45,9 @@ def get_median(data: np.ndarray, axis: int | None = None) -> float:
     -------
     median : `float`
         The median.
+    std_dev : `float`
+        Estimate of the standard deviation.
     """
-    _, median, _ = np.quantile(data, QUANTILE, axis=axis)
-    return median
+    q25, median, q75 = np.quantile(data, _QUANTILE, axis=axis)
+    std_dev = _STD_DEV_FACTOR * (q75 - q25)
+    return median, std_dev

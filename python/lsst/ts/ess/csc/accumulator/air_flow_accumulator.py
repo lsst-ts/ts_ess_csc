@@ -23,7 +23,7 @@ __all__ = ["AirFlowAccumulator"]
 
 import numpy as np
 
-from .utils import get_median
+from .utils import get_median_and_std_dev
 
 
 class AirFlowAccumulator:
@@ -148,11 +148,9 @@ class AirFlowAccumulator:
         if len(self.speed) >= self.num_samples:
             # Return good data
             speed_arr = np.array(self.speed)
-            speed_median = get_median(data=speed_arr)
-            speed_std = np.std(speed_arr)
+            speed_median, speed_std = get_median_and_std_dev(data=speed_arr)
             direction_arr = np.array(self.direction)
-            direction_median = int(get_median(data=direction_arr))
-            direction_std = int(np.std(direction_arr))
+            direction_median, direction_std = get_median_and_std_dev(data=direction_arr)
             self.clear()
             return dict(
                 timestamp=timestamp,

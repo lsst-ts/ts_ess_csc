@@ -26,7 +26,7 @@ from collections.abc import Sequence
 
 import numpy as np
 
-from .utils import get_median
+from .utils import get_median_and_std_dev
 
 
 class AirTurbulenceAccumulator:
@@ -158,12 +158,15 @@ class AirTurbulenceAccumulator:
             if len(self.speed) >= self.num_samples:
                 # Return good data
                 speed_arr = np.column_stack(self.speed)
-                speed_median_arr = get_median(data=speed_arr, axis=1)
-                speed_std_arr = np.std(speed_arr, axis=1)
+                speed_median_arr, speed_std_arr = get_median_and_std_dev(
+                    data=speed_arr, axis=1
+                )
                 magnitude_arr = np.linalg.norm(speed_arr, axis=1)
-                magnitude_median_arr = get_median(data=magnitude_arr)
+                magnitude_median_arr, _ = get_median_and_std_dev(data=magnitude_arr)
                 sonic_temperature_arr = np.array(self.sonic_temperature)
-                sonic_temperature_median_arr = get_median(data=sonic_temperature_arr)
+                sonic_temperature_median_arr, _ = get_median_and_std_dev(
+                    data=sonic_temperature_arr
+                )
                 self.clear()
                 dict_to_return = dict(
                     timestamp=timestamp,

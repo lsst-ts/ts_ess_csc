@@ -228,9 +228,9 @@ additionalProperties: false
         sensor_data : each of type `float`
             A Sequence of floats representing the sensor telemetry data:
 
-            * 0: relative humidity (%)
-            * 1: air temperature (C)
-            * 2: dew point (C)
+            * relative humidity (%)
+            * air temperature (C)
+            * dew point (C)
         """
         await self.write_humidity_etc(
             sensor_name=sensor_name,
@@ -265,10 +265,10 @@ additionalProperties: false
         sensor_data : each of type `float`
             A Sequence of floats representing the sensor telemetry data:
 
-            * 0: relative humidity (%)
-            * 1: air temperature (C)
-            * 2: air pressure (mbar)
-            * 3: dew point (C)
+            * relative humidity (%)
+            * air temperature (C)
+            * air pressure (mbar)
+            * dew point (C)
         """
         await self.write_humidity_etc(
             sensor_name=sensor_name,
@@ -426,8 +426,8 @@ additionalProperties: false
         sensor_data : each of type `float`
             A Sequence of floats representing the sensor telemetry data:
 
-            * 0: wind speed (m/s)
-            * 1: wind direction (deg)
+            * wind speed (m/s)
+            * wind direction (deg)
         """
         device_configuration = self.device_configurations[sensor_name]
 
@@ -448,10 +448,23 @@ additionalProperties: false
         if not topic_kwargs:
             return
 
+        # TODO DM-37648: Remove these lines and use **topic_kwargs as soon as
+        #  ts_xml has been updated.
+        assert isinstance(topic_kwargs["direction"], float)
+        assert isinstance(topic_kwargs["directionStdDev"], float)
+        telemetry = {
+            "timestamp": topic_kwargs["timestamp"],
+            "direction": int(topic_kwargs["direction"]),
+            "directionStdDev": int(topic_kwargs["directionStdDev"]),
+            "speed": topic_kwargs["speed"],
+            "speedStdDev": topic_kwargs["speedStdDev"],
+            "maxSpeed": topic_kwargs["maxSpeed"],
+        }
+
         await self.topics.tel_airFlow.set_write(
             sensorName=sensor_name,
             location=device_configuration.location,
-            **topic_kwargs,
+            **telemetry,
         )
         await self.topics.evt_sensorStatus.set_write(
             sensorName=sensor_name, sensorStatus=0, serverStatus=response_code
