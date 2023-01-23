@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["EssCsc"]
+__all__ = ["EssCsc", "run_ess_csc"]
 
 import asyncio
 import traceback
@@ -59,6 +59,10 @@ def get_task_index_exception(
     return (None, None)
 
 
+def run_ess_csc() -> None:
+    asyncio.run(EssCsc.amain(index=True))
+
+
 class EssCsc(salobj.ConfigurableCsc):
     """Upper level Commandable SAL Component for the Environmental Sensors
     Support.
@@ -85,7 +89,7 @@ class EssCsc(salobj.ConfigurableCsc):
     def __init__(
         self,
         index: int,
-        config_dir: str = None,
+        config_dir: str | None = None,
         initial_state: salobj.State = salobj.State.STANDBY,
         simulation_mode: int = 0,
         override: str = "",

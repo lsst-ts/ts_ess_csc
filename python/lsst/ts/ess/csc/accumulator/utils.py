@@ -19,12 +19,35 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["execute_csc"]
+__all__ = ["get_median_and_std_dev"]
 
-import asyncio
+from typing import Tuple
 
-from .ess_csc import EssCsc
+import numpy as np
+
+_QUANTILE = [0.25, 0.5, 0.75]
+_STD_DEV_FACTOR = 0.741
 
 
-def execute_csc() -> None:
-    asyncio.run(EssCsc.amain(index=True))
+def get_median_and_std_dev(
+    data: np.ndarray, axis: int | None = None
+) -> Tuple[float, float]:
+    """Compute the median and estimated standard deviation using quantiles.
+
+    Parameters
+    ----------
+    data : `list` of `float`
+        The data to compute the median for.
+    axis : `int`
+        The axis of the data to use.
+
+    Returns
+    -------
+    median : `float`
+        The median.
+    std_dev : `float`
+        Estimate of the standard deviation.
+    """
+    q25, median, q75 = np.quantile(data, _QUANTILE, axis=axis)
+    std_dev = _STD_DEV_FACTOR * (q75 - q25)
+    return median, std_dev
