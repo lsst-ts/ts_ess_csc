@@ -23,6 +23,7 @@ test:
     - ts-idl {{ idl_version }}
     - ts-salobj {{ salobj_version }}
     - ts-tcpip
+    - ts-utils
     - ts-ess-common
     - ts-dds
     - pyserial
