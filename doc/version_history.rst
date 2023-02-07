@@ -6,6 +6,24 @@
 Version History
 ###############
 
+v0.14.1
+=======
+
+* Fix NaN to int conversion in Windsonic anemometer telemetry handling.
+* Fix invalid config schema for lightning sensors.
+* Decrease safe_interval default value because it clashed with communication timeout value.
+* Add check for number of elements in timestamp list in ElectricFieldStrengthAccumulator class.
+* Improve logging of lightning sensors telemetry handling.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 14
+* ts_ess_common 0.11
+* ts_tcpip
+* ts_utils 1.0
+
 v0.14.0
 =======
 
@@ -21,7 +39,7 @@ Requires:
 * ts_salobj 7
 * ts_idl 3.7
 * IDL file for ESS from ts_xml 14
-* ts_ess_common 0.10
+* ts_ess_common 0.11
 * ts_tcpip
 * ts_utils 1.0
 
