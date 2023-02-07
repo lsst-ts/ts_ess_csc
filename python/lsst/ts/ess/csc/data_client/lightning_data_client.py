@@ -165,7 +165,6 @@ properties:
       required:
         - name
         - sensor_type
-        - ftdi_id
         - baud_rate
         - safe_interval
 required:
