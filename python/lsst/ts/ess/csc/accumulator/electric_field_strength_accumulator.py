@@ -136,27 +136,30 @@ class ElectricFieldStrengthAccumulator:
             * strengthStdDev
             * strengthMax
         """
-        timestamp = self.timestamp[-1]
-        if len(self.strength) >= self.num_samples:
-            # Return good data
-            strength_arr = np.array(self.strength)
-            strength_median, strength_std = get_median_and_std_dev(data=strength_arr)
-            self.clear()
-            return dict(
-                timestamp=timestamp,
-                strength=strength_median,
-                strengthStdDev=strength_std,
-                strengthMax=np.max(strength_arr),
-            )
+        if len(self.timestamp) > 0:
+            timestamp = self.timestamp[-1]
+            if len(self.strength) >= self.num_samples:
+                # Return good data
+                strength_arr = np.array(self.strength)
+                strength_median, strength_std = get_median_and_std_dev(
+                    data=strength_arr
+                )
+                self.clear()
+                return dict(
+                    timestamp=timestamp,
+                    strength=strength_median,
+                    strengthStdDev=strength_std,
+                    strengthMax=np.max(strength_arr),
+                )
 
-        if self.num_bad_samples >= self.num_samples:
-            # Return bad data
-            self.clear()
-            return dict(
-                timestamp=timestamp,
-                strength=np.nan,
-                strengthStdDev=np.nan,
-                strengthMax=np.nan,
-            )
+            if self.num_bad_samples >= self.num_samples:
+                # Return bad data
+                self.clear()
+                return dict(
+                    timestamp=timestamp,
+                    strength=np.nan,
+                    strengthStdDev=np.nan,
+                    strengthMax=np.nan,
+                )
 
         return dict()
