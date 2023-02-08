@@ -136,7 +136,7 @@ properties:
             no lightning strikes or high electric field have been detected
             anymore.
           type: integer
-          default: 60
+          default: 10
         num_samples:
           description: >-
             Number of samples per telemetry sample. Only relevant for
