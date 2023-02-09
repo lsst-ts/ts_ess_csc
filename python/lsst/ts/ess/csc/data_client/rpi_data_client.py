@@ -437,10 +437,16 @@ additionalProperties: false
             )
         accumulator = self.air_flow_cache[sensor_name]
 
+        # TODO DM-37648: Remove these lines as soon as ts_xml has been updated.
+        if np.isnan(sensor_data[1]):
+            direction = -1
+        else:
+            direction = int(sensor_data[1])
+
         accumulator.add_sample(
             timestamp=timestamp,
             speed=sensor_data[0],
-            direction=int(sensor_data[1]),
+            direction=direction,
             isok=response_code == common.ResponseCode.OK,
         )
 

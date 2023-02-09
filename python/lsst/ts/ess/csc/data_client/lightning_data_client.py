@@ -136,7 +136,7 @@ properties:
             no lightning strikes or high electric field have been detected
             anymore.
           type: integer
-          default: 60
+          default: 10
         num_samples:
           description: >-
             Number of samples per telemetry sample. Only relevant for
@@ -165,7 +165,6 @@ properties:
       required:
         - name
         - sensor_type
-        - ftdi_id
         - baud_rate
         - safe_interval
 required:
@@ -223,16 +222,21 @@ additionalProperties: false
             self.high_electric_field_timer_task = asyncio.create_task(
                 self.sleep_timer(device_configuration.safe_interval)
             )
+            self.log.debug("Sending the evt_highElectricField event.")
             await self.topics.evt_highElectricField.set_write(
                 sensorName=sensor_name,
                 strength=device_configuration.threshold,
             )
         else:
             if self.high_electric_field_timer_task.done():
+                self.log.debug("Sending the evt_highElectricField event.")
                 await self.topics.evt_highElectricField.set_write(
                     sensorName=sensor_name,
                     strength=np.nan,
                 )
+        self.log.debug(
+            "Sending the tel_electricFieldStrength telemetry and evt_sensorStatus event."
+        )
         await self.topics.tel_electricFieldStrength.set_write(
             sensorName=sensor_name,
             **topic_kwargs,
@@ -310,11 +314,12 @@ additionalProperties: false
         self.strike_timer_task = asyncio.create_task(
             self.sleep_timer(device_configuration.safe_interval)
         )
+        # TODO DM-37648: Remove cast to int as soon as ts_xml has been updated.
         await self.topics.evt_lightningStrike.set_write(
             sensorName=sensor_name,
             correctedDistance=sensor_data[1],
             uncorrectedDistance=sensor_data[2],
-            bearing=sensor_data[3],
+            bearing=int(sensor_data[3]),
         )
 
     async def process_ld250_noise_or_status(
