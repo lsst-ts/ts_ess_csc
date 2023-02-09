@@ -222,16 +222,21 @@ additionalProperties: false
             self.high_electric_field_timer_task = asyncio.create_task(
                 self.sleep_timer(device_configuration.safe_interval)
             )
+            self.log.debug("Sending the evt_highElectricField event.")
             await self.topics.evt_highElectricField.set_write(
                 sensorName=sensor_name,
                 strength=device_configuration.threshold,
             )
         else:
             if self.high_electric_field_timer_task.done():
+                self.log.debug("Sending the evt_highElectricField event.")
                 await self.topics.evt_highElectricField.set_write(
                     sensorName=sensor_name,
                     strength=np.nan,
                 )
+        self.log.debug(
+            "Sending the tel_electricFieldStrength telemetry and evt_sensorStatus event."
+        )
         await self.topics.tel_electricFieldStrength.set_write(
             sensorName=sensor_name,
             **topic_kwargs,

@@ -266,20 +266,20 @@ class ControllerDataClient(common.BaseDataClient):
                 if common.Key.RESPONSE in data:
                     self.log.warning("Read a command response with no command pending")
                 elif common.Key.TELEMETRY in data:
-                    self.log.debug(f"Processing data {data}")
+                    self.log.debug(f"Processing {data=!s}")
                     try:
                         validator.validate(data)
-                    except Exception as e:
-                        raise RuntimeError(e)
-                    telemetry_data = data[common.Key.TELEMETRY]
-                    await self.process_telemetry(
-                        sensor_name=telemetry_data[common.Key.NAME],
-                        timestamp=telemetry_data[common.Key.TIMESTAMP],
-                        response_code=telemetry_data[common.Key.RESPONSE_CODE],
-                        sensor_data=telemetry_data[common.Key.SENSOR_TELEMETRY],
-                    )
+                        telemetry_data = data[common.Key.TELEMETRY]
+                        await self.process_telemetry(
+                            sensor_name=telemetry_data[common.Key.NAME],
+                            timestamp=telemetry_data[common.Key.TIMESTAMP],
+                            response_code=telemetry_data[common.Key.RESPONSE_CODE],
+                            sensor_data=telemetry_data[common.Key.SENSOR_TELEMETRY],
+                        )
+                    except Exception:
+                        self.log.exception(f"Exception processing {data=!s}. Ignoring.")
                 else:
-                    self.log.warning(f"Ignoring unparsable data: {data}.")
+                    self.log.warning(f"Ignoring unparsable {data=!s}.")
 
             except asyncio.CancelledError:
                 self.log.debug("read_loop cancelled")
@@ -296,7 +296,7 @@ class ControllerDataClient(common.BaseDataClient):
                     )
                     raise
             except RuntimeError as e:
-                self.log.error(f"read_loop failed: {e}")
+                self.log.exception(f"read_loop failed: {e}")
                 raise
             except Exception:
                 self.log.exception("read_loop failed")
