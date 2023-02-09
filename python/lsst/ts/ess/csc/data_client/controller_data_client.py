@@ -296,7 +296,7 @@ class ControllerDataClient(common.BaseDataClient):
                     )
                     raise
             except RuntimeError as e:
-                self.log.error(f"read_loop failed: {e}")
+                self.log.exception(f"read_loop failed: {e}")
                 raise
             except Exception:
                 self.log.exception("read_loop failed")
