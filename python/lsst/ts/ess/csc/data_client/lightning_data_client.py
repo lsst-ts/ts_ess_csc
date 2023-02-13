@@ -314,12 +314,11 @@ additionalProperties: false
         self.strike_timer_task = asyncio.create_task(
             self.sleep_timer(device_configuration.safe_interval)
         )
-        # TODO DM-37648: Remove cast to int as soon as ts_xml has been updated.
         await self.topics.evt_lightningStrike.set_write(
             sensorName=sensor_name,
             correctedDistance=sensor_data[1],
             uncorrectedDistance=sensor_data[2],
-            bearing=int(sensor_data[3]),
+            bearing=sensor_data[3],
         )
 
     async def process_ld250_noise_or_status(
