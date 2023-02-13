@@ -101,7 +101,6 @@ pipeline {
                 withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
                         source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
-                        pip install --ignore-installed -e .
                         setup -r .
                         pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT_PATH}
                     """
