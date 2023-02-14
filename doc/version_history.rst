@@ -11,6 +11,8 @@ v0.14.2
 
 * Remove cast to int for lightning strike bearing and wind direction standard deviation.
 * Add a unit test function to check Windsonic telemetry because the one in ts_ess_common is invalid for the telemetry.
+* Clean up pyproject.toml dependencies.
+* Remove `pip install` step since the dependencies were added to ts-develop.
 
 Requires:
 
