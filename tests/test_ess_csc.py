@@ -346,6 +346,36 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         mtt = MockTestTools()
         mtt.check_csat3b_reply(reply=reply, name=sensor_name)
 
+    def check_windsonic_telemetry(
+        self,
+        reply: common.test_utils.SensorReply,
+        name: str,
+        num_channels: int = 0,
+        disconnected_channel: int = -1,
+        missed_channels: int = 0,
+        in_error_state: bool = False,
+    ) -> None:
+        device_name = reply["name"]
+        time = float(reply["timestamp"])
+        response_code = reply["response_code"]
+        resp: list[float | int] = []
+        assert len(reply["sensor_telemetry"]) == 2
+        assert isinstance(reply["sensor_telemetry"][0], float)
+        assert isinstance(reply["sensor_telemetry"][1], float)
+        for value in reply["sensor_telemetry"]:
+            resp.append(value)
+
+        assert name == device_name
+        assert time > 0
+        if in_error_state:
+            assert common.ResponseCode.DEVICE_READ_ERROR == response_code
+        else:
+            assert common.ResponseCode.OK == response_code
+        assert common.device.MockWindSpeedConfig.min <= resp[0]
+        assert resp[0] <= common.device.MockWindSpeedConfig.max
+        assert common.device.MockDirectionConfig.min <= resp[1]
+        assert resp[1] <= common.device.MockDirectionConfig.max
+
     async def validate_windsonic_telemetry(
         self, device_config: types.SimpleNamespace, sensor_name: str
     ) -> None:
@@ -357,8 +387,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             sensor_name=data.sensorName,
             additional_data=[data.speed, data.direction],
         )
-        mtt = MockTestTools()
-        mtt.check_windsonic_reply(reply=reply, name=sensor_name)
+        self.check_windsonic_telemetry(reply=reply, name=sensor_name)
 
     async def validate_telemetry(self) -> None:
         for topic in (

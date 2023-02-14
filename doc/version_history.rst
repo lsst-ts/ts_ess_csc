@@ -6,6 +6,23 @@
 Version History
 ###############
 
+v0.14.2
+=======
+
+* Remove cast to int for lightning strike bearing and wind direction standard deviation.
+* Add a unit test function to check Windsonic telemetry because the one in ts_ess_common is invalid for the telemetry.
+* Clean up pyproject.toml dependencies.
+* Remove `pip install` step since the dependencies were added to ts-develop.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 14
+* ts_ess_common 0.11
+* ts_tcpip
+* ts_utils 1.0
+
 v0.14.1
 =======
 

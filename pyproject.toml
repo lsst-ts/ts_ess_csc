@@ -46,9 +46,4 @@ exclude = "version.py"
 profile = "black"
 
 [project.optional-dependencies]
-dev = [
-    "documenteer[pipelines]",
-    "pyserial",
-    "pyftdi",
-    "pylibftdi"
-]
+dev = [ "documenteer[pipelines]" ]

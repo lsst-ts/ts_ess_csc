@@ -437,7 +437,6 @@ additionalProperties: false
             )
         accumulator = self.air_flow_cache[sensor_name]
 
-        # TODO DM-37648: Remove these lines as soon as ts_xml has been updated.
         if np.isnan(sensor_data[1]):
             direction = -1
         else:
@@ -454,23 +453,10 @@ additionalProperties: false
         if not topic_kwargs:
             return
 
-        # TODO DM-37648: Remove these lines and use **topic_kwargs as soon as
-        #  ts_xml has been updated.
-        assert isinstance(topic_kwargs["direction"], float)
-        assert isinstance(topic_kwargs["directionStdDev"], float)
-        telemetry = {
-            "timestamp": topic_kwargs["timestamp"],
-            "direction": int(topic_kwargs["direction"]),
-            "directionStdDev": int(topic_kwargs["directionStdDev"]),
-            "speed": topic_kwargs["speed"],
-            "speedStdDev": topic_kwargs["speedStdDev"],
-            "maxSpeed": topic_kwargs["maxSpeed"],
-        }
-
         await self.topics.tel_airFlow.set_write(
             sensorName=sensor_name,
             location=device_configuration.location,
-            **telemetry,
+            **topic_kwargs,
         )
         await self.topics.evt_sensorStatus.set_write(
             sensorName=sensor_name, sensorStatus=0, serverStatus=response_code
