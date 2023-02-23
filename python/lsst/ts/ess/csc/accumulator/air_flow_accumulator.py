@@ -136,13 +136,16 @@ class AirFlowAccumulator:
         Returns
         -------
         topic_kwargs : `dict` [`str`, `float`]
-            Data for the electricFieldStrength telemetry topic as a keyword,
+            Data for the airFlow telemetry topic as a keyword,
             arguments, or an empty dict if there are not enough samples yet.
             A dict with data will have these keys:
 
-            * strength
-            * strengthStdDev
-            * strengthMax
+            * timestamp
+            * direction
+            * directionStdDev
+            * speed
+            * speedStdDev
+            * maxSpeed
         """
         timestamp = self.timestamp[-1]
         if len(self.speed) >= self.num_samples:

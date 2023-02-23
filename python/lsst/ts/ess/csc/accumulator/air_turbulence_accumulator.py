@@ -143,9 +143,13 @@ class AirTurbulenceAccumulator:
             arguments, or an empty dict if there are not enough samples yet.
             A dict with data will have these keys:
 
-            * ux, uy, uz
-            * uxStdDev, uyStdDev, uzStdDev
-            * magnitude, maximumMagnitude
+            * timestamp
+            * speed
+            * speedStdDev
+            * speedMagnitude
+            * speedMaxMagnitude
+            * sonicTemperature
+            * sonicTemperatureStdDev
         """
         timestamp = self.timestamp[-1]
         dict_to_return = dict()
