@@ -437,15 +437,10 @@ additionalProperties: false
             )
         accumulator = self.air_flow_cache[sensor_name]
 
-        if np.isnan(sensor_data[1]):
-            direction = -1
-        else:
-            direction = int(sensor_data[1])
-
         accumulator.add_sample(
             timestamp=timestamp,
             speed=sensor_data[0],
-            direction=direction,
+            direction=sensor_data[1],
             isok=response_code == common.ResponseCode.OK,
         )
 
