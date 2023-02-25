@@ -25,7 +25,7 @@ import math
 
 import numpy as np
 
-from .utils import get_median_and_std_dev
+from .utils import get_circular_mean_and_std_dev, get_median_and_std_dev
 
 
 # TODO DM-38119: delete this function and stop using it once the data type of
@@ -34,7 +34,7 @@ def float_as_int(value: float, nan_value: int = -1) -> int:
     """Cast a float value to int, returning nan_value for a NaN."""
     if math.isnan(value):
         return nan_value
-    return int(value)
+    return int(round(value))
 
 
 class AirFlowAccumulator:
@@ -160,17 +160,16 @@ class AirFlowAccumulator:
         """
         timestamp = self.timestamp[-1]
         if len(self.speed) >= self.num_samples:
-            # Return good data
+            direction_arr = np.array(self.direction)
+            direction_mean, direction_std = get_circular_mean_and_std_dev(direction_arr)
             speed_arr = np.array(self.speed)
             speed_median, speed_std = get_median_and_std_dev(data=speed_arr)
-            direction_arr = np.array(self.direction)
-            direction_median, direction_std = get_median_and_std_dev(data=direction_arr)
             self.clear()
             return dict(
                 timestamp=timestamp,
                 # TODO DM-38119: delete float_as_int once the data type of
                 # direction and directionStdDev is float.
-                direction=float_as_int(direction_median),
+                direction=float_as_int(direction_mean),
                 directionStdDev=float_as_int(direction_std),
                 speed=speed_median,
                 speedStdDev=speed_std,
