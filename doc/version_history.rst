@@ -6,6 +6,23 @@
 Version History
 ###############
 
+v0.15.0
+=======
+
+* Bug fix: reported airFlow direction and directionStdDev did not handle wraparound correctly.
+  Use circular statistics instead of standard statistics.
+* Add get_circular_mean_and_std_dev function.
+* Add Young32400WeatherStationDataClient.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 14
+* ts_ess_common 0.11
+* ts_tcpip
+* ts_utils 1.0
+
 v0.14.2
 =======
 
