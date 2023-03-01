@@ -100,7 +100,8 @@ class FloatAccumulator:
         """
         self.values.append(value)
         if len(self.values) >= self.num_samples:
-            median = np.median(self.values)
+            # The explicit cast to float is needed by mypy
+            median = float(np.median(self.values))
             self.clear()
             return median
         return None
@@ -212,7 +213,7 @@ class Young32400WeatherStationDataClient(common.BaseDataClient):
         )
 
         self.air_flow_accumulator = AirFlowAccumulator(
-            num_samples=self.config.num_samples_airflow
+            log=self.log, num_samples=self.config.num_samples_airflow
         )
 
         self.humidity_accumulator = FloatAccumulator(

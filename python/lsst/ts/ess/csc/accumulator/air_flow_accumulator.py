@@ -21,7 +21,9 @@
 
 __all__ = ["AirFlowAccumulator"]
 
+import logging
 import math
+from typing import Any
 
 import numpy as np
 
@@ -89,9 +91,10 @@ class AirFlowAccumulator:
     Note that the accumulated good data will be lost.
     """
 
-    def __init__(self, num_samples: int) -> None:
+    def __init__(self, log: logging.Logger, num_samples: int) -> None:
         if num_samples < 2:
             raise ValueError(f"{num_samples=} must be > 1")
+        self.log = log.getChild(type(self).__name__)
         self.num_samples = num_samples
         self.timestamp: list[float] = list()
         self.speed: list[float] = list()
@@ -158,34 +161,40 @@ class AirFlowAccumulator:
             * speedStdDev
             * maxSpeed
         """
-        timestamp = self.timestamp[-1]
-        if len(self.speed) >= self.num_samples:
-            direction_arr = np.array(self.direction)
-            direction_mean, direction_std = get_circular_mean_and_std_dev(direction_arr)
-            speed_arr = np.array(self.speed)
-            speed_median, speed_std = get_median_and_std_dev(data=speed_arr)
-            self.clear()
-            return dict(
-                timestamp=timestamp,
-                # TODO DM-38119: delete float_as_int once the data type of
-                # direction and directionStdDev is float.
-                direction=float_as_int(direction_mean),
-                directionStdDev=float_as_int(direction_std),
-                speed=speed_median,
-                speedStdDev=speed_std,
-                maxSpeed=np.max(speed_arr),
-            )
+        dict_to_return: dict[str, Any] = dict()
+        try:
+            timestamp = self.timestamp[-1]
+            if len(self.speed) >= self.num_samples:
+                direction_arr = np.array(self.direction)
+                direction_mean, direction_std = get_circular_mean_and_std_dev(
+                    direction_arr
+                )
+                speed_arr = np.array(self.speed)
+                speed_median, speed_std = get_median_and_std_dev(data=speed_arr)
+                dict_to_return = dict(
+                    timestamp=timestamp,
+                    # TODO DM-38119: delete float_as_int once the data type of
+                    # direction and directionStdDev is float.
+                    direction=float_as_int(direction_mean),
+                    directionStdDev=float_as_int(direction_std),
+                    speed=float(speed_median),
+                    speedStdDev=float(speed_std),
+                    maxSpeed=np.max(speed_arr),
+                )
+                self.clear()
 
-        if self.num_bad_samples >= self.num_samples:
-            # Return bad data
-            self.clear()
-            return dict(
-                timestamp=timestamp,
-                direction=-1,
-                directionStdDev=-1,
-                speed=np.nan,
-                speedStdDev=np.nan,
-                maxSpeed=np.nan,
-            )
-
-        return dict()
+            elif self.num_bad_samples >= self.num_samples:
+                # Return bad data
+                dict_to_return = dict(
+                    timestamp=timestamp,
+                    direction=-1,
+                    directionStdDev=-1,
+                    speed=np.nan,
+                    speedStdDev=np.nan,
+                    maxSpeed=np.nan,
+                )
+                self.clear()
+            return dict_to_return
+        except Exception as e:
+            self.log.exception(f"Error parsing sensor data: {e!r}")
+            raise
