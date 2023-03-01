@@ -23,6 +23,7 @@ __all__ = ["AirTurbulenceAccumulator"]
 
 import logging
 from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 
@@ -152,12 +153,7 @@ class AirTurbulenceAccumulator:
             * sonicTemperatureStdDev
         """
         timestamp = self.timestamp[-1]
-        dict_to_return = dict()
-
-        self.log.debug(
-            f"{len(self.speed)=!s}, {self.num_bad_samples=!s}, {self.num_samples}"
-        )
-
+        dict_to_return: dict[str, Any] = dict()
         try:
             if len(self.speed) >= self.num_samples:
                 # Return good data
@@ -166,24 +162,23 @@ class AirTurbulenceAccumulator:
                     data=speed_arr, axis=1
                 )
                 magnitude_arr = np.linalg.norm(speed_arr, axis=1)
-                magnitude_median_arr, _ = get_median_and_std_dev(data=magnitude_arr)
-                sonic_temperature_arr = np.array(self.sonic_temperature)
-                sonic_temperature_median_arr, _ = get_median_and_std_dev(
-                    data=sonic_temperature_arr
-                )
-                self.clear()
+                magnitude_median_arr = np.median(magnitude_arr)
+                (
+                    sonic_temperature_median,
+                    sonic_temperature_std,
+                ) = get_median_and_std_dev(self.sonic_temperature)
                 dict_to_return = dict(
                     timestamp=timestamp,
                     speed=speed_median_arr,
                     speedStdDev=speed_std_arr,
                     speedMagnitude=magnitude_median_arr,
                     speedMaxMagnitude=np.max(magnitude_arr),
-                    sonicTemperature=sonic_temperature_median_arr,
-                    sonicTemperatureStdDev=np.std(sonic_temperature_arr),
+                    sonicTemperature=sonic_temperature_median,
+                    sonicTemperatureStdDev=sonic_temperature_std,
                 )
+                self.clear()
             elif self.num_bad_samples >= self.num_samples:
                 # Return bad data
-                self.clear()
                 dict_to_return = dict(
                     timestamp=timestamp,
                     speed=[np.nan] * 3,
@@ -193,8 +188,9 @@ class AirTurbulenceAccumulator:
                     sonicTemperature=np.nan,
                     sonicTemperatureStdDev=np.nan,
                 )
-        except Exception:
-            self.log.exception("Error parsing sensor data.")
+        except Exception as e:
+            self.log.exception(f"Error parsing sensor data: {e!r}")
+            raise
 
         self.log.debug(f"Returning {dict_to_return=!s}")
         return dict_to_return

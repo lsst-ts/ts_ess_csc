@@ -109,7 +109,6 @@ class EssCsc(salobj.ConfigurableCsc):
             simulation_mode=simulation_mode,
             override=override,
         )
-        self.log.info("ESS CSC created.")
 
     async def begin_enable(self, data: salobj.BaseDdsDataType) -> None:
         """Begin do_enable; called before state changes.

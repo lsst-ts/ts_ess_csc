@@ -11,8 +11,10 @@ v0.15.0
 
 * Bug fix: reported airFlow direction and directionStdDev did not handle wraparound correctly.
   Use circular statistics instead of standard statistics.
-* Add get_circular_mean_and_std_dev function.
-* Add Young32400WeatherStationDataClient.
+* `AirFlowAccumulator`: add a ``log`` attribute, making it more like `AirTurbulenceAccumulator`.
+* Add `get_circular_mean_and_std_dev` function.
+* Add `Young32400WeatherStationDataClient`.
+* Improve type annotation of get_median_and_std_dev.
 
 Requires:
 
