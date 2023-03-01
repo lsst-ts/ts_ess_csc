@@ -23,15 +23,15 @@ __all__ = ["get_circular_mean_and_std_dev", "get_median_and_std_dev"]
 
 import cmath
 import math
-from typing import Tuple
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 _QUANTILE = [0.25, 0.5, 0.75]
 _STD_DEV_FACTOR = 0.741
 
 
-def get_circular_mean_and_std_dev(angles: np.ndarray) -> Tuple[float, float]:
+def get_circular_mean_and_std_dev(angles: np.ndarray) -> tuple[float, float]:
     """Compute the circular mean and circcular standard deviation
     of an array of angles in degrees.
 
@@ -58,8 +58,8 @@ def get_circular_mean_and_std_dev(angles: np.ndarray) -> Tuple[float, float]:
 
 
 def get_median_and_std_dev(
-    data: np.ndarray, axis: int | None = None
-) -> Tuple[float, float]:
+    data: ArrayLike, axis: int | None = None
+) -> tuple[np.ndarray, np.ndarray] | tuple[float, float]:
     """Compute the median and estimated standard deviation using quantiles.
 
     Parameters

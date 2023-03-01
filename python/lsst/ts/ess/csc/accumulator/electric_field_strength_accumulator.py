@@ -147,8 +147,8 @@ class ElectricFieldStrengthAccumulator:
                 self.clear()
                 return dict(
                     timestamp=timestamp,
-                    strength=strength_median,
-                    strengthStdDev=strength_std,
+                    strength=float(strength_median),
+                    strengthStdDev=float(strength_std),
                     strengthMax=np.max(strength_arr),
                 )
 

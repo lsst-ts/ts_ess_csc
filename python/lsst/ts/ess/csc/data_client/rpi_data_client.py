@@ -433,7 +433,7 @@ additionalProperties: false
 
         if sensor_name not in self.air_flow_cache:
             self.air_flow_cache[sensor_name] = AirFlowAccumulator(
-                num_samples=device_configuration.num_samples
+                log=self.log, num_samples=device_configuration.num_samples
             )
         accumulator = self.air_flow_cache[sensor_name]
 
