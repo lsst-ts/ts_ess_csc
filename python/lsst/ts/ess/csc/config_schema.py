@@ -28,8 +28,8 @@ CONFIG_SCHEMA = yaml.safe_load(
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_ess/blob/main/python/lsst/ts/ess/csc/config_schema.py
 # title must end with one or more spaces followed by the schema version, which must begin with "v"
-title: ESS v3
-description: Schema for ESS configuration
+title: ESS v4
+description: Schema for ESS configuration.
 type: object
 properties:
   instances:
