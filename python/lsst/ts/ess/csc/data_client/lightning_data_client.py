@@ -94,7 +94,7 @@ class LightningDataClient(ControllerDataClient):
         return yaml.safe_load(
             """
 $schema: http://json-schema.org/draft-07/schema#
-description: Schema for RPiDataClient
+description: Schema for LightningDataClient.
 type: object
 properties:
   host:
@@ -130,6 +130,9 @@ properties:
           description: Baud rate of the sensor.
           type: integer
           default: 19200
+        location:
+          description: Sensor location (used for all telemetry topics).
+          type: string
         safe_interval:
           description: >-
             The amount of time [s] after which an event is sent informing that
@@ -167,6 +170,7 @@ properties:
         - sensor_type
         - baud_rate
         - safe_interval
+        - location
 required:
   - host
   - port
@@ -214,6 +218,8 @@ additionalProperties: false
         topic_kwargs = accumulator.get_topic_kwargs()
         if not topic_kwargs:
             return
+
+        topic_kwargs["location"] = device_configuration.location
 
         if np.abs(topic_kwargs["strengthMax"]) > device_configuration.threshold:
             if not self.high_electric_field_timer_task.done():
@@ -328,6 +334,7 @@ additionalProperties: false
         response_code: int,
         sensor_data: Sequence[float | str | int],
     ) -> None:
+        device_configuration = self.device_configurations[sensor_name]
         isok = response_code == 0
         sensor_status = 0
 
@@ -354,6 +361,7 @@ additionalProperties: false
             closeAlarmStatus=close_alarm_status,
             severeAlarmStatus=severe_alarm_status,
             heading=heading,
+            location=device_configuration.location,
         )
         await self.topics.evt_sensorStatus.set_write(
             sensorName=sensor_name,

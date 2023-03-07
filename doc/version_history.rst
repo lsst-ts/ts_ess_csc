@@ -14,6 +14,8 @@ v0.15.0
 * `AirFlowAccumulator`: add a ``log`` attribute, making it more like `AirTurbulenceAccumulator`.
 * Add `get_circular_mean_and_std_dev` function.
 * Add `Young32400WeatherStationDataClient`.
+* Add `SiglentSsa3000xSpectrumAnalyzerDataClient`.
+* Add location to lightning sensors telemetry.
 * Improve type annotation of get_median_and_std_dev.
 
 Requires:

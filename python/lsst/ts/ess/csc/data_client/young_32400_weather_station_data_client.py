@@ -259,7 +259,7 @@ class Young32400WeatherStationDataClient(common.BaseDataClient):
         return yaml.safe_load(
             """
 $schema: http://json-schema.org/draft-07/schema#
-description: Schema for RPiDataClient
+description: Schema for Young32400WeatherStationDataClient.
 type: object
 properties:
   host:

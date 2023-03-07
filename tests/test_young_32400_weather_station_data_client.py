@@ -46,7 +46,7 @@ STD_TIMEOUT = 5
 LONG_TIMEOUT = 30
 
 
-class DataClientTestCase(unittest.IsolatedAsyncioTestCase):
+class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         salobj.set_random_lsst_dds_partition_prefix()
         config_schema = csc.Young32400WeatherStationDataClient.get_config_schema()
