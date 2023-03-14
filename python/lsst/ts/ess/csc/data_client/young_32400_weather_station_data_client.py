@@ -269,7 +269,7 @@ properties:
   port:
     description: Port number of the TCP/IP interface.
     type: integer
-    default: 5000
+    default: 4001
   connect_timeout:
     description: Timeout for connecting to the weather station (sec).
     type: number
@@ -412,7 +412,9 @@ additionalProperties: false
         await self.disconnect()
 
         if self.simulation_mode == 0:
-            self.client = tcpip.Client(host=self.config.host, port=self.config.port)
+            self.client = tcpip.Client(
+                host=self.config.host, port=self.config.port, log=self.log
+            )
             await asyncio.wait_for(self.client.start_task, self.config.connect_timeout)
         else:
             self.log.info(
@@ -583,7 +585,7 @@ additionalProperties: false
                 if self.simulation_mode == 0:
                     assert self.client is not None  # make mypy happy
                     read_bytes = await asyncio.wait_for(
-                        self.client.read_until(TERMINATOR),
+                        self.client.readuntil(TERMINATOR),
                         timeout=self.config.read_timeout,
                     )
                     data = read_bytes.decode().strip()
