@@ -19,7 +19,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["Young32400RawDataGenerator", "Young32400WeatherStationDataClient"]
+__all__ = [
+    "Young32400RawDataGenerator",
+    "Young32400WeatherStationDataClient",
+    "MockYoung32400DataServer",
+]
 
 import asyncio
 import collections.abc
@@ -43,7 +47,8 @@ from lsst.ts.utils import current_tai, make_done_future
 
 from ..accumulator import AirFlowAccumulator
 
-TERMINATOR = b"\r\n"
+# Terminator for data from the Young 32400 serial device.
+YOUNG_TERMINATOR = b"\r\n"
 
 # Maximum reported rain tip count before the value wraps around.
 MAX_RAIN_TIP_COUNT = 9999
@@ -238,18 +243,21 @@ class Young32400WeatherStationDataClient(common.BaseDataClient):
             num_samples=self.config.num_samples_temperature
         )
 
+        self.mock_data_server: MockYoung32400DataServer | None = None
+
         # Interval betweens raw data reads (sec) in simulation mode.
         # This should equal the actual rate of the weather station
         # if you want to publish telemetry at the standard rate.
         self.simulation_interval = 0.5
 
-        # By default the simulated data is cycled (endlessly repeated)
-        # as the raw data input. The rain counter cannot easily cycle
-        # (other than the wraparound at 9999), so the default is "no rain".
+        # Raw data to use in simulation mode.
+        # By default the data is cycled (endlessly repeated).
+        # But the rain counter cannot easily cycle (other than
+        # to wrap around at 9999), so the default is "no rain".
         wstats = Young32400RawDataGenerator(
             mean_rain_rate=0, std_rain_rate=0, read_interval=self.simulation_interval
         )
-        self.simulated_raw_data = itertools.cycle(
+        self.simulated_raw_data: collections.abc.Iterable[str] = itertools.cycle(
             wstats.create_raw_data_list(config=self.config, num_items=100)
         )
 
@@ -429,16 +437,21 @@ additionalProperties: false
     async def connect(self) -> None:
         await self.disconnect()
 
-        if self.simulation_mode == 0:
-            self.client = tcpip.Client(
-                host=self.config.host, port=self.config.port, log=self.log
+        if self.simulation_mode > 0:
+            self.mock_data_server = MockYoung32400DataServer(
+                log=self.log,
+                simulated_raw_data=self.simulated_raw_data,
+                simulation_interval=self.simulation_interval,
             )
-            await asyncio.wait_for(self.client.start_task, self.config.connect_timeout)
+            await self.mock_data_server.start_task
+            host = tcpip.LOCALHOST_IPV4
+            port = self.mock_data_server.port
         else:
-            self.log.info(
-                "Simulating output from a 32400 weather station serial interface at "
-                f"host={self.config.host}, port={self.config.port}"
-            )
+            host = self.config.host
+            port = self.config.port
+
+        self.client = tcpip.Client(host=host, port=port, log=self.log)
+        await asyncio.wait_for(self.client.start_task, self.config.connect_timeout)
 
     def descr(self) -> str:
         return f"host={self.config.host}, port={self.config.port}"
@@ -457,6 +470,9 @@ additionalProperties: false
                 await self.client.close()
         finally:
             self.client = None
+        if self.mock_data_server is not None:
+            await self.mock_data_server.close()
+            self.mock_data_server = None
 
     async def handle_data(
         self,
@@ -611,23 +627,17 @@ additionalProperties: false
 
         The format is as described by by DATA_REGEX.
         """
-        simulated_data_iter = iter(self.simulated_raw_data)
         # Start the "rain stopped" timer so we can report "no rain"
         # as soon after starting as it is safe to do so.
         self.restart_rain_stopped_timer()
         try:
-            while self.connected or self.simulation_mode != 0:
-                if self.simulation_mode == 0:
-                    assert self.client is not None  # make mypy happy
-                    read_bytes = await asyncio.wait_for(
-                        self.client.readuntil(TERMINATOR),
-                        timeout=self.config.read_timeout,
-                    )
-                    data = read_bytes.decode().strip()
-                else:
-                    await asyncio.sleep(self.simulation_interval)
-                    data = next(simulated_data_iter)
-
+            while self.connected:
+                assert self.client is not None  # make mypy happy
+                read_bytes = await asyncio.wait_for(
+                    self.client.readuntil(YOUNG_TERMINATOR),
+                    timeout=self.config.read_timeout,
+                )
+                data = read_bytes.decode().strip()
                 if not data:
                     continue
                 match = DATA_REGEX.fullmatch(data)
@@ -768,3 +778,59 @@ class Young32400RawDataGenerator:
             " ".join(str_list[i] for str_list in str_list_dict.values())
             for i in range(num_items)
         ]
+
+
+class MockYoung32400DataServer(tcpip.OneClientServer):
+    """Mock Young 32400 data server.
+
+    Parameters
+    ----------
+    log : `logging.Logger`
+        Logger.
+    simulated_raw_data : iterable [`str`]
+        Simulated raw data. If the mock server runs out of data
+        then it will log a warning and repeat the final value.
+    simulation_interval : `float`
+        Interval between writes (sec).
+    """
+
+    def __init__(
+        self,
+        log: logging.Logger,
+        simulated_raw_data: collections.abc.Iterable[str],
+        simulation_interval: float,
+    ) -> None:
+        self.simulated_raw_data = simulated_raw_data
+        self.simulation_interval = simulation_interval
+        super().__init__(
+            host=tcpip.LOCALHOST_IPV4,
+            port=0,
+            log=log,
+            connect_callback=self.connect_callback,
+        )
+        self.write_loop_task = make_done_future()
+
+    async def connect_callback(self, server: tcpip.OneClientServer) -> None:
+        self.write_loop_task.cancel()
+        if server.connected:
+            self.write_loop_task = asyncio.create_task(self.write_loop())
+
+    async def write_loop(self) -> None:
+        data: str | None = None
+        try:
+            for data in self.simulated_raw_data:
+                if not self.connected:
+                    return
+                await self.write(data.encode() + YOUNG_TERMINATOR)
+                await asyncio.sleep(self.simulation_interval)
+            if data is None:
+                raise RuntimeError("no simulated data")
+
+            self.log.info(
+                "Mock server ran out of simulated data; repeating the final value"
+            )
+            while self.connected:
+                await self.write(data.encode() + YOUNG_TERMINATOR)
+                await asyncio.sleep(self.simulation_interval)
+        except Exception as e:
+            self.log.exception(f"write loop failed: {e!r}")
