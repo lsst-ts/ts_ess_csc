@@ -79,6 +79,11 @@ class LightningDataClient(ControllerDataClient):
             str, ElectricFieldStrengthAccumulator
         ] = dict()
 
+        # TODO DM-38363 Remove this as soon as XML 16 has been released.
+        self.has_location = hasattr(
+            self.topics.tel_electricFieldStrength.DataType(), "location"
+        )
+
     async def sleep_timer(self, sleep_time: float) -> None:
         """Simple timer that sleeps for the given amount of time.
 
@@ -219,7 +224,10 @@ additionalProperties: false
         if not topic_kwargs:
             return
 
-        topic_kwargs["location"] = device_configuration.location
+        # TODO DM-38363 Remove the line containing "if" as soon as XML 16 has
+        #  been released and leave the line setting "location" in place.
+        if self.has_location:
+            topic_kwargs["location"] = device_configuration.location
 
         if np.abs(topic_kwargs["strengthMax"]) > device_configuration.threshold:
             if not self.high_electric_field_timer_task.done():
@@ -353,16 +361,21 @@ additionalProperties: false
             close_alarm_status = sensor_data[3] == 0
             severe_alarm_status = sensor_data[4] == 0
             heading = float(sensor_data[5])
-        await self.topics.tel_lightningStrikeStatus.set_write(
-            sensorName=sensor_name,
-            timestamp=timestamp,
-            closeStrikeRate=close_strike_rate,
-            totalStrikeRate=total_strike_rate,
-            closeAlarmStatus=close_alarm_status,
-            severeAlarmStatus=severe_alarm_status,
-            heading=heading,
-            location=device_configuration.location,
-        )
+
+        topic_kwargs = {
+            "sensorName": sensor_name,
+            "timestamp": timestamp,
+            "closeStrikeRate": close_strike_rate,
+            "totalStrikeRate": total_strike_rate,
+            "closeAlarmStatus": close_alarm_status,
+            "severeAlarmStatus": severe_alarm_status,
+            "heading": heading,
+        }
+        # TODO DM-38363 Remove the line containing "if" as soon as XML 16 has
+        #  been released and leave the line setting "location" in place.
+        if self.has_location:
+            topic_kwargs["location"] = device_configuration.location
+        await self.topics.tel_lightningStrikeStatus.set_write(**topic_kwargs)
         await self.topics.evt_sensorStatus.set_write(
             sensorName=sensor_name,
             sensorStatus=sensor_status,
