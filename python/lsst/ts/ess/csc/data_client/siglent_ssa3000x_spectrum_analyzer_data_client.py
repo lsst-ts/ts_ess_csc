@@ -78,7 +78,7 @@ class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseDataClient):
         return yaml.safe_load(
             """
 $schema: http://json-schema.org/draft-07/schema#
-description: Schema for SiglentSsa3000xSpectrumAnalyzerDataClient
+description: Schema for SiglentSSA3000xSpectrumAnalyzerDataClient
 type: object
 properties:
   host:
