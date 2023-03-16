@@ -32,6 +32,7 @@ import numpy as np
 import pytest
 from lsst.ts import salobj, utils
 from lsst.ts.ess import csc
+from lsst.ts.ess.common.sensor import compute_dew_point_magnus
 
 logging.basicConfig(
     format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.DEBUG
@@ -60,6 +61,7 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             num_samples_temperature=20,
             rain_stopped_interval=30,
             sensor_name_airflow="05108",
+            sensor_name_dew_point="computed",
             sensor_name_humidity="41382VC",
             sensor_name_pressure="61402V",
             sensor_name_rain="52202H",
@@ -222,7 +224,7 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             try:
                 for i in range(num_checks_per_topic):
                     await self.check_air_flow(config=config, data_gen=data_gen)
-                    await self.check_humidity_temperature_pressure(
+                    await self.check_humidity_temperature_pressure_dew_point(
                         config=config, data_gen=data_gen
                     )
                     if i == 0:
@@ -277,11 +279,11 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
         )
         assert data.speedStdDev == pytest.approx(data_gen.std_wind_speed, rel=0.5)
 
-    async def check_humidity_temperature_pressure(
+    async def check_humidity_temperature_pressure_dew_point(
         self, config: types.SimpleNamespace, data_gen: csc.Young32400RawDataGenerator
     ) -> None:
-        """Check the next sample of relativeHumidity, temperature, and
-        pressure.
+        """Check the next sample of relativeHumidity, temperature,
+        pressure and dewPoint.
 
         Parameters
         ----------
@@ -298,7 +300,8 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             sensorName=config.sensor_name_humidity,
             location=config.location,
         )
-        assert data.relativeHumidity == pytest.approx(
+        read_humidity = data.relativeHumidity
+        assert read_humidity == pytest.approx(
             data_gen.mean_humidity, abs=data_gen.std_humidity
         )
 
@@ -309,7 +312,8 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             location=config.location,
             numChannels=1,
         )
-        assert data.temperature[0] == pytest.approx(
+        read_temperature = data.temperature[0]
+        assert read_temperature == pytest.approx(
             data_gen.mean_temperature, abs=data_gen.std_temperature
         )
         assert all(math.isnan(value) for value in data.temperature[1:])
@@ -325,6 +329,16 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             data_gen.mean_pressure, abs=data_gen.std_pressure
         )
         assert all(math.isnan(value) for value in data.pressure[1:])
+
+        expected_dew_point = compute_dew_point_magnus(
+            relative_humidity=read_humidity,
+            temperature=read_temperature,
+        )
+        data = await self.remote.tel_dewPoint.next(flush=False, timeout=STD_TIMEOUT)
+        self.check_data(
+            data, sensorName=config.sensor_name_dew_point, location=config.location
+        )
+        assert data.dewPoint == pytest.approx(expected_dew_point)
 
     async def check_rain_rate(
         self, config: types.SimpleNamespace, data_gen: csc.Young32400RawDataGenerator

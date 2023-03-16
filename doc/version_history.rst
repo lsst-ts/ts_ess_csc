@@ -6,6 +6,26 @@
 Version History
 ###############
 
+v0.15.1
+=======
+
+* `SiglentSsa3000xSpectrumAnalyzerDataClient`: fix a bug constructing and using an lsst.ts.tcpip.Client.
+* `Young32400WeatherStationDataClient`:
+
+  * Add output of computed dew point.
+  * Fix a bug constructing and using an lsst.ts.tcpip.Client.
+  * Fix the default port.
+  * Use a mock server in simulation mode, to make simulation mode much more similar to normal mode.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 15 (14 is OK if not using SiglentSsa3000xSpectrumAnalyzerDataClient)
+* ts_ess_common 0.11
+* ts_tcpip
+* ts_utils 1.0
+
 v0.15.0
 =======
 
@@ -15,6 +35,7 @@ v0.15.0
 * Add `get_circular_mean_and_std_dev` function.
 * Add `Young32400WeatherStationDataClient`.
 * Add `SiglentSsa3000xSpectrumAnalyzerDataClient`.
+  This requires ts_xml 15.
 * Add location to lightning sensors telemetry.
 * Improve type annotation of get_median_and_std_dev.
 
@@ -22,7 +43,7 @@ Requires:
 
 * ts_salobj 7
 * ts_idl 3.7
-* IDL file for ESS from ts_xml 14
+* IDL file for ESS from ts_xml 15 (14 is OK if not using SiglentSsa3000xSpectrumAnalyzerDataClient)
 * ts_ess_common 0.11
 * ts_tcpip
 * ts_utils 1.0

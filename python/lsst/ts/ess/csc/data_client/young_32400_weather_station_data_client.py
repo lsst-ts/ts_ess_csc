@@ -19,7 +19,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["Young32400RawDataGenerator", "Young32400WeatherStationDataClient"]
+__all__ = [
+    "Young32400RawDataGenerator",
+    "Young32400WeatherStationDataClient",
+    "MockYoung32400DataServer",
+]
 
 import asyncio
 import collections.abc
@@ -38,11 +42,13 @@ import yaml
 from astropy.coordinates import Angle
 from lsst.ts import salobj, tcpip
 from lsst.ts.ess import common
+from lsst.ts.ess.common.sensor import compute_dew_point_magnus
 from lsst.ts.utils import current_tai, make_done_future
 
 from ..accumulator import AirFlowAccumulator
 
-TERMINATOR = b"\r\n"
+# Terminator for data from the Young 32400 serial device.
+YOUNG_TERMINATOR = b"\r\n"
 
 # Maximum reported rain tip count before the value wraps around.
 MAX_RAIN_TIP_COUNT = 9999
@@ -183,12 +189,23 @@ class Young32400WeatherStationDataClient(common.BaseDataClient):
             raise ValueError(
                 f"{config.rain_stopped_interval=} must be > {config.read_timeout=}"
             )
+        if config.sensor_name_dew_point and (
+            not config.sensor_name_humidity or not config.sensor_name_temperature
+        ):
+            raise ValueError(
+                f"{config.sensor_name_dew_point=} must be blank unless both "
+                f"{config.sensor_name_humidity=} and "
+                f"{config.sensor_name_temperature=} are specified"
+            )
         super().__init__(
             config=config, topics=topics, log=log, simulation_mode=simulation_mode
         )
 
         self.topics.tel_airFlow.set(
             sensorName=self.config.sensor_name_airflow, location=self.config.location
+        )
+        self.topics.tel_dewPoint.set(
+            sensorName=self.config.sensor_name_dew_point, location=self.config.location
         )
         self.topics.tel_relativeHumidity.set(
             sensorName=self.config.sensor_name_humidity, location=self.config.location
@@ -226,18 +243,21 @@ class Young32400WeatherStationDataClient(common.BaseDataClient):
             num_samples=self.config.num_samples_temperature
         )
 
+        self.mock_data_server: MockYoung32400DataServer | None = None
+
         # Interval betweens raw data reads (sec) in simulation mode.
         # This should equal the actual rate of the weather station
         # if you want to publish telemetry at the standard rate.
         self.simulation_interval = 0.5
 
-        # By default the simulated data is cycled (endlessly repeated)
-        # as the raw data input. The rain counter cannot easily cycle
-        # (other than the wraparound at 9999), so the default is "no rain".
+        # Raw data to use in simulation mode.
+        # By default the data is cycled (endlessly repeated).
+        # But the rain counter cannot easily cycle (other than
+        # to wrap around at 9999), so the default is "no rain".
         wstats = Young32400RawDataGenerator(
             mean_rain_rate=0, std_rain_rate=0, read_interval=self.simulation_interval
         )
-        self.simulated_raw_data = itertools.cycle(
+        self.simulated_raw_data: collections.abc.Iterable[str] = itertools.cycle(
             wstats.create_raw_data_list(config=self.config, num_items=100)
         )
 
@@ -269,7 +289,7 @@ properties:
   port:
     description: Port number of the TCP/IP interface.
     type: integer
-    default: 5000
+    default: 4001
   connect_timeout:
     description: Timeout for connecting to the weather station (sec).
     type: number
@@ -305,6 +325,11 @@ properties:
   sensor_name_airflow:
     description: Wind speed and direction sensor model. Blank if no sensor.
     type: string
+  sensor_name_dew_point:
+    description: >-
+      Sensor name to report for dewPoint. This value is computed from
+      relative humidity and temperature; leave blank if you do not want it
+      reported (e.g. if either of those sensors is not available).
   sensor_name_humidity:
     description: Humidity sensor model. Blank if no sensor.
     type: string
@@ -389,6 +414,7 @@ required:
   - num_samples_temperature
   - rain_stopped_interval
   - sensor_name_airflow
+  - sensor_name_dew_point
   - sensor_name_humidity
   - sensor_name_pressure
   - sensor_name_rain
@@ -411,14 +437,21 @@ additionalProperties: false
     async def connect(self) -> None:
         await self.disconnect()
 
-        if self.simulation_mode == 0:
-            self.client = tcpip.Client(host=self.config.host, port=self.config.port)
-            await asyncio.wait_for(self.client.start_task, self.config.connect_timeout)
-        else:
-            self.log.info(
-                "Simulating output from a 32400 weather station serial interface at "
-                f"host={self.config.host}, port={self.config.port}"
+        if self.simulation_mode > 0:
+            self.mock_data_server = MockYoung32400DataServer(
+                log=self.log,
+                simulated_raw_data=self.simulated_raw_data,
+                simulation_interval=self.simulation_interval,
             )
+            await self.mock_data_server.start_task
+            host = tcpip.LOCALHOST_IPV4
+            port = self.mock_data_server.port
+        else:
+            host = self.config.host
+            port = self.config.port
+
+        self.client = tcpip.Client(host=host, port=port, log=self.log)
+        await asyncio.wait_for(self.client.start_task, self.config.connect_timeout)
 
     def descr(self) -> str:
         return f"host={self.config.host}, port={self.config.port}"
@@ -437,6 +470,9 @@ additionalProperties: false
                 await self.client.close()
         finally:
             self.client = None
+        if self.mock_data_server is not None:
+            await self.mock_data_server.close()
+            self.mock_data_server = None
 
     async def handle_data(
         self,
@@ -477,9 +513,11 @@ additionalProperties: false
             if kwargs:
                 await self.topics.tel_airFlow.set_write(**kwargs)
 
+        report_humidity = False
         if self.config.sensor_name_humidity:
             raw_median = self.humidity_accumulator.add_sample(humidity)
             if raw_median is not None:
+                report_humidity = True
                 await self.topics.tel_relativeHumidity.set_write(
                     relativeHumidity=scaled_from_raw(
                         raw=raw_median,
@@ -499,15 +537,30 @@ additionalProperties: false
                 )
                 await self.topics.tel_pressure.set_write(timestamp=timestamp)
 
+        report_temperature = False
         if self.config.sensor_name_temperature:
             raw_median = self.temperature_accumulator.add_sample(temperature)
             if raw_median is not None:
+                report_temperature = True
                 self.topics.tel_temperature.data.temperature[0] = scaled_from_raw(
                     raw=raw_median,
                     scale=self.config.scale_offset_temperature[0],
                     offset=self.config.scale_offset_temperature[1],
                 )
                 await self.topics.tel_temperature.set_write(timestamp=timestamp)
+
+        if self.config.sensor_name_dew_point and (
+            report_humidity or report_temperature
+        ):
+            relative_humidity = self.topics.tel_relativeHumidity.data.relativeHumidity
+            temperature = self.topics.tel_temperature.data.temperature[0]
+            if not math.isnan(relative_humidity) and not math.isnan(temperature):
+                dew_point = compute_dew_point_magnus(
+                    relative_humidity=relative_humidity, temperature=temperature
+                )
+                await self.topics.tel_dewPoint.set_write(
+                    dewPoint=dew_point, timestamp=timestamp
+                )
 
         if self.config.sensor_name_rain:
             if self.last_rain_tip_timestamp == 0:
@@ -574,23 +627,17 @@ additionalProperties: false
 
         The format is as described by by DATA_REGEX.
         """
-        simulated_data_iter = iter(self.simulated_raw_data)
         # Start the "rain stopped" timer so we can report "no rain"
         # as soon after starting as it is safe to do so.
         self.restart_rain_stopped_timer()
         try:
-            while self.connected or self.simulation_mode != 0:
-                if self.simulation_mode == 0:
-                    assert self.client is not None  # make mypy happy
-                    read_bytes = await asyncio.wait_for(
-                        self.client.read_until(TERMINATOR),
-                        timeout=self.config.read_timeout,
-                    )
-                    data = read_bytes.decode().strip()
-                else:
-                    await asyncio.sleep(self.simulation_interval)
-                    data = next(simulated_data_iter)
-
+            while self.connected:
+                assert self.client is not None  # make mypy happy
+                read_bytes = await asyncio.wait_for(
+                    self.client.readuntil(YOUNG_TERMINATOR),
+                    timeout=self.config.read_timeout,
+                )
+                data = read_bytes.decode().strip()
                 if not data:
                     continue
                 match = DATA_REGEX.fullmatch(data)
@@ -731,3 +778,59 @@ class Young32400RawDataGenerator:
             " ".join(str_list[i] for str_list in str_list_dict.values())
             for i in range(num_items)
         ]
+
+
+class MockYoung32400DataServer(tcpip.OneClientServer):
+    """Mock Young 32400 data server.
+
+    Parameters
+    ----------
+    log : `logging.Logger`
+        Logger.
+    simulated_raw_data : iterable [`str`]
+        Simulated raw data. If the mock server runs out of data
+        then it will log a warning and repeat the final value.
+    simulation_interval : `float`
+        Interval between writes (sec).
+    """
+
+    def __init__(
+        self,
+        log: logging.Logger,
+        simulated_raw_data: collections.abc.Iterable[str],
+        simulation_interval: float,
+    ) -> None:
+        self.simulated_raw_data = simulated_raw_data
+        self.simulation_interval = simulation_interval
+        super().__init__(
+            host=tcpip.LOCALHOST_IPV4,
+            port=0,
+            log=log,
+            connect_callback=self.connect_callback,
+        )
+        self.write_loop_task = make_done_future()
+
+    async def connect_callback(self, server: tcpip.OneClientServer) -> None:
+        self.write_loop_task.cancel()
+        if server.connected:
+            self.write_loop_task = asyncio.create_task(self.write_loop())
+
+    async def write_loop(self) -> None:
+        data: str | None = None
+        try:
+            for data in self.simulated_raw_data:
+                if not self.connected:
+                    return
+                await self.write(data.encode() + YOUNG_TERMINATOR)
+                await asyncio.sleep(self.simulation_interval)
+            if data is None:
+                raise RuntimeError("no simulated data")
+
+            self.log.info(
+                "Mock server ran out of simulated data; repeating the final value"
+            )
+            while self.connected:
+                await self.write(data.encode() + YOUNG_TERMINATOR)
+                await asyncio.sleep(self.simulation_interval)
+        except Exception as e:
+            self.log.exception(f"write loop failed: {e!r}")
