@@ -7,6 +7,21 @@ Version History
 ###############
 
 =======
+v0.15.3
+=======
+
+* Make `SiglentSSA3000xSpectrumAnalyzerDataClient` backward compatible with XML 15.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 16 (14 is OK if not using SiglentSSA3000xSpectrumAnalyzerDataClient)
+* ts_ess_common 0.11
+* ts_tcpip
+* ts_utils 1.0
+
+=======
 v0.15.2
 =======
 

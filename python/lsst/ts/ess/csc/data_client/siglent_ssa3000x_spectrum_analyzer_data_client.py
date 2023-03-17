@@ -63,6 +63,10 @@ class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseDataClient):
             config=config, topics=topics, log=log, simulation_mode=simulation_mode
         )
 
+        # TODO DM-38363 Remove this as soon as XML 16 has been released.
+        if not hasattr(self.topics, "tel_spectrumAnalyzer"):
+            raise RuntimeError("At least ts_xml 16.0 required to use this class.")
+
         self.topics.tel_spectrumAnalyzer.set(
             sensorName=self.config.sensor_name, location=self.config.location
         )
