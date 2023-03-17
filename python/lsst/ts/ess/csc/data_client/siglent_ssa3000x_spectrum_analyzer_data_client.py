@@ -34,6 +34,14 @@ from lsst.ts.ess import common
 # The standard TCP/IP line terminator (bytes).
 TERMINATOR = b"\n"
 
+# The expected number of data points as returned by the spectrum analyzer given
+# the fixed start and stop frequency.
+EXPECTED_NUMBER_OF_DATA_POINTS = 751
+
+# The maximum allowed number of truncated messages. This is set to 1 so reading
+# truncated data when connecting doesn't lead to a RuntimeError.
+MAX_NUM_TRUNCATED_DATA = 1
+
 
 class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseDataClient):
     ###########################################################################
@@ -48,9 +56,6 @@ class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseDataClient):
     # The start and stop frequencies as float values.
     start_frequency = 0.0
     stop_frequency = 3.0e9
-    # The number of data points as returned by the spectrum analyzer given the
-    # fixed start and stop frequency.
-    num_data_points = 751
 
     def __init__(
         self,
@@ -76,6 +81,10 @@ class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseDataClient):
 
         self.client: tcpip.Client | None = None
         self.read_loop_task = utils.make_done_future()
+
+        self.mock_data_server: MockSiglentSSA3000xDataServer | None = None
+
+        self.number_of_truncated_data_read = 0
 
     @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
@@ -135,15 +144,20 @@ additionalProperties: false
         await self.disconnect()
 
         if self.simulation_mode == 0:
-            self.client = tcpip.Client(
-                host=self.config.host, port=self.config.port, log=self.log
-            )
-            await asyncio.wait_for(self.client.start_task, self.config.connect_timeout)
+            host = self.config.host
+            port = self.config.port
         else:
             self.log.info(
                 "Simulating output from an SSA3000X Spectrum Analyzer serial interface at "
                 f"host={self.config.host}, port={self.config.port}"
             )
+            self.mock_data_server = MockSiglentSSA3000xDataServer(log=self.log)
+            await self.mock_data_server.start_task
+            host = tcpip.LOCALHOST_IPV4
+            port = self.mock_data_server.port
+
+        self.client = tcpip.Client(host=host, port=port, log=self.log)
+        await asyncio.wait_for(self.client.start_task, self.config.connect_timeout)
 
     async def disconnect(self) -> None:
         self.read_loop_task.cancel()
@@ -153,6 +167,9 @@ additionalProperties: false
                 await self.client.close()
         finally:
             self.client = None
+        if self.mock_data_server is not None:
+            await self.mock_data_server.close()
+            self.mock_data_server = None
 
     async def run(self) -> None:
         self.read_loop_task.cancel()
@@ -177,39 +194,87 @@ additionalProperties: false
                 # spectrum analyzer.
                 await self.write(self.set_freq_start_cmd)
                 await self.write(self.set_freq_stop_cmd)
-            while self.connected or self.simulation_mode != 0:
+            while self.connected:
                 timestamp = utils.current_tai()
-                if self.simulation_mode == 0:
-                    await self.write(self.query_trace_data_cmd)
-                    assert self.client is not None  # make mypy happy
-                    read_bytes = await asyncio.wait_for(
-                        self.client.readuntil(TERMINATOR),
-                        timeout=self.config.read_timeout,
+                await self.write(self.query_trace_data_cmd)
+                assert self.client is not None  # make mypy happy
+                read_bytes = await asyncio.wait_for(
+                    self.client.readuntil(TERMINATOR),
+                    timeout=self.config.read_timeout,
+                )
+                raw_data = read_bytes.decode().strip()
+                raw_data_items = raw_data.split(",")
+                data = [float(i.strip()) for i in raw_data_items]
+                if (
+                    len(data) < EXPECTED_NUMBER_OF_DATA_POINTS
+                    and self.number_of_truncated_data_read < MAX_NUM_TRUNCATED_DATA
+                ):
+                    logging.warning(
+                        f"Data of length {len(data)} read. Ignoring because this is "
+                        f"read #{self.number_of_truncated_data_read} out of {MAX_NUM_TRUNCATED_DATA}."
                     )
-                    raw_data = read_bytes.decode().strip()
-                    raw_data_items = raw_data.split(",")
-                    data = [float(i.strip()) for i in raw_data_items]
+                    self.number_of_truncated_data_read += 1
+                elif len(data) != EXPECTED_NUMBER_OF_DATA_POINTS:
+                    raise RuntimeError(
+                        f"Encountered {len(data)} data points instead of "
+                        f"{EXPECTED_NUMBER_OF_DATA_POINTS}. Check the Spectrum "
+                        f"Analyzer and the configuration."
+                    )
                 else:
-                    # Generate random data between 0 and -100 dB. Convert to
-                    # list to keep mypy happy.
-                    data = (-100.0 * np.random.random(self.num_data_points)).tolist()
-                try:
-                    await self.topics.tel_spectrumAnalyzer.set_write(
-                        startFrequency=self.start_frequency,
-                        stopFrequency=self.stop_frequency,
-                        spectrum=data,
-                        timestamp=timestamp,
-                    )
-                except Exception as e:
-                    self.log.exception(f"Failed to handle {data=}: {e!r}")
+                    try:
+                        await self.topics.tel_spectrumAnalyzer.set_write(
+                            startFrequency=self.start_frequency,
+                            stopFrequency=self.stop_frequency,
+                            spectrum=data,
+                            timestamp=timestamp,
+                        )
+                    except Exception as e:
+                        self.log.exception(f"Failed to handle {data=}: {e!r}")
 
                 # Maybe a bit of an overkill but this ensures that no drift
                 # gets introduced while sleeping.
                 sleep_delay = (
-                    utils.current_tai() - timestamp - self.config.sleep_interval
+                    utils.current_tai() - timestamp - self.config.poll_interval
                 )
                 if sleep_delay > 0:
                     await asyncio.sleep(sleep_delay)
         except Exception as e:
             self.log.exception(f"read loop failed: {e!r}")
             raise
+
+
+class MockSiglentSSA3000xDataServer(tcpip.OneClientServer):
+    """Mock Siglent SSA3000x data server.
+
+    Parameters
+    ----------
+    log : `logging.Logger`
+        Logger.
+    """
+
+    def __init__(
+        self,
+        log: logging.Logger,
+    ) -> None:
+        super().__init__(
+            host=tcpip.LOCALHOST_IPV4,
+            port=0,
+            log=log,
+            connect_callback=self.connect_callback,
+        )
+        self.write_loop_task = utils.make_done_future()
+
+    async def connect_callback(self, server: tcpip.OneClientServer) -> None:
+        self.write_loop_task.cancel()
+        if server.connected:
+            self.write_loop_task = asyncio.create_task(self.write_loop())
+
+    async def write_loop(self) -> None:
+        try:
+            while self.connected:
+                rng = np.random.default_rng(10)
+                data = -100.0 * rng.random(EXPECTED_NUMBER_OF_DATA_POINTS)
+                data_string = ", ".join(f"{d:0.3f}" for d in data)
+                await self.write(data_string.encode() + TERMINATOR)
+        except Exception as e:
+            self.log.exception(f"write loop failed: {e!r}")
