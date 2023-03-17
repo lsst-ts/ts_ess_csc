@@ -497,6 +497,8 @@ additionalProperties: false
             Air temperature (raw units)
         pressure : `int`
             Air pressure (raw units)
+        rain_tip_count : `int`
+            Rain tip count (raw units)
         """
         timestamp = current_tai()
 
@@ -733,6 +735,8 @@ class Young32400RawDataGenerator:
             Configuration for the data client.
         num_items : `int`
             Number of raw strings to create.
+        random_seed : `int`
+            Random seed.
         """
         rng = numpy.random.default_rng(random_seed)
         float_array_dict = {
