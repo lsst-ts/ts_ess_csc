@@ -274,6 +274,9 @@ class Young32400WeatherStationDataClient(common.BaseDataClient):
         self.read_loop_task = make_done_future()
         self.rain_stopped_timer_task = make_done_future()
 
+        # Number of consecutive read timeouts encountered.
+        self.num_consecutive_read_timeouts = 0
+
     @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
         return yaml.safe_load(
@@ -298,6 +301,10 @@ properties:
       Timeout for reading data from the weather station (sec). Note that the standard
       output rate is either 2 Hz or 15 Hz, depending on configuration.
     type: number
+  max_read_timeouts:
+    description: Maximum number of read timeouts before an exception is raised.
+    type: integer
+    default: 5
   num_samples_airflow:
     description: ->
       The number of airflow readings to accumulate before computing statistics
@@ -410,6 +417,7 @@ required:
   - port
   - connect_timeout
   - read_timeout
+  - max_read_timeouts
   - num_samples_airflow
   - num_samples_temperature
   - rain_stopped_interval
@@ -437,6 +445,7 @@ additionalProperties: false
     async def connect(self) -> None:
         await self.disconnect()
 
+        self.num_consecutive_read_timeouts = 0
         if self.simulation_mode > 0:
             self.mock_data_server = MockYoung32400DataServer(
                 log=self.log,
@@ -639,6 +648,7 @@ additionalProperties: false
                     self.client.readuntil(YOUNG_TERMINATOR),
                     timeout=self.config.read_timeout,
                 )
+                self.num_consecutive_read_timeouts = 0
                 data = read_bytes.decode().strip()
                 if not data:
                     continue
@@ -654,6 +664,17 @@ additionalProperties: false
                     await self.handle_data(**raw_data_dict)
                 except Exception as e:
                     self.log.exception(f"Failed to handle {data=}: {e!r}")
+        except asyncio.TimeoutError:
+            self.num_consecutive_read_timeouts += 1
+            self.log.warning(
+                f"Read timed out. This is timeout #{self.num_consecutive_read_timeouts} "
+                f"of {self.config.max_read_timeouts} allowed."
+            )
+            if self.num_consecutive_read_timeouts >= self.config.max_read_timeouts:
+                self.log.error(
+                    f"Encountered at least {self.config.max_read_timeouts} timeouts. Raising error."
+                )
+                raise
         except StopIteration:
             self.log.info("read loop ends: out of simulated raw data")
         except Exception as e:

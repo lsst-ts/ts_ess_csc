@@ -6,56 +6,6 @@
 Version History
 ###############
 
-=======
-v0.15.3
-=======
-
-* Make `SiglentSSA3000xSpectrumAnalyzerDataClient` backward compatible with XML 15.
-
-Requires:
-
-* ts_salobj 7
-* ts_idl 3.7
-* IDL file for ESS from ts_xml 16 (14 is OK if not using SiglentSSA3000xSpectrumAnalyzerDataClient)
-* ts_ess_common 0.11
-* ts_tcpip
-* ts_utils 1.0
-
-=======
-v0.15.2
-=======
-
-* Make `LightningDataClient` backward compatible with XML 15.
-
-Requires:
-
-* ts_salobj 7
-* ts_idl 3.7
-* IDL file for ESS from ts_xml 16 (14 is OK if not using SiglentSSA3000xSpectrumAnalyzerDataClient)
-* ts_ess_common 0.11
-* ts_tcpip
-* ts_utils 1.0
-
-v0.15.1
-=======
-
-* `SiglentSsa3000xSpectrumAnalyzerDataClient`: fix a bug constructing and using an lsst.ts.tcpip.Client.
-* `Young32400WeatherStationDataClient`:
-
-  * Add output of computed dew point.
-  * Fix a bug constructing and using an lsst.ts.tcpip.Client.
-  * Fix the default port.
-  * Use a mock server in simulation mode, to make simulation mode much more similar to normal mode.
-
-Requires:
-
-* ts_salobj 7
-* ts_idl 3.7
-* IDL file for ESS from ts_xml 16 (14 is OK if not using SiglentSSA3000xSpectrumAnalyzerDataClient)
-* ts_ess_common 0.11
-* ts_tcpip
-* ts_utils 1.0
-
 v0.15.0
 =======
 

@@ -38,10 +38,6 @@ TERMINATOR = b"\n"
 # the fixed start and stop frequency.
 EXPECTED_NUMBER_OF_DATA_POINTS = 751
 
-# The maximum allowed number of truncated messages. This is set to 1 so reading
-# truncated data when connecting doesn't lead to a RuntimeError.
-MAX_NUM_TRUNCATED_DATA = 1
-
 
 class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseDataClient):
     ###########################################################################
@@ -84,7 +80,10 @@ class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseDataClient):
 
         self.mock_data_server: MockSiglentSSA3000xDataServer | None = None
 
-        self.number_of_truncated_data_read = 0
+        self.read_data = False
+
+        # Number of consecutive read timeouts encountered.
+        self.num_consecutive_read_timeouts = 0
 
     @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
@@ -110,6 +109,10 @@ properties:
       Timeout for reading data from the spectrum analyzer (sec). Note that the
       standard output rate is 1 Hz.
     type: number
+  max_read_timeouts:
+    description: Maximum number of read timeouts before an exception is raised.
+    type: integer
+    default: 5
   location:
     description: Sensor location (used for all telemetry topics).
     type: string
@@ -126,6 +129,7 @@ required:
   - port
   - connect_timeout
   - read_timeout
+  - max_read_timeouts
   - location
   - sensor_name
   - poll_interval
@@ -142,6 +146,9 @@ additionalProperties: false
 
     async def connect(self) -> None:
         await self.disconnect()
+
+        self.num_consecutive_read_timeouts = 0
+        self.read_data = False
 
         if self.simulation_mode == 0:
             host = self.config.host
@@ -202,18 +209,16 @@ additionalProperties: false
                     self.client.readuntil(TERMINATOR),
                     timeout=self.config.read_timeout,
                 )
+                self.num_consecutive_read_timeouts = 0
                 raw_data = read_bytes.decode().strip()
                 raw_data_items = raw_data.split(",")
                 data = [float(i.strip()) for i in raw_data_items]
-                if (
-                    len(data) < EXPECTED_NUMBER_OF_DATA_POINTS
-                    and self.number_of_truncated_data_read < MAX_NUM_TRUNCATED_DATA
-                ):
+                if len(data) < EXPECTED_NUMBER_OF_DATA_POINTS and not self.read_data:
                     logging.warning(
                         f"Data of length {len(data)} read. Ignoring because this is "
-                        f"read #{self.number_of_truncated_data_read} out of {MAX_NUM_TRUNCATED_DATA}."
+                        f"read #{self.number_of_truncated_data_read} out of {self.config.max_read_timeouts}."
                     )
-                    self.number_of_truncated_data_read += 1
+                    self.read_data = True
                 elif len(data) != EXPECTED_NUMBER_OF_DATA_POINTS:
                     raise RuntimeError(
                         f"Encountered {len(data)} data points instead of "
@@ -238,6 +243,17 @@ additionalProperties: false
                 )
                 if sleep_delay > 0:
                     await asyncio.sleep(sleep_delay)
+        except asyncio.TimeoutError:
+            self.num_consecutive_read_timeouts += 1
+            self.log.warning(
+                f"Read timed out. This is timeout #{self.num_consecutive_read_timeouts} "
+                f"of {self.config.max_read_timeouts} allowed."
+            )
+            if self.num_consecutive_read_timeouts >= self.config.max_read_timeouts:
+                self.log.error(
+                    f"Encountered at least {self.config.max_read_timeouts} timeouts. Raising error."
+                )
+                raise
         except Exception as e:
             self.log.exception(f"read loop failed: {e!r}")
             raise
