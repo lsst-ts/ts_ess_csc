@@ -18,6 +18,7 @@ v0.15.0
   This requires ts_xml 15.
 * Add location to lightning sensors telemetry.
 * Improve type annotation of get_median_and_std_dev.
+* Add command_ess_csc entry point.
 
 Requires:
 

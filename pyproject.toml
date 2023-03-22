@@ -18,6 +18,7 @@ where = [ "python" ]
 
 [project.scripts]
 run_ess_csc = "lsst.ts.ess.csc.ess_csc:run_ess_csc"
+command_ess_csc = "lsst.ts.ess.csc.ess_csc:command_ess_csc"
 
 [tool.setuptools_scm]
 write_to = "python/lsst/ts/ess/csc/version.py"
