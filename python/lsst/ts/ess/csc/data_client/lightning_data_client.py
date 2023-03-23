@@ -79,6 +79,11 @@ class LightningDataClient(ControllerDataClient):
             str, ElectricFieldStrengthAccumulator
         ] = dict()
 
+        # TODO DM-38363 Remove this as soon as XML 16 has been released.
+        self.has_location = hasattr(
+            self.topics.tel_electricFieldStrength.DataType(), "location"
+        )
+
     async def sleep_timer(self, sleep_time: float) -> None:
         """Simple timer that sleeps for the given amount of time.
 
@@ -94,7 +99,7 @@ class LightningDataClient(ControllerDataClient):
         return yaml.safe_load(
             """
 $schema: http://json-schema.org/draft-07/schema#
-description: Schema for RPiDataClient
+description: Schema for LightningDataClient.
 type: object
 properties:
   host:
@@ -105,6 +110,10 @@ properties:
     description: Port number of the TCP/IP interface.
     type: integer
     default: 5000
+  max_read_timeouts:
+    description: Maximum number of read timeouts before an exception is raised.
+    type: integer
+    default: 5
   devices:
     type: array
     minItems: 1
@@ -130,6 +139,9 @@ properties:
           description: Baud rate of the sensor.
           type: integer
           default: 19200
+        location:
+          description: Sensor location (used for all telemetry topics).
+          type: string
         safe_interval:
           description: >-
             The amount of time [s] after which an event is sent informing that
@@ -167,9 +179,11 @@ properties:
         - sensor_type
         - baud_rate
         - safe_interval
+        - location
 required:
   - host
   - port
+  - max_read_timeouts
   - devices
 additionalProperties: false
 """
@@ -214,6 +228,11 @@ additionalProperties: false
         topic_kwargs = accumulator.get_topic_kwargs()
         if not topic_kwargs:
             return
+
+        # TODO DM-38363 Remove the line containing "if" as soon as XML 16 has
+        #  been released and leave the line setting "location" in place.
+        if self.has_location:
+            topic_kwargs["location"] = device_configuration.location
 
         if np.abs(topic_kwargs["strengthMax"]) > device_configuration.threshold:
             if not self.high_electric_field_timer_task.done():
@@ -328,6 +347,7 @@ additionalProperties: false
         response_code: int,
         sensor_data: Sequence[float | str | int],
     ) -> None:
+        device_configuration = self.device_configurations[sensor_name]
         isok = response_code == 0
         sensor_status = 0
 
@@ -346,15 +366,21 @@ additionalProperties: false
             close_alarm_status = sensor_data[3] == 0
             severe_alarm_status = sensor_data[4] == 0
             heading = float(sensor_data[5])
-        await self.topics.tel_lightningStrikeStatus.set_write(
-            sensorName=sensor_name,
-            timestamp=timestamp,
-            closeStrikeRate=close_strike_rate,
-            totalStrikeRate=total_strike_rate,
-            closeAlarmStatus=close_alarm_status,
-            severeAlarmStatus=severe_alarm_status,
-            heading=heading,
-        )
+
+        topic_kwargs = {
+            "sensorName": sensor_name,
+            "timestamp": timestamp,
+            "closeStrikeRate": close_strike_rate,
+            "totalStrikeRate": total_strike_rate,
+            "closeAlarmStatus": close_alarm_status,
+            "severeAlarmStatus": severe_alarm_status,
+            "heading": heading,
+        }
+        # TODO DM-38363 Remove the line containing "if" as soon as XML 16 has
+        #  been released and leave the line setting "location" in place.
+        if self.has_location:
+            topic_kwargs["location"] = device_configuration.location
+        await self.topics.tel_lightningStrikeStatus.set_write(**topic_kwargs)
         await self.topics.evt_sensorStatus.set_write(
             sensorName=sensor_name,
             sensorStatus=sensor_status,

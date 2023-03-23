@@ -94,6 +94,10 @@ properties:
     description: Port number of the TCP/IP interface.
     type: integer
     default: 5000
+  max_read_timeouts:
+    description: Maximum number of read timeouts before an exception is raised.
+    type: integer
+    default: 5
   devices:
     type: array
     minItems: 1
@@ -167,6 +171,7 @@ properties:
 required:
   - host
   - port
+  - max_read_timeouts
   - devices
 additionalProperties: false
 """
@@ -433,19 +438,14 @@ additionalProperties: false
 
         if sensor_name not in self.air_flow_cache:
             self.air_flow_cache[sensor_name] = AirFlowAccumulator(
-                num_samples=device_configuration.num_samples
+                log=self.log, num_samples=device_configuration.num_samples
             )
         accumulator = self.air_flow_cache[sensor_name]
-
-        if np.isnan(sensor_data[1]):
-            direction = -1
-        else:
-            direction = int(sensor_data[1])
 
         accumulator.add_sample(
             timestamp=timestamp,
             speed=sensor_data[0],
-            direction=direction,
+            direction=sensor_data[1],
             isok=response_code == common.ResponseCode.OK,
         )
 

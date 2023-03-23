@@ -22,3 +22,5 @@
 from .controller_data_client import *
 from .lightning_data_client import *
 from .rpi_data_client import *
+from .siglent_ssa3000x_spectrum_analyzer_data_client import *
+from .young_32400_weather_station_data_client import *

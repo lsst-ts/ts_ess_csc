@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["EssCsc", "run_ess_csc"]
+__all__ = ["EssCsc", "command_ess_csc", "run_ess_csc"]
 
 import asyncio
 import traceback
@@ -61,6 +61,10 @@ def get_task_index_exception(
 
 def run_ess_csc() -> None:
     asyncio.run(EssCsc.amain(index=True))
+
+
+def command_ess_csc() -> None:
+    asyncio.run(salobj.CscCommander.amain(name="ESS", index=True))
 
 
 class EssCsc(salobj.ConfigurableCsc):
@@ -109,7 +113,6 @@ class EssCsc(salobj.ConfigurableCsc):
             simulation_mode=simulation_mode,
             override=override,
         )
-        self.log.info("ESS CSC created.")
 
     async def begin_enable(self, data: salobj.BaseDdsDataType) -> None:
         """Begin do_enable; called before state changes.

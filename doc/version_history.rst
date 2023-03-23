@@ -6,6 +6,29 @@
 Version History
 ###############
 
+v0.15.0
+=======
+
+* Bug fix: reported airFlow direction and directionStdDev did not handle wraparound correctly.
+  Use circular statistics instead of standard statistics.
+* `AirFlowAccumulator`: add a ``log`` attribute, making it more like `AirTurbulenceAccumulator`.
+* Add `get_circular_mean_and_std_dev` function.
+* Add `Young32400WeatherStationDataClient`.
+* Add `SiglentSSA3000xSpectrumAnalyzerDataClient`.
+  This requires ts_xml 15.
+* Add location to lightning sensors telemetry.
+* Improve type annotation of get_median_and_std_dev.
+* Add command_ess_csc entry point.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 16 (14 is OK if not using SiglentSSA3000xSpectrumAnalyzerDataClient)
+* ts_ess_common 0.11
+* ts_tcpip
+* ts_utils 1.0
+
 v0.14.2
 =======
 

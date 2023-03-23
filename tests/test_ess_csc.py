@@ -360,8 +360,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         response_code = reply["response_code"]
         resp: list[float | int] = []
         assert len(reply["sensor_telemetry"]) == 2
-        assert isinstance(reply["sensor_telemetry"][0], float)
-        assert isinstance(reply["sensor_telemetry"][1], float)
+        for i, value in enumerate(reply["sensor_telemetry"][0:2]):
+            with self.subTest(i=i, value=value):
+                assert isinstance(value, float) or isinstance(value, int)
         for value in reply["sensor_telemetry"]:
             resp.append(value)
 
