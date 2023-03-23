@@ -36,9 +36,6 @@ from lsst.ts.ess import common
 # Time limit for connecting to the Controller (seconds).
 CONNECT_TIMEOUT = 5
 
-# The maximum number of timeouts to allow before raising a TimeoutError.
-MAX_ALLOWED_READ_TIMEOUTS = 5
-
 # Timeout limit for communicating with the RPi (seconds). This includes
 # writing a command and reading the response and reading telemetry. Unit
 # tests can set this to a lower value to speed up the test.
@@ -203,6 +200,7 @@ class ControllerDataClient(common.BaseDataClient):
         if self.connected:
             raise RuntimeError("Already connected.")
 
+        self.num_consecutive_read_timeouts = 0
         if self.simulation_mode != 0:
             if self.enable_mock_server:
                 self.mock_server = common.SocketServer(
@@ -288,11 +286,11 @@ class ControllerDataClient(common.BaseDataClient):
                 self.num_consecutive_read_timeouts += 1
                 self.log.warning(
                     f"Read timed out. This is timeout #{self.num_consecutive_read_timeouts} "
-                    f"of {MAX_ALLOWED_READ_TIMEOUTS} allowed."
+                    f"of {self.config.max_read_timeouts} allowed."
                 )
-                if self.num_consecutive_read_timeouts >= MAX_ALLOWED_READ_TIMEOUTS:
+                if self.num_consecutive_read_timeouts >= self.config.max_read_timeouts:
                     self.log.error(
-                        f"Encountered at least {MAX_ALLOWED_READ_TIMEOUTS} timeouts. Raising error."
+                        f"Encountered at least {self.config.max_read_timeouts} timeouts. Raising error."
                     )
                     raise
             except Exception as e:

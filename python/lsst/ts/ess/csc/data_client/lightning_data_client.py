@@ -110,6 +110,10 @@ properties:
     description: Port number of the TCP/IP interface.
     type: integer
     default: 5000
+  max_read_timeouts:
+    description: Maximum number of read timeouts before an exception is raised.
+    type: integer
+    default: 5
   devices:
     type: array
     minItems: 1
@@ -179,6 +183,7 @@ properties:
 required:
   - host
   - port
+  - max_read_timeouts
   - devices
 additionalProperties: false
 """
