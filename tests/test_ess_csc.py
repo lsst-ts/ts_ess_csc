@@ -557,9 +557,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await self.stop_mock_server()
 
     async def test_rpi_data_client_loses_connection(self) -> None:
-        """The CSC should fault when the RPiDataClient loses its connection
-        to the server and the RpiDataClient should reconnect when the CSC is
-        set to ENABLED again.
+        """Test timeouts of connections from the DataClient to the server.
+
+        The CSC should fault when the DataClient loses its connection to the
+        server and the DataClient should reconnect when the CSC is set to
+        ENABLED again.
         """
         # Start the MockServer for manual control.
         await self.start_mock_server()
