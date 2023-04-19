@@ -42,7 +42,7 @@ CONNECT_TIMEOUT = 5
 COMMUNICATE_TIMEOUT = 60
 
 
-class ControllerDataClient(common.BaseDataClient):
+class ControllerDataClient(common.BaseReadLoopDataClient):
     """Get environmental data from sensors connected to an ESS Controller.
 
     Parameters
@@ -88,13 +88,13 @@ class ControllerDataClient(common.BaseDataClient):
         # Mock server for simulation mode
         self.mock_server = None
 
-        # Number of consecutive read timeouts encountered.
-        self.num_consecutive_read_timeouts = 0
-
         super().__init__(
             config=config, topics=topics, log=log, simulation_mode=simulation_mode
         )
         self.configure()
+
+        # Validator for JSON data.
+        self.validator = jsonschema.Draft7Validator(schema=self.get_telemetry_schema())
 
     @abc.abstractmethod
     def get_telemetry_dispatch_dict(self) -> dict[str, Callable]:
@@ -200,7 +200,6 @@ class ControllerDataClient(common.BaseDataClient):
         if self.connected:
             raise RuntimeError("Already connected.")
 
-        self.num_consecutive_read_timeouts = 0
         if self.simulation_mode != 0:
             if self.enable_mock_server:
                 self.mock_server = common.SocketServer(
@@ -244,6 +243,7 @@ class ControllerDataClient(common.BaseDataClient):
         Always safe to call, though it may raise asyncio.CancelledError
         if the writer is currently being closed.
         """
+        self.run_task.cancel()
         if self.connected:
             await asyncio.wait_for(
                 tcpip.close_stream_writer(self.writer), timeout=CONNECT_TIMEOUT
@@ -251,53 +251,29 @@ class ControllerDataClient(common.BaseDataClient):
         if self.mock_server is not None:
             await self.mock_server.close()
 
-    async def run(self) -> None:
+    async def read_data(self) -> None:
         """Read and process data from the RPi."""
-        validator = jsonschema.Draft7Validator(schema=self.get_telemetry_schema())
-        while self.connected:
+        async with self.stream_lock:
+            data = await self.basic_read()
+        if common.Key.RESPONSE in data:
+            self.log.warning("Read a command response with no command pending")
+        elif common.Key.TELEMETRY in data:
+            self.log.debug(f"Processing {data}")
             try:
-                async with self.stream_lock:
-                    data = await self.read()
-                    # Reset the number of consecutive timouts since no timeout
-                    # happend.
-                    self.num_consecutive_read_timeouts = 0
-                if common.Key.RESPONSE in data:
-                    self.log.warning("Read a command response with no command pending")
-                elif common.Key.TELEMETRY in data:
-                    self.log.debug(f"Processing {data}")
-                    try:
-                        validator.validate(data)
-                        telemetry_data = data[common.Key.TELEMETRY]
-                        await self.process_telemetry(
-                            sensor_name=telemetry_data[common.Key.NAME],
-                            timestamp=telemetry_data[common.Key.TIMESTAMP],
-                            response_code=telemetry_data[common.Key.RESPONSE_CODE],
-                            sensor_data=telemetry_data[common.Key.SENSOR_TELEMETRY],
-                        )
-                    except Exception:
-                        self.log.exception(f"Exception processing {data}. Ignoring.")
-                else:
-                    self.log.warning(f"Ignoring unparsable {data}.")
-
-            except asyncio.CancelledError:
-                self.log.debug("read_loop cancelled")
-                raise
-            except asyncio.TimeoutError:
-                self.num_consecutive_read_timeouts += 1
-                self.log.warning(
-                    f"Read timed out. This is timeout #{self.num_consecutive_read_timeouts} "
-                    f"of {self.config.max_read_timeouts} allowed."
+                self.validator.validate(data)
+                telemetry_data = data[common.Key.TELEMETRY]
+                await self.process_telemetry(
+                    sensor_name=telemetry_data[common.Key.NAME],
+                    timestamp=telemetry_data[common.Key.TIMESTAMP],
+                    response_code=telemetry_data[common.Key.RESPONSE_CODE],
+                    sensor_data=telemetry_data[common.Key.SENSOR_TELEMETRY],
                 )
-                if self.num_consecutive_read_timeouts >= self.config.max_read_timeouts:
-                    self.log.error(
-                        f"Encountered at least {self.config.max_read_timeouts} timeouts. Raising error."
-                    )
-                    raise
-            except Exception as e:
-                self.log.exception(f"read_loop failed: {e!r}")
-                raise
+            except Exception:
+                self.log.exception(f"Exception processing {data}. Ignoring.")
+        else:
+            self.log.warning(f"Ignoring unparsable {data}.")
 
-    async def read(self) -> dict:
+    async def basic_read(self) -> dict:
         """Read and unmarshal a json-encoded dict.
 
         This may be a command acknowedgement or telemetry data.
@@ -387,7 +363,7 @@ class ControllerDataClient(common.BaseDataClient):
                     raise ConnectionError(
                         "Disconnected while waiting for command response"
                     )
-                data = await self.read()
+                data = await self.basic_read()
                 if common.Key.RESPONSE in data:
                     response = data[common.Key.RESPONSE]
                     if response == common.ResponseCode.OK:

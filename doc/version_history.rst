@@ -6,6 +6,40 @@
 Version History
 ###############
 
+v0.16.0
+=======
+
+* Remove unused options for pytest.
+* Switch Young32400WeatherStationDataClient to BaseReadLoopDataClient.
+* Switch SiglentSSA3000xSpectrumAnalyzerDataClient to BaseReadLoopDataClient.
+* Switch ControllerDataClient to BaseReadLoopDataClient.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 16
+* ts_ess_common 0.14
+* ts_tcpip
+* ts_utils 1.0
+
+v0.15.1
+=======
+
+* CONFIG_SCHEMA: update to version v5, for changes to lsst.ts.ess.labjack.LabJackAccelerometerDataClient.
+  Note: that data client requires ts_xml 16.
+* Use ts_pre_commit_conf.
+* ``Jenkinsfile``: use the shared library.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 16
+* ts_ess_common 0.11
+* ts_tcpip
+* ts_utils 1.0
+
 v0.15.0
 =======
 
@@ -15,7 +49,7 @@ v0.15.0
 * Add `get_circular_mean_and_std_dev` function.
 * Add `Young32400WeatherStationDataClient`.
 * Add `SiglentSSA3000xSpectrumAnalyzerDataClient`.
-  This requires ts_xml 15.
+  This requires ts_xml 16.
 * Add location to lightning sensors telemetry.
 * Improve type annotation of get_median_and_std_dev.
 * Add command_ess_csc entry point.
