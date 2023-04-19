@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.16.1
+=======
+
+* Make the unit tests compatible with XML 15.0.
+* Make handling of lightning strike telemetry compatible with XML 15.0.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 15
+* ts_ess_common 0.14
+* ts_tcpip
+* ts_utils 1.0
+
 v0.16.0
 =======
 
