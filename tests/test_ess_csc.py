@@ -557,9 +557,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         await self.stop_mock_server()
 
     async def test_rpi_data_client_loses_connection(self) -> None:
-        """The CSC should fault when the RPiDataClient loses its connection
-        to the server and the RpiDataClient should reconnect when the CSC is
-        set to ENABLED again.
+        """Test timeouts of connections from the DataClient to the server.
+
+        The CSC should fault when the DataClient loses its connection to the
+        server and the DataClient should reconnect when the CSC is set to
+        ENABLED again.
         """
         # Start the MockServer for manual control.
         await self.start_mock_server()
@@ -671,3 +673,67 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 topic=self.remote.evt_sensorStatus,
                 sensorName="EssElectricField",
             )
+
+    async def test_weather_station_data_client_loses_connection(self) -> None:
+        """Test timeouts of connections from the DataClient to the server.
+
+        The CSC should fault when the DataClient loses its connection to the
+        server and the DataClient should reconnect when the CSC is set to
+        ENABLED again.
+        """
+        # Start the CSC in DISABLED mode for manual control of the DataClient.
+        async with self.make_csc(
+            initial_state=salobj.State.DISABLED,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=1,
+            override="test_weather_station.yaml",
+        ):
+            await self.assert_next_summary_state(salobj.State.DISABLED)
+            assert len(self.csc.data_clients) == 1
+            assert self.csc.data_clients[0] is not None
+            assert self.csc.data_clients[0].mock_data_server is None
+            self.csc.data_clients[0].simulation_interval = LONG_WAIT_TIME
+
+            await salobj.set_summary_state(
+                remote=self.remote, state=salobj.State.ENABLED
+            )
+            await self.assert_next_summary_state(salobj.State.ENABLED)
+            assert len(self.csc.data_clients) == 1
+            assert self.csc.data_clients[0].mock_data_server is not None
+            assert self.csc.data_clients[0].mock_data_server.connected
+
+            # The CSC should go to FAULT state because of the long interval
+            # between reading consecutive data.
+            await self.assert_next_summary_state(salobj.State.FAULT)
+
+    async def test_spectrum_analyzer_data_client_loses_connection(self) -> None:
+        """Test timeouts of connections from the DataClient to the server.
+
+        The CSC should fault when the DataClient loses its connection to the
+        server and the DataClient should reconnect when the CSC is set to
+        ENABLED again.
+        """
+        # Start the CSC in DISABLED mode for manual control of the DataClient.
+        async with self.make_csc(
+            initial_state=salobj.State.DISABLED,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=1,
+            override="test_spectrum_analyzer_slow.yaml",
+        ):
+            await self.assert_next_summary_state(salobj.State.DISABLED)
+            assert len(self.csc.data_clients) == 1
+            assert self.csc.data_clients[0] is not None
+            assert self.csc.data_clients[0].mock_data_server is None
+            self.csc.data_clients[0].simulation_interval = LONG_WAIT_TIME
+
+            await salobj.set_summary_state(
+                remote=self.remote, state=salobj.State.ENABLED
+            )
+            await self.assert_next_summary_state(salobj.State.ENABLED)
+            assert len(self.csc.data_clients) == 1
+            assert self.csc.data_clients[0].mock_data_server is not None
+            assert self.csc.data_clients[0].mock_data_server.connected
+
+            # The CSC should go to FAULT state because of the long interval
+            # between reading consecutive data.
+            await self.assert_next_summary_state(salobj.State.FAULT)

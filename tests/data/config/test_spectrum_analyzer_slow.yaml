@@ -1,0 +1,12 @@
+instances:
+  - sal_index: 1
+    data_clients:
+      - client_class: SiglentSSA3000xSpectrumAnalyzerDataClient
+        config:
+            host: localhost
+            port: 5000
+            connect_timeout: 5
+            read_timeout: 1
+            location: Test Location
+            sensor_name: MockSSA3000X
+            poll_interval: 10.0  # Set to a high value to simulate a timeout.

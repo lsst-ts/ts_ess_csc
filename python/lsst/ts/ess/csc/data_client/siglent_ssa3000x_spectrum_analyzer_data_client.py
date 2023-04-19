@@ -39,7 +39,23 @@ TERMINATOR = b"\n"
 EXPECTED_NUMBER_OF_DATA_POINTS = 751
 
 
-class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseDataClient):
+class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseReadLoopDataClient):
+    """Get data from a Siglent SSA3000X Spectrum analyzer.
+
+    Parameters
+    ----------
+    config : types.SimpleNamespace
+        The configuration, after validation by the schema returned
+        by `get_config_schema` and conversion to a types.SimpleNamespace.
+    topics : `salobj.Controller` or `types.SimpleNamespace`
+        The telemetry topics this data client can write,
+        as a struct with attributes such as ``tel_spectrumAnalyzer``.
+    log : `logging.Logger`
+        Logger.
+    simulation_mode : `int`, optional
+        Simulation mode; 0 for normal operation.
+    """
+
     ###########################################################################
     # The following constants need to be hard coded because of limitations in #
     # the way DDS handles arrays. This ensures that all arrays always have    #
@@ -76,14 +92,9 @@ class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseDataClient):
         self.stream_lock = asyncio.Lock()
 
         self.client: tcpip.Client | None = None
-        self.read_loop_task = utils.make_done_future()
-
         self.mock_data_server: MockSiglentSSA3000xDataServer | None = None
-
-        self.read_data = False
-
-        # Number of consecutive read timeouts encountered.
-        self.num_consecutive_read_timeouts = 0
+        self._have_seen_data = False
+        self.simulation_interval = 0.5
 
     @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
@@ -147,8 +158,10 @@ additionalProperties: false
     async def connect(self) -> None:
         await self.disconnect()
 
-        self.num_consecutive_read_timeouts = 0
-        self.read_data = False
+        # The first data read from the spectrum analyzer can be truncated, in
+        # which case that data may be discarded. This boolean is used to keep
+        # track of having read data for the first time.
+        self._have_seen_data = False
 
         if self.simulation_mode == 0:
             host = self.config.host
@@ -158,7 +171,9 @@ additionalProperties: false
                 "Simulating output from an SSA3000X Spectrum Analyzer serial interface at "
                 f"host={self.config.host}, port={self.config.port}"
             )
-            self.mock_data_server = MockSiglentSSA3000xDataServer(log=self.log)
+            self.mock_data_server = MockSiglentSSA3000xDataServer(
+                log=self.log, simulation_interval=self.simulation_interval
+            )
             await self.mock_data_server.start_task
             host = tcpip.LOCALHOST_IPV4
             port = self.mock_data_server.port
@@ -167,7 +182,7 @@ additionalProperties: false
         await asyncio.wait_for(self.client.start_task, self.config.connect_timeout)
 
     async def disconnect(self) -> None:
-        self.read_loop_task.cancel()
+        self.run_task.cancel()
         try:
             if self.connected:
                 assert self.client is not None  # make mypy happy
@@ -177,10 +192,6 @@ additionalProperties: false
         if self.mock_data_server is not None:
             await self.mock_data_server.close()
             self.mock_data_server = None
-
-    async def run(self) -> None:
-        self.read_loop_task.cancel()
-        self.read_loop_task = asyncio.create_task(self.read_loop())
 
     async def write(self, data: str) -> None:
         """Write the data appended with the standard terminator.
@@ -193,70 +204,53 @@ additionalProperties: false
         assert self.client is not None  # make mypy happy
         await self.client.write(data.encode() + b"\r\n")
 
-    async def read_loop(self) -> None:
-        """Read raw data from the SSA3000X Spectrum Analyzer."""
-        try:
-            if self.connected and self.simulation_mode == 0:
-                # Make sure that the correct frequency range is used by the
-                # spectrum analyzer.
-                await self.write(self.set_freq_start_cmd)
-                await self.write(self.set_freq_stop_cmd)
-            while self.connected:
-                timestamp = utils.current_tai()
-                await self.write(self.query_trace_data_cmd)
-                assert self.client is not None  # make mypy happy
-                read_bytes = await asyncio.wait_for(
-                    self.client.readuntil(TERMINATOR),
-                    timeout=self.config.read_timeout,
-                )
-                self.num_consecutive_read_timeouts = 0
-                raw_data = read_bytes.decode().strip()
-                raw_data_items = raw_data.split(",")
-                data = [float(i.strip()) for i in raw_data_items]
-                if len(data) < EXPECTED_NUMBER_OF_DATA_POINTS and not self.read_data:
-                    logging.warning(
-                        f"Data of length {len(data)} read. Ignoring because this is "
-                        f"read #{self.number_of_truncated_data_read} out of {self.config.max_read_timeouts}."
-                    )
-                    self.read_data = True
-                elif len(data) != EXPECTED_NUMBER_OF_DATA_POINTS:
-                    raise RuntimeError(
-                        f"Encountered {len(data)} data points instead of "
-                        f"{EXPECTED_NUMBER_OF_DATA_POINTS}. Check the Spectrum "
-                        f"Analyzer and the configuration."
-                    )
-                else:
-                    try:
-                        await self.topics.tel_spectrumAnalyzer.set_write(
-                            startFrequency=self.start_frequency,
-                            stopFrequency=self.stop_frequency,
-                            spectrum=data,
-                            timestamp=timestamp,
-                        )
-                    except Exception as e:
-                        self.log.exception(f"Failed to handle {data=}: {e!r}")
+    async def setup_reading(self) -> None:
+        self._have_seen_data = False
+        if self.connected and self.simulation_mode == 0:
+            # Make sure that the correct frequency range is used by the
+            # spectrum analyzer.
+            await self.write(self.set_freq_start_cmd)
+            await self.write(self.set_freq_stop_cmd)
 
-                # Maybe a bit of an overkill but this ensures that no drift
-                # gets introduced while sleeping.
-                sleep_delay = (
-                    utils.current_tai() - timestamp - self.config.poll_interval
-                )
-                if sleep_delay > 0:
-                    await asyncio.sleep(sleep_delay)
-        except asyncio.TimeoutError:
-            self.num_consecutive_read_timeouts += 1
-            self.log.warning(
-                f"Read timed out. This is timeout #{self.num_consecutive_read_timeouts} "
-                f"of {self.config.max_read_timeouts} allowed."
+    async def read_data(self) -> None:
+        """Read raw data from the SSA3000X Spectrum Analyzer."""
+        timestamp = utils.current_tai()
+        await self.write(self.query_trace_data_cmd)
+        assert self.client is not None  # make mypy happy
+        try:
+            read_bytes = await asyncio.wait_for(
+                self.client.readuntil(TERMINATOR),
+                timeout=self.config.read_timeout,
             )
-            if self.num_consecutive_read_timeouts >= self.config.max_read_timeouts:
-                self.log.error(
-                    f"Encountered at least {self.config.max_read_timeouts} timeouts. Raising error."
-                )
-                raise
-        except Exception as e:
-            self.log.exception(f"read loop failed: {e!r}")
+        except Exception:
+            self._have_seen_data = False
             raise
+        raw_data = read_bytes.decode().strip()
+        raw_data_items = raw_data.split(",")
+        data = [float(i.strip()) for i in raw_data_items]
+        if len(data) < EXPECTED_NUMBER_OF_DATA_POINTS and not self._have_seen_data:
+            logging.warning(
+                f"Data of length {len(data)} read. Ignoring because this is the first time data was read."
+            )
+            self._have_seen_data = True
+        elif len(data) != EXPECTED_NUMBER_OF_DATA_POINTS:
+            raise RuntimeError(
+                f"Encountered {len(data)} data points instead of "
+                f"{EXPECTED_NUMBER_OF_DATA_POINTS}. Check the Spectrum "
+                f"Analyzer and the configuration."
+            )
+        else:
+            try:
+                await self.topics.tel_spectrumAnalyzer.set_write(
+                    startFrequency=self.start_frequency,
+                    stopFrequency=self.stop_frequency,
+                    spectrum=data,
+                    timestamp=timestamp,
+                )
+            except Exception as e:
+                self.log.exception(f"Failed to handle {data=}: {e!r}")
+
+        await asyncio.sleep(self.config.poll_interval)
 
 
 class MockSiglentSSA3000xDataServer(tcpip.OneClientServer):
@@ -266,11 +260,14 @@ class MockSiglentSSA3000xDataServer(tcpip.OneClientServer):
     ----------
     log : `logging.Logger`
         Logger.
+    simulation_interval : `float`
+        Interval between writes (sec).
     """
 
     def __init__(
         self,
         log: logging.Logger,
+        simulation_interval: float,
     ) -> None:
         super().__init__(
             host=tcpip.LOCALHOST_IPV4,
@@ -278,6 +275,7 @@ class MockSiglentSSA3000xDataServer(tcpip.OneClientServer):
             log=log,
             connect_callback=self.connect_callback,
         )
+        self.simulation_interval = simulation_interval
         self.write_loop_task = utils.make_done_future()
 
     async def connect_callback(self, server: tcpip.OneClientServer) -> None:
@@ -288,6 +286,7 @@ class MockSiglentSSA3000xDataServer(tcpip.OneClientServer):
     async def write_loop(self) -> None:
         try:
             while self.connected:
+                await asyncio.sleep(self.simulation_interval)
                 rng = np.random.default_rng(10)
                 data = -100.0 * rng.random(EXPECTED_NUMBER_OF_DATA_POINTS)
                 data_string = ", ".join(f"{d:0.3f}" for d in data)

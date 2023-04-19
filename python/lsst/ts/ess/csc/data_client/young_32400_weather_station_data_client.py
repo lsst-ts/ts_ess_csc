@@ -145,7 +145,7 @@ def scaled_from_raw(raw: float, scale: float, offset: float) -> float:
     return raw * scale + offset
 
 
-class Young32400WeatherStationDataClient(common.BaseDataClient):
+class Young32400WeatherStationDataClient(common.BaseReadLoopDataClient):
     """Get environmental data from Young 32400 weather station
     serial interface.
 
@@ -271,11 +271,7 @@ class Young32400WeatherStationDataClient(common.BaseDataClient):
 
         self.client: tcpip.Client | None = None
 
-        self.read_loop_task = make_done_future()
         self.rain_stopped_timer_task = make_done_future()
-
-        # Number of consecutive read timeouts encountered.
-        self.num_consecutive_read_timeouts = 0
 
     @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
@@ -445,7 +441,6 @@ additionalProperties: false
     async def connect(self) -> None:
         await self.disconnect()
 
-        self.num_consecutive_read_timeouts = 0
         if self.simulation_mode > 0:
             self.mock_data_server = MockYoung32400DataServer(
                 log=self.log,
@@ -466,7 +461,7 @@ additionalProperties: false
         return f"host={self.config.host}, port={self.config.port}"
 
     async def disconnect(self) -> None:
-        self.read_loop_task.cancel()
+        self.run_task.cancel()
         self.rain_stopped_timer_task.cancel()
         self.last_rain_tip_timestamp = 0
         self.air_flow_accumulator.clear()
@@ -629,57 +624,31 @@ additionalProperties: false
         self.rain_stopped_timer_task.cancel()
         self.rain_stopped_timer_task = asyncio.create_task(self.rain_stopped_timer())
 
-    async def run(self) -> None:
-        self.read_loop_task.cancel()
-        self.read_loop_task = asyncio.create_task(self.read_loop())
-
-    async def read_loop(self) -> None:
-        """Read raw data from the weather station.
-
-        The format is as described by by DATA_REGEX.
-        """
+    async def setup_reading(self) -> None:
         # Start the "rain stopped" timer so we can report "no rain"
         # as soon after starting as it is safe to do so.
         self.restart_rain_stopped_timer()
-        try:
-            while self.connected:
-                assert self.client is not None  # make mypy happy
-                read_bytes = await asyncio.wait_for(
-                    self.client.readuntil(YOUNG_TERMINATOR),
-                    timeout=self.config.read_timeout,
-                )
-                self.num_consecutive_read_timeouts = 0
-                data = read_bytes.decode().strip()
-                if not data:
-                    continue
-                match = DATA_REGEX.fullmatch(data)
-                if match is None:
-                    self.log.warning(f"Ignoring {data=}: could not parse the data")
-                    continue
-                # Convert raw data values from str to int.
-                raw_data_dict = {
-                    key: int(value) for key, value in match.groupdict().items()
-                }
-                try:
-                    await self.handle_data(**raw_data_dict)
-                except Exception as e:
-                    self.log.exception(f"Failed to handle {data=}: {e!r}")
-        except asyncio.TimeoutError:
-            self.num_consecutive_read_timeouts += 1
-            self.log.warning(
-                f"Read timed out. This is timeout #{self.num_consecutive_read_timeouts} "
-                f"of {self.config.max_read_timeouts} allowed."
-            )
-            if self.num_consecutive_read_timeouts >= self.config.max_read_timeouts:
-                self.log.error(
-                    f"Encountered at least {self.config.max_read_timeouts} timeouts. Raising error."
-                )
-                raise
-        except StopIteration:
-            self.log.info("read loop ends: out of simulated raw data")
-        except Exception as e:
-            self.log.exception(f"read loop failed: {e!r}")
-            raise
+
+    async def read_data(self) -> None:
+        """Read raw data from the weather station.
+
+        The format is as described by DATA_REGEX.
+        """
+        assert self.client is not None  # make mypy happy
+        read_bytes = await asyncio.wait_for(
+            self.client.readuntil(YOUNG_TERMINATOR),
+            timeout=self.config.read_timeout,
+        )
+        data = read_bytes.decode().strip()
+        if not data:
+            return
+        match = DATA_REGEX.fullmatch(data)
+        if match is None:
+            self.log.warning(f"Ignoring {data=}: could not parse the data")
+            return
+        # Convert raw data values from str to int.
+        raw_data_dict = {key: int(value) for key, value in match.groupdict().items()}
+        await self.handle_data(**raw_data_dict)
 
     async def rain_stopped_timer(self) -> None:
         """Wait for the configured time, then report that rain has stopped.
