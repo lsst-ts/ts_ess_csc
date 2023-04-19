@@ -720,20 +720,23 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=1,
             override="test_spectrum_analyzer_slow.yaml",
         ):
-            await self.assert_next_summary_state(salobj.State.DISABLED)
-            assert len(self.csc.data_clients) == 1
-            assert self.csc.data_clients[0] is not None
-            assert self.csc.data_clients[0].mock_data_server is None
-            self.csc.data_clients[0].simulation_interval = LONG_WAIT_TIME
+            # TODO DM-38363 Remove this this hasattr test and keep the rest of
+            #  the code as soon as XML 16 has been released.
+            if hasattr(self.csc, "tel_spectrumAnalyzer"):
+                await self.assert_next_summary_state(salobj.State.DISABLED)
+                assert len(self.csc.data_clients) == 1
+                assert self.csc.data_clients[0] is not None
+                assert self.csc.data_clients[0].mock_data_server is None
+                self.csc.data_clients[0].simulation_interval = LONG_WAIT_TIME
 
-            await salobj.set_summary_state(
-                remote=self.remote, state=salobj.State.ENABLED
-            )
-            await self.assert_next_summary_state(salobj.State.ENABLED)
-            assert len(self.csc.data_clients) == 1
-            assert self.csc.data_clients[0].mock_data_server is not None
-            assert self.csc.data_clients[0].mock_data_server.connected
+                await salobj.set_summary_state(
+                    remote=self.remote, state=salobj.State.ENABLED
+                )
+                await self.assert_next_summary_state(salobj.State.ENABLED)
+                assert len(self.csc.data_clients) == 1
+                assert self.csc.data_clients[0].mock_data_server is not None
+                assert self.csc.data_clients[0].mock_data_server.connected
 
-            # The CSC should go to FAULT state because of the long interval
-            # between reading consecutive data.
-            await self.assert_next_summary_state(salobj.State.FAULT)
+                # The CSC should go to FAULT state because of the long interval
+                # between reading consecutive data.
+                await self.assert_next_summary_state(salobj.State.FAULT)
