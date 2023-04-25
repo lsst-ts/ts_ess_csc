@@ -614,9 +614,8 @@ additionalProperties: false
                     * SECONDS_PER_HOUR
                     / rain_tip_dt
                 )
-                # TODO DM-38119: remove the int cast.
                 await self.topics.tel_rainRate.set_write(
-                    rainRate=int(round(rain_rate_mm_per_hr))
+                    rainRate=round(rain_rate_mm_per_hr)
                 )
 
     def restart_rain_stopped_timer(self) -> None:
