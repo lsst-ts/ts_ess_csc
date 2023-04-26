@@ -33,7 +33,7 @@ _STD_DEV_FACTOR = 0.741
 def get_circular_mean_and_std_dev(
     angles: np.ndarray | list[float],
 ) -> tuple[float, float]:
-    """Compute the circular mean and circcular standard deviation
+    """Compute the circular mean and circular standard deviation
     of an array of angles in degrees.
 
     Parameters
@@ -43,18 +43,28 @@ def get_circular_mean_and_std_dev(
 
     Returns
     -------
-    median : `float`
-        The median.
+    mean : `float`
+        The circular mean.
     std_dev : `float`
-        Estimate of the standard deviation.
+        The circular standard deviation, which ranges from 0 to math.inf.
+
+    Raises
+    ------
+    ValueError
+        If ``angles`` is empty.
     """
+    if len(angles) == 0:
+        raise ValueError("angles is empty; you must provide at least one value")
     # See https://en.wikipedia.org/wiki/Directional_statistics
     # for information about statistics on direction.
     complex_sum = np.sum(np.exp(1j * np.radians(angles))) / len(angles)
     circular_mean = math.degrees(cmath.phase(complex_sum))
     if circular_mean < 0:
         circular_mean += 360
-    circular_std = math.degrees(math.sqrt(-2 * math.log(abs(complex_sum))))
+    try:
+        circular_std = math.degrees(math.sqrt(-2 * math.log(abs(complex_sum))))
+    except ValueError:
+        circular_std = math.inf
     return (circular_mean, circular_std)
 
 
