@@ -22,6 +22,7 @@
 __all__ = ["get_circular_mean_and_std_dev", "get_median_and_std_dev"]
 
 import cmath
+import logging
 import math
 
 import numpy as np
@@ -32,6 +33,7 @@ _STD_DEV_FACTOR = 0.741
 
 def get_circular_mean_and_std_dev(
     angles: np.ndarray | list[float],
+    log: logging.Logger | None = None,
 ) -> tuple[float, float]:
     """Compute the circular mean and circcular standard deviation
     of an array of angles in degrees.
@@ -40,21 +42,39 @@ def get_circular_mean_and_std_dev(
     ----------
     angles : `list` of `float`
         A sequence of angles in degrees.
+    log : `logging.Logger`, optional
+        Logger for warnings.
 
     Returns
     -------
-    median : `float`
-        The median.
+    mean : `float`
+        The circular mean.
     std_dev : `float`
-        Estimate of the standard deviation.
+        The circular standard deviation. This ranges from 0 to math.inf,
+        and will be math.nan if it could not be computed.
+
+    Raises
+    ------
+    ValueError
+        If ``angles`` is empty.
     """
+    if len(angles) == 0:
+        raise ValueError("angles is empty; you must provide at least one value")
     # See https://en.wikipedia.org/wiki/Directional_statistics
     # for information about statistics on direction.
     complex_sum = np.sum(np.exp(1j * np.radians(angles))) / len(angles)
     circular_mean = math.degrees(cmath.phase(complex_sum))
     if circular_mean < 0:
         circular_mean += 360
-    circular_std = math.degrees(math.sqrt(-2 * math.log(abs(complex_sum))))
+    try:
+        circular_std = math.degrees(math.sqrt(-2 * math.log(abs(complex_sum))))
+    except ValueError:
+        if log is not None:
+            log.warning(
+                "Could not compute circular std dev: "
+                f"{complex_sum=!r}; {math.log(abs(complex_sum))=!r}"
+            )
+        circular_std = math.nan
     return (circular_mean, circular_std)
 
 
