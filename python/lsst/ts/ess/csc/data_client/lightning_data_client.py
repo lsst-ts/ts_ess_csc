@@ -79,11 +79,6 @@ class LightningDataClient(ControllerDataClient):
             str, ElectricFieldStrengthAccumulator
         ] = dict()
 
-        # TODO DM-38363 Remove this as soon as XML 16 has been released.
-        self.has_location = hasattr(
-            self.topics.tel_electricFieldStrength.DataType(), "location"
-        )
-
     async def sleep_timer(self, sleep_time: float) -> None:
         """Simple timer that sleeps for the given amount of time.
 
@@ -229,11 +224,7 @@ additionalProperties: false
         if not topic_kwargs:
             return
 
-        # TODO DM-38363 Remove the line containing "if" as soon as XML 16 has
-        #  been released and leave the line setting "location" in place.
-        if self.has_location:
-            topic_kwargs["location"] = device_configuration.location
-
+        topic_kwargs["location"] = device_configuration.location
         if np.abs(topic_kwargs["strengthMax"]) > device_configuration.threshold:
             if not self.high_electric_field_timer_task.done():
                 self.high_electric_field_timer_task.cancel()
@@ -333,12 +324,11 @@ additionalProperties: false
         self.strike_timer_task = asyncio.create_task(
             self.sleep_timer(device_configuration.safe_interval)
         )
-        # TODO DM-38363 Remove cast to int.
         await self.topics.evt_lightningStrike.set_write(
             sensorName=sensor_name,
             correctedDistance=sensor_data[1],
             uncorrectedDistance=sensor_data[2],
-            bearing=int(sensor_data[3]),
+            bearing=sensor_data[3],
         )
 
     async def process_ld250_noise_or_status(
@@ -376,11 +366,8 @@ additionalProperties: false
             "closeAlarmStatus": close_alarm_status,
             "severeAlarmStatus": severe_alarm_status,
             "heading": heading,
+            "location": device_configuration.location,
         }
-        # TODO DM-38363 Remove the line containing "if" as soon as XML 16 has
-        #  been released and leave the line setting "location" in place.
-        if self.has_location:
-            topic_kwargs["location"] = device_configuration.location
         await self.topics.tel_lightningStrikeStatus.set_write(**topic_kwargs)
         await self.topics.evt_sensorStatus.set_write(
             sensorName=sensor_name,
