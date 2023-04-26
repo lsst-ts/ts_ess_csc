@@ -648,7 +648,10 @@ additionalProperties: false
             return
         # Convert raw data values from str to int.
         raw_data_dict = {key: int(value) for key, value in match.groupdict().items()}
-        await self.handle_data(**raw_data_dict)
+        try:
+            await self.handle_data(**raw_data_dict)
+        except Exception as e:
+            self.log.exception(f"Failed to handle {data=}: {e!r}")
 
     async def rain_stopped_timer(self) -> None:
         """Wait for the configured time, then report that rain has stopped.
