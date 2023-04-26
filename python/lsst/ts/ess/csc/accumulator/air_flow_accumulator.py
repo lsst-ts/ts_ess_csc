@@ -47,6 +47,8 @@ class AirFlowAccumulator:
 
     Parameters
     ----------
+    log : `logging.Logger`
+        Logger.
     num_samples : `int`
         The number of samples to read before producing aggregate data.
 
