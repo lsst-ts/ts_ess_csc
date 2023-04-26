@@ -66,8 +66,7 @@ class SiglentSSA3000xDataClientTestCase(unittest.IsolatedAsyncioTestCase):
         ) as self.remote:
             yield
 
-    # TODO DM-38363 Remove this function as soon as XML 16 has been released.
-    def get_data_client(self) -> csc.SiglentSSA3000xSpectrumAnalyzerDataClient:
+    def create_data_client(self) -> csc.SiglentSSA3000xSpectrumAnalyzerDataClient:
         """Helper function to create a DataClient.
 
         Returns
@@ -85,23 +84,18 @@ class SiglentSSA3000xDataClientTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_siglent_ssa3000x_spectrum_analyzer_data_client(self) -> None:
         async with self.create_controller():
-            # TODO DM-38363 Remove this as soon as XML 16 has been released.
-            if not hasattr(self.controller, "tel_spectrumAnalyzer"):
-                with pytest.raises(RuntimeError):
-                    self.get_data_client()
-            else:
-                data_client = self.get_data_client()
+            data_client = self.create_data_client()
 
-                await data_client.start()
-                try:
-                    telemetry = await self.remote.tel_spectrumAnalyzer.next(flush=False)
-                    assert telemetry.startFrequency == pytest.approx(
-                        csc.SiglentSSA3000xSpectrumAnalyzerDataClient.start_frequency
-                    )
-                    assert telemetry.stopFrequency == pytest.approx(
-                        csc.SiglentSSA3000xSpectrumAnalyzerDataClient.stop_frequency
-                    )
-                    assert np.amax(telemetry.spectrum) <= 0.0
-                    assert np.amin(telemetry.spectrum) >= -100.0
-                finally:
-                    await data_client.stop()
+            await data_client.start()
+            try:
+                telemetry = await self.remote.tel_spectrumAnalyzer.next(flush=False)
+                assert telemetry.startFrequency == pytest.approx(
+                    csc.SiglentSSA3000xSpectrumAnalyzerDataClient.start_frequency
+                )
+                assert telemetry.stopFrequency == pytest.approx(
+                    csc.SiglentSSA3000xSpectrumAnalyzerDataClient.stop_frequency
+                )
+                assert np.amax(telemetry.spectrum) <= 0.0
+                assert np.amin(telemetry.spectrum) >= -100.0
+            finally:
+                await data_client.stop()

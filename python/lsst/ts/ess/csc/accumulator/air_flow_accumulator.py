@@ -22,21 +22,11 @@
 __all__ = ["AirFlowAccumulator"]
 
 import logging
-import math
 from typing import Any
 
 import numpy as np
 
 from .utils import get_circular_mean_and_std_dev, get_median_and_std_dev
-
-
-# TODO DM-38119: delete this function and stop using it once the data type of
-# direction and directionStdDev is float.
-def float_as_int(value: float, nan_value: int = -1) -> int:
-    """Cast a float value to int, returning nan_value for a NaN."""
-    if math.isnan(value):
-        return nan_value
-    return int(round(value))
 
 
 class AirFlowAccumulator:
@@ -173,10 +163,8 @@ class AirFlowAccumulator:
                 speed_median, speed_std = get_median_and_std_dev(data=speed_arr)
                 dict_to_return = dict(
                     timestamp=timestamp,
-                    # TODO DM-38119: delete float_as_int once the data type of
-                    # direction and directionStdDev is float.
-                    direction=float_as_int(direction_mean),
-                    directionStdDev=float_as_int(direction_std),
+                    direction=direction_mean,
+                    directionStdDev=direction_std,
                     speed=float(speed_median),
                     speedStdDev=float(speed_std),
                     maxSpeed=np.max(speed_arr),

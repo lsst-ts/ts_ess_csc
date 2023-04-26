@@ -80,10 +80,6 @@ class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseReadLoopDataClient):
             config=config, topics=topics, log=log, simulation_mode=simulation_mode
         )
 
-        # TODO DM-38363 Remove this as soon as XML 16 has been released.
-        if not hasattr(self.topics, "tel_spectrumAnalyzer"):
-            raise RuntimeError("At least ts_xml 16.0 required to use this class.")
-
         self.topics.tel_spectrumAnalyzer.set(
             sensorName=self.config.sensor_name, location=self.config.location
         )
@@ -227,6 +223,10 @@ additionalProperties: false
             raise
         raw_data = read_bytes.decode().strip()
         raw_data_items = raw_data.split(",")
+        # The data from the spectrum analyzer ends in a "," so the last item
+        # will be an empty string and needs to be dropped.
+        if raw_data_items[-1] == "":
+            del raw_data_items[-1]
         data = [float(i.strip()) for i in raw_data_items]
         if len(data) < EXPECTED_NUMBER_OF_DATA_POINTS and not self._have_seen_data:
             logging.warning(

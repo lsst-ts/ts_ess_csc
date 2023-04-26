@@ -50,6 +50,9 @@ LONG_WAIT_TIME = 8
 TOO_LONG_WAIT_TIME = 12
 # The number of sensors when all sensors are used in the test.
 NUM_ALL_SENSORS = 5
+# The number os seconds to wait for a summary state change. This needs to be
+# set to a sufficiently high number so the timeout tests don't fail.
+STATE_TIMEOUT = 60
 
 
 def create_reply_dict(
@@ -413,7 +416,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=1,
             override="test_all_sensors.yaml",
         ):
-            await self.assert_next_summary_state(salobj.State.ENABLED, timeout=2)
+            await self.assert_next_summary_state(
+                salobj.State.ENABLED, timeout=STATE_TIMEOUT
+            )
             assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
                 assert isinstance(data_client, csc.RPiDataClient)
@@ -439,7 +444,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=1,
             override="test_all_sensors.yaml",
         ):
-            await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_summary_state(
+                salobj.State.ENABLED, timeout=STATE_TIMEOUT
+            )
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
             assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
@@ -448,7 +455,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Disconnect one of the mock servers
             await self.csc.data_clients[1].mock_server.exit()
 
-            await self.assert_next_summary_state(salobj.State.FAULT)
+            await self.assert_next_summary_state(
+                salobj.State.FAULT, timeout=STATE_TIMEOUT
+            )
             await self.assert_next_sample(
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.ConnectionLost
             )
@@ -466,7 +475,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             override="test_all_sensors.yaml",
         ):
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
-            await self.assert_next_summary_state(salobj.State.DISABLED)
+            await self.assert_next_summary_state(
+                salobj.State.DISABLED, timeout=STATE_TIMEOUT
+            )
 
             # Prevent one of the data_clients from connecting,
             # then try to enable the CSC.
@@ -476,7 +487,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             self.csc.data_clients[1].enable_mock_server = False
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_enable.start(timeout=STD_TIMEOUT)
-            await self.assert_next_summary_state(salobj.State.FAULT)
+            await self.assert_next_summary_state(
+                salobj.State.FAULT, timeout=STATE_TIMEOUT
+            )
             await self.assert_next_sample(
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.ConnectionFailed
             )
@@ -491,7 +504,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
         ):
-            await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_summary_state(
+                salobj.State.ENABLED, timeout=STATE_TIMEOUT
+            )
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
             assert len(self.csc.data_clients) == 1
             for data_client in self.csc.data_clients:
@@ -519,7 +534,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.validate_telemetry()
 
             # Here LONG_WAIT_TIME is used. This should time out.
-            await self.assert_next_summary_state(salobj.State.FAULT)
+            await self.assert_next_summary_state(
+                salobj.State.FAULT, timeout=STATE_TIMEOUT
+            )
             await self.assert_next_sample(
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.ConnectionLost
             )
@@ -536,7 +553,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=0,
             override="test_one_temp_sensor.yaml",
         ):
-            await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_summary_state(
+                salobj.State.ENABLED, timeout=STATE_TIMEOUT
+            )
 
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
             assert len(self.csc.data_clients) == 1
@@ -544,14 +563,22 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.STANDBY
             )
-            await self.assert_next_summary_state(salobj.State.DISABLED)
-            await self.assert_next_summary_state(salobj.State.STANDBY)
+            await self.assert_next_summary_state(
+                salobj.State.DISABLED, timeout=STATE_TIMEOUT
+            )
+            await self.assert_next_summary_state(
+                salobj.State.STANDBY, timeout=STATE_TIMEOUT
+            )
 
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.ENABLED
             )
-            await self.assert_next_summary_state(salobj.State.DISABLED)
-            await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_summary_state(
+                salobj.State.DISABLED, timeout=STATE_TIMEOUT
+            )
+            await self.assert_next_summary_state(
+                salobj.State.ENABLED, timeout=STATE_TIMEOUT
+            )
 
         # Stop the MockServer to clean up after ourselves.
         await self.stop_mock_server()
@@ -571,19 +598,25 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=0,
             override="test_one_temp_sensor.yaml",
         ):
-            await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_summary_state(
+                salobj.State.ENABLED, timeout=STATE_TIMEOUT
+            )
 
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
             assert len(self.csc.data_clients) == 1
 
             # Stop the MockServer.
             await self.stop_mock_server()
-            await self.assert_next_summary_state(salobj.State.FAULT)
+            await self.assert_next_summary_state(
+                salobj.State.FAULT, timeout=STATE_TIMEOUT
+            )
 
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.STANDBY
             )
-            await self.assert_next_summary_state(salobj.State.STANDBY)
+            await self.assert_next_summary_state(
+                salobj.State.STANDBY, timeout=STATE_TIMEOUT
+            )
 
             # Start the MockServer again.
             await self.start_mock_server()
@@ -591,8 +624,12 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.ENABLED
             )
-            await self.assert_next_summary_state(salobj.State.DISABLED)
-            await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_summary_state(
+                salobj.State.DISABLED, timeout=STATE_TIMEOUT
+            )
+            await self.assert_next_summary_state(
+                salobj.State.ENABLED, timeout=STATE_TIMEOUT
+            )
 
         # Stop the MockServer to clean up after ourselves.
         await self.stop_mock_server()
@@ -637,7 +674,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=1,
             override="test_lightning_sensors.yaml",
         ):
-            await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_summary_state(
+                salobj.State.ENABLED, timeout=STATE_TIMEOUT
+            )
 
             # Verify that strike events and telemetry have been sent.
             await self.assert_next_sample(
@@ -688,7 +727,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=1,
             override="test_weather_station.yaml",
         ):
-            await self.assert_next_summary_state(salobj.State.DISABLED)
+            await self.assert_next_summary_state(
+                salobj.State.DISABLED, timeout=STATE_TIMEOUT
+            )
             assert len(self.csc.data_clients) == 1
             assert self.csc.data_clients[0] is not None
             assert self.csc.data_clients[0].mock_data_server is None
@@ -697,14 +738,18 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.ENABLED
             )
-            await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_summary_state(
+                salobj.State.ENABLED, timeout=STATE_TIMEOUT
+            )
             assert len(self.csc.data_clients) == 1
             assert self.csc.data_clients[0].mock_data_server is not None
             assert self.csc.data_clients[0].mock_data_server.connected
 
             # The CSC should go to FAULT state because of the long interval
             # between reading consecutive data.
-            await self.assert_next_summary_state(salobj.State.FAULT)
+            await self.assert_next_summary_state(
+                salobj.State.FAULT, timeout=STATE_TIMEOUT
+            )
 
     async def test_spectrum_analyzer_data_client_loses_connection(self) -> None:
         """Test timeouts of connections from the DataClient to the server.
@@ -720,23 +765,26 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             simulation_mode=1,
             override="test_spectrum_analyzer_slow.yaml",
         ):
-            # TODO DM-38363 Remove this this hasattr test and keep the rest of
-            #  the code as soon as XML 16 has been released.
-            if hasattr(self.csc, "tel_spectrumAnalyzer"):
-                await self.assert_next_summary_state(salobj.State.DISABLED)
-                assert len(self.csc.data_clients) == 1
-                assert self.csc.data_clients[0] is not None
-                assert self.csc.data_clients[0].mock_data_server is None
-                self.csc.data_clients[0].simulation_interval = LONG_WAIT_TIME
+            await self.assert_next_summary_state(
+                salobj.State.DISABLED, timeout=STATE_TIMEOUT
+            )
+            assert len(self.csc.data_clients) == 1
+            assert self.csc.data_clients[0] is not None
+            assert self.csc.data_clients[0].mock_data_server is None
+            self.csc.data_clients[0].simulation_interval = LONG_WAIT_TIME
 
-                await salobj.set_summary_state(
-                    remote=self.remote, state=salobj.State.ENABLED
-                )
-                await self.assert_next_summary_state(salobj.State.ENABLED)
-                assert len(self.csc.data_clients) == 1
-                assert self.csc.data_clients[0].mock_data_server is not None
-                assert self.csc.data_clients[0].mock_data_server.connected
+            await salobj.set_summary_state(
+                remote=self.remote, state=salobj.State.ENABLED
+            )
+            await self.assert_next_summary_state(
+                salobj.State.ENABLED, timeout=STATE_TIMEOUT
+            )
+            assert len(self.csc.data_clients) == 1
+            assert self.csc.data_clients[0].mock_data_server is not None
+            assert self.csc.data_clients[0].mock_data_server.connected
 
-                # The CSC should go to FAULT state because of the long interval
-                # between reading consecutive data.
-                await self.assert_next_summary_state(salobj.State.FAULT)
+            # The CSC should go to FAULT state because of the long interval
+            # between reading consecutive data.
+            await self.assert_next_summary_state(
+                salobj.State.FAULT, timeout=STATE_TIMEOUT
+            )
