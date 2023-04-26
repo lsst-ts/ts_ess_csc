@@ -35,7 +35,7 @@ def get_circular_mean_and_std_dev(
     angles: np.ndarray | list[float],
     log: logging.Logger | None = None,
 ) -> tuple[float, float]:
-    """Compute the circular mean and circcular standard deviation
+    """Compute the circular mean and circular standard deviation
     of an array of angles in degrees.
 
     Parameters
@@ -52,6 +52,8 @@ def get_circular_mean_and_std_dev(
     std_dev : `float`
         The circular standard deviation. This ranges from 0 to math.inf,
         and will be math.nan if it could not be computed.
+        Except as a hack for ts_xml 15 it will be -1 instead of nan or inf
+        because some direction std dev fields are reported as int.
 
     Raises
     ------
@@ -75,6 +77,10 @@ def get_circular_mean_and_std_dev(
                 f"{complex_sum=!r}; {math.log(abs(complex_sum))=!r}"
             )
         circular_std = math.nan
+    # For ts_xml the value is cast to int, so nan or inf are illegal.
+    # Use -1 as a sentinal value.
+    if not math.isfinite(circular_std):
+        circular_std = -1
     return (circular_mean, circular_std)
 
 
