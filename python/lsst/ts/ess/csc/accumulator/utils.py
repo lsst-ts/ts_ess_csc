@@ -73,9 +73,7 @@ def get_circular_mean_and_std_dev(
     except ValueError:
         if log is not None:
             log.warning(
-                "Could not compute circular std dev: "
-                f"{complex_sum=!r}; {math.log(abs(complex_sum))=!r}; "
-                f"{angles=}"
+                "Could not compute circular std dev: {complex_sum=!r}; {angles=}"
             )
         circular_std = math.nan
     # For ts_xml the value is cast to int, so nan or inf are illegal.
