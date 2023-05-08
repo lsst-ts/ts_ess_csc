@@ -9,13 +9,6 @@ source:
 build:
   noarch: generic
   script: {{ PYTHON }} -m pip install --no-deps --ignore-installed .
-  script_env:
-    - PATH
-    - LD_LIBRARY_PATH
-    - OSPL_HOME
-    - PYTHON_BUILD_LOCATION
-    - LSST_DDS_PARTITION_PREFIX
-    - TS_CONFIG_OCS_DIR
 
 test:
   requires:
@@ -32,7 +25,6 @@ test:
     - python
     - bin
     - tests
-    - setup.cfg
     - pyproject.toml
   commands:
     - pytest
