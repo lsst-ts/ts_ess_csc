@@ -301,11 +301,10 @@ additionalProperties: false
         # interval has passed without any new strikes and a "safe" event can be
         # sent.
         if self.strike_timer_task.done() and not self.strike_timer_task.cancelled():
-            # The distance values are integers so np.nan cannot be used here.
             await self.topics.evt_lightningStrike.set_write(
                 sensorName=sensor_name,
-                correctedDistance=-1,
-                uncorrectedDistance=-1,
+                correctedDistance=np.inf,
+                uncorrectedDistance=np.inf,
                 bearing=0,
             )
 
@@ -326,9 +325,9 @@ additionalProperties: false
         )
         await self.topics.evt_lightningStrike.set_write(
             sensorName=sensor_name,
-            correctedDistance=sensor_data[1],
-            uncorrectedDistance=sensor_data[2],
-            bearing=sensor_data[3],
+            correctedDistance=float(sensor_data[1]),
+            uncorrectedDistance=float(sensor_data[2]),
+            bearing=float(sensor_data[3]),
         )
 
     async def process_ld250_noise_or_status(
@@ -342,9 +341,8 @@ additionalProperties: false
         isok = response_code == 0
         sensor_status = 0
 
-        # The strike rate values are integers so np.nan cannot be used here.
-        close_strike_rate = -1
-        total_strike_rate = -1
+        close_strike_rate = np.nan
+        total_strike_rate = np.nan
         close_alarm_status = False
         severe_alarm_status = False
         heading = np.nan
@@ -352,8 +350,8 @@ additionalProperties: false
             sensor_status = 1
             isok = False
         if isok:
-            close_strike_rate = int(sensor_data[1])
-            total_strike_rate = int(sensor_data[2])
+            close_strike_rate = float(sensor_data[1])
+            total_strike_rate = float(sensor_data[2])
             close_alarm_status = sensor_data[3] == 0
             severe_alarm_status = sensor_data[4] == 0
             heading = float(sensor_data[5])
