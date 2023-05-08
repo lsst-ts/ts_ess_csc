@@ -1,25 +1,23 @@
+__pycache__
+*.egg
+*.egg-info
+.sconf_temp
+.sconsign.dblite
 *.log
-*.o
-*.os
-*.so
-*.cfgc
-*.pyc
-*_wrap.cc
-*Lib.py
-
-# Built by sconsUtils
 version.py
 
-# Pytest
+# pytest
 tests/.tests
 pytest_session.txt
-.cache
 .hypothesis
 .pytest_cache
 .coverage
 
+# editors
 .idea
 .vscode
+
+# ts_pre_commit_conf
 .pre-commit-config.yaml
 .flake8
 .isort.cfg
