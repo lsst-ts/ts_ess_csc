@@ -6,6 +6,31 @@
 Version History
 ###############
 
+v0.16.4
+=======
+
+* Remove XML 15 compatibility:
+
+  * For the ``lightningStrikeStatus`` telemetry topic, initialize ``closeStrikeRate`` and ``totalStrikeRate`` to NaN instead of -1.
+  * For the ``lightningStrike`` event, report "no lightning strikes nearby" by setting ``correctedDistance`` and  ``uncorrectedDistance`` to infinity, instead of -1.
+  * Stop rounding these fields and other lightning-related numbers to integer; all are now float.
+
+* Remove scons support.
+* Git hide egg info and simplify .gitignore.
+* Further refinements for ts_pre_commit_config:
+
+  * Remove unused bits from ``conda/meta.yaml``.
+  * Remove ``setup.cfg``.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 16
+* ts_ess_common 0.14
+* ts_tcpip
+* ts_utils 1.0
+
 v0.16.3
 =======
 
