@@ -118,7 +118,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         )
         return ess_csc
 
-    def topic_callback(self, data: salobj.BaseMsgType, attr_name: str) -> None:
+    async def topic_callback(self, data: salobj.BaseMsgType, attr_name: str) -> None:
         """Callback for read topics.
 
         Assign to all topics for which you want to call next_data.
