@@ -118,7 +118,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         )
         return ess_csc
 
-    def topic_callback(self, data: salobj.BaseMsgType, attr_name: str) -> None:
+    async def topic_callback(self, data: salobj.BaseMsgType, attr_name: str) -> None:
         """Callback for read topics.
 
         Assign to all topics for which you want to call next_data.
@@ -679,13 +679,13 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             # Verify that strike events and telemetry have been sent.
-            await self.assert_next_sample(
+            data = await self.assert_next_sample(
                 topic=self.remote.evt_lightningStrike,
                 sensorName="EssLightning",
-                correctedDistance=-1,
-                uncorrectedDistance=-1,
                 bearing=0,
             )
+            assert np.isinf(data.correctedDistance)
+            assert np.isinf(data.uncorrectedDistance)
             await self.assert_next_sample(
                 topic=self.remote.tel_lightningStrikeStatus,
                 sensorName="EssLightning",
