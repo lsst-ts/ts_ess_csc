@@ -453,7 +453,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 assert data_client.mock_server.connected
 
             # Disconnect one of the mock servers
-            await self.csc.data_clients[1].mock_server.exit()
+            await self.csc.data_clients[1].mock_server.close()
 
             await self.assert_next_summary_state(
                 salobj.State.FAULT, timeout=STATE_TIMEOUT
@@ -639,10 +639,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             name="MockServer",
             host=tcpip.LOCAL_HOST,
             port=5000,
+            log=logging.getLogger("MockServer"),
             simulation_mode=1,
         )
         mock_command_handler = common.MockCommandHandler(
-            callback=self.mock_server.write,
+            callback=self.mock_server.write_json,
             simulation_mode=1,
         )
         self.mock_server.set_command_handler(mock_command_handler)
