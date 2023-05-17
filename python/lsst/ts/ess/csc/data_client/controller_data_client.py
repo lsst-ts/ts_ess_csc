@@ -26,6 +26,7 @@ import asyncio
 import json
 import logging
 import types
+import typing
 from collections.abc import Sequence
 from typing import Any, Callable
 
@@ -33,12 +34,12 @@ import jsonschema
 from lsst.ts import salobj, tcpip
 from lsst.ts.ess import common
 
-# Time limit for connecting to the Controller (seconds).
+# Time limit for connecting to the ESS Controller (seconds).
 CONNECT_TIMEOUT = 5
 
-# Timeout limit for communicating with the RPi (seconds). This includes
-# writing a command and reading the response and reading telemetry. Unit
-# tests can set this to a lower value to speed up the test.
+# Timeout limit for communicating with the ESS Controller (seconds). This
+# includes writing a command and reading the response and reading telemetry.
+# Unit tests can set this to a lower value to speed up the test.
 COMMUNICATE_TIMEOUT = 60
 
 
@@ -72,9 +73,8 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
         # Lock for TCP/IP communication
         self.stream_lock = asyncio.Lock()
 
-        # TCP/IP stream reader and writer
-        self.reader: asyncio.StreamReader | None = None
-        self.writer: asyncio.StreamWriter | None = None
+        # TCP/IP Client
+        self.client: tcpip.Client | None = None
 
         # Set this attribute false before calling `start` to test failure
         # to connect to the server. Ignored if not simulating.
@@ -148,12 +148,7 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
 
     @property
     def connected(self) -> bool:
-        return not (
-            self.reader is None
-            or self.writer is None
-            or self.reader.at_eof()
-            or self.writer.is_closing()
-        )
+        return self.client is not None and self.client.connected
 
     def configure(self) -> None:
         """Store device configurations.
@@ -190,7 +185,7 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
         return f"host={self.config.host}, port={self.config.port}"
 
     async def connect(self) -> None:
-        """Connect to the RPi and configure it.
+        """Connect to the ESS Controller and configure it.
 
         Raises
         ------
@@ -203,14 +198,15 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
         if self.simulation_mode != 0:
             if self.enable_mock_server:
                 self.mock_server = common.SocketServer(
-                    name="MockRPiServer",
-                    host=tcpip.LOCAL_HOST,
+                    name="MockDataServer",
+                    host=tcpip.DEFAULT_LOCALHOST,
                     port=0,
+                    log=self.log,
                     simulation_mode=1,
                 )
                 assert self.mock_server is not None  # make mypy happy
                 mock_command_handler = common.MockCommandHandler(
-                    callback=self.mock_server.write,
+                    callback=self.mock_server.write_json,
                     simulation_mode=1,
                 )
                 self.mock_server.set_command_handler(mock_command_handler)
@@ -221,44 +217,50 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
                 # so descr and __repr__ show the correct host and port
                 port = self.mock_server.port
             else:
-                self.log.info(f"{self}.enable_mock_server false; connection will fail")
+                self.log.info(f"{self}.enable_mock_server false; connection will fail.")
                 port = 0
             # Change self.config so descr and __repr__ show the actual
             # host and port.
             self.config.host = tcpip.LOCAL_HOST
             self.config.port = port
 
-        self.reader, self.writer = await asyncio.wait_for(
-            asyncio.open_connection(
-                host=self.config.host, port=self.config.port
-            ),  # type: ignore
-            timeout=CONNECT_TIMEOUT,
+        self.client = tcpip.Client(
+            host=self.config.host,
+            port=self.config.port,
+            log=self.log,
+            name=type(self).__name__,
         )
-        configuration = {"devices": self.config.devices}
-        await self.run_command(command="configure", configuration=configuration)
+        await asyncio.wait_for(fut=self.client.start_task, timeout=CONNECT_TIMEOUT)
+        configuration = {common.Key.DEVICES: self.config.devices}
+        await self.run_command(
+            command=common.Command.CONFIGURE, configuration=configuration
+        )
 
     async def disconnect(self) -> None:
-        """Disconnect from the RPi.
+        """Disconnect from the ESS Controller.
 
         Always safe to call, though it may raise asyncio.CancelledError
-        if the writer is currently being closed.
+        if the client is currently being closed.
         """
         self.run_task.cancel()
         if self.connected:
-            await asyncio.wait_for(
-                tcpip.close_stream_writer(self.writer), timeout=CONNECT_TIMEOUT
-            )
+            assert self.client is not None  # make mypy happy
+            await self.client.close()
+            self.client = None
         if self.mock_server is not None:
             await self.mock_server.close()
 
     async def read_data(self) -> None:
-        """Read and process data from the RPi."""
+        """Read and process data from the ESS Controller."""
         async with self.stream_lock:
-            data = await self.basic_read()
+            assert self.client is not None  # keep mypy happy.
+            data = await asyncio.wait_for(
+                self.client.read_json(), timeout=COMMUNICATE_TIMEOUT
+            )
         if common.Key.RESPONSE in data:
-            self.log.warning("Read a command response with no command pending")
+            self.log.warning("Read a command response with no command pending.")
         elif common.Key.TELEMETRY in data:
-            self.log.debug(f"Processing {data}")
+            self.log.debug(f"Processing {data}.")
             try:
                 self.validator.validate(data)
                 telemetry_data = data[common.Key.TELEMETRY]
@@ -272,42 +274,6 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
                 self.log.exception(f"Exception processing {data}. Ignoring.")
         else:
             self.log.warning(f"Ignoring unparsable {data}.")
-
-    async def basic_read(self) -> dict:
-        """Read and unmarshal a json-encoded dict.
-
-        This may be a command acknowedgement or telemetry data.
-
-        Time out if reading takes longer than COMMUNICATE_TIMEOUT seconds.
-
-        Returns
-        -------
-        data : `dict`
-            The read data, after json-decoding it.
-
-        Raises
-        ------
-        RuntimeError
-            In case of not being connected.
-            In case parsing gthe JSON data fails.
-        """
-        if not self.connected:
-            raise RuntimeError("Not connected.")
-        assert self.reader is not None  # make mypy happy
-
-        read_bytes = await asyncio.wait_for(
-            self.reader.readuntil(tcpip.TERMINATOR),
-            timeout=COMMUNICATE_TIMEOUT,
-        )
-        try:
-            data = json.loads(read_bytes.decode())
-        except json.decoder.JSONDecodeError as e:
-            raise RuntimeError(f"Could not parse {read_bytes!r} as json.") from e
-        if not isinstance(data, dict):
-            raise RuntimeError(
-                f"Could not parse {read_bytes!r} as a json-encoded dict."
-            )
-        return data
 
     async def run_command(self, command: str, **parameters: Any) -> None:
         """Write a command. Time out if it takes too long.
@@ -329,18 +295,22 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
             If it takes more than COMMUNICATE_TIMEOUT seconds
             to acquire the lock or write the data.
         """
-        json_str = json.dumps({"command": command, "parameters": parameters})
+        data = {
+            common.Key.COMMAND: command,
+            common.Key.PARAMETERS: parameters,
+        }
         await asyncio.wait_for(
-            self._basic_run_command(json_str), timeout=COMMUNICATE_TIMEOUT
+            self._basic_run_command(data), timeout=COMMUNICATE_TIMEOUT
         )
 
-    async def _basic_run_command(self, json_str: str) -> None:
+    async def _basic_run_command(self, data: dict[str, typing.Any]) -> None:
         """Write a json-encoded command dict. Potentially wait forever.
 
         Parameters
         ----------
-        json_str : `str`
-            json-encoded dict to write. The dict should be of the form::
+        data : `dict`[`str`, `typing.Any`]
+            The data to write. The data should be of the form (but this is not
+            verified)::
 
                 {"command": command_str, "parameters": params_dict}
 
@@ -354,24 +324,22 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
         async with self.stream_lock:
             if not self.connected:
                 raise ConnectionError("Not connected; cannot send the command.")
-            assert self.writer is not None  # make mypy happy
-
-            self.writer.write(json_str.encode() + tcpip.TERMINATOR)
-            await self.writer.drain()
+            assert self.client is not None  # keep mypy happy.
+            await self.client.write_json(data)
             while True:
                 if not self.connected:
                     raise ConnectionError(
-                        "Disconnected while waiting for command response"
+                        "Disconnected while waiting for command response."
                     )
-                data = await self.basic_read()
+                data = await self.client.read_json()
                 if common.Key.RESPONSE in data:
                     response = data[common.Key.RESPONSE]
                     if response == common.ResponseCode.OK:
                         return
                     else:
-                        raise RuntimeError(f"Command {json_str!r} failed: {response!r}")
+                        raise RuntimeError(f"Command {data!r} failed: {response=!r}.")
                 else:
-                    self.log.debug("Ignoring non-command-ack")
+                    self.log.debug("Ignoring non-command-ack.")
 
     async def process_telemetry(
         self,
@@ -402,7 +370,7 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
             device_configuration = self.device_configurations.get(sensor_name)
             if device_configuration is None:
                 raise RuntimeError(
-                    f"No device configuration for sensor_name={sensor_name}"
+                    f"No device configuration for sensor_name={sensor_name}."
                 )
             if response_code == common.ResponseCode.OK:
                 telemetry_method = self.telemetry_dispatch_dict.get(
@@ -410,7 +378,7 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
                 )
                 if telemetry_method is None:
                     raise RuntimeError(
-                        f"Unsupported sensor type {device_configuration.sens_type}"
+                        f"Unsupported sensor type {device_configuration.sens_type}."
                     )
                 await telemetry_method(
                     sensor_name=sensor_name,
@@ -424,8 +392,9 @@ class ControllerDataClient(common.BaseReadLoopDataClient):
                 )
             else:
                 self.log.warning(
-                    f"Ignoring telemetry for sensor {sensor_name} with unknown response code {response_code}"
+                    f"Ignoring telemetry for sensor {sensor_name} "
+                    f"with unknown response code {response_code}."
                 )
         except Exception as e:
-            self.log.exception(f"process_telemetry failed: {e!r}")
+            self.log.exception(f"process_telemetry failed: {e!r}.")
             raise

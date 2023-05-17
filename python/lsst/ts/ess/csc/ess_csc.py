@@ -175,6 +175,7 @@ class EssCsc(salobj.ConfigurableCsc):
             self.run_data_clients_task = asyncio.gather(*tasks)
             await self.run_data_clients_task
         except Exception as main_exception:
+            self.log.exception("WOUTERRRRR!!!")
             index, task_exception = get_task_index_exception(tasks)
             traceback_arg = None
             if index is None:
