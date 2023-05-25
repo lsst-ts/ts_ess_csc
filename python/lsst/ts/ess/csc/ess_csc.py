@@ -175,7 +175,7 @@ class EssCsc(salobj.ConfigurableCsc):
             self.run_data_clients_task = asyncio.gather(*tasks)
             await self.run_data_clients_task
         except Exception as main_exception:
-            self.log.exception("WOUTERRRRR!!!")
+            self.log.exception(f"run_data_clients failed: {main_exception!r}")
             index, task_exception = get_task_index_exception(tasks)
             traceback_arg = None
             if index is None:
@@ -249,7 +249,9 @@ class EssCsc(salobj.ConfigurableCsc):
         else:
             raise RuntimeError(f"No config found for sal_index={self.salinfo.index}")
         for client_index, client_data in enumerate(instance["data_clients"]):
-            client_class = common.get_data_client_class(client_data["client_class"])
+            client_class = common.data_client.get_data_client_class(
+                client_data["client_class"]
+            )
             config_schema = client_class.get_config_schema()
             validator = salobj.DefaultingValidator(config_schema)
             client_config_dict = client_data["config"]
