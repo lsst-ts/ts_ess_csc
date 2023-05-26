@@ -314,7 +314,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             additional_data=[
                 topics_data["tel_relativeHumidity"].relativeHumidity,
                 topics_data["tel_temperature"].temperature[0],
-                topics_data["tel_pressure"].pressure[0] / common.PASCALS_PER_MILLIBAR,
+                topics_data["tel_pressure"].pressure[0] / csc.PASCALS_PER_MILLIBAR,
                 topics_data["tel_dewPoint"].dewPoint,
             ],
         )
@@ -421,7 +421,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
-                assert isinstance(data_client, common.data_client.RPiDataClient)
+                assert isinstance(data_client, csc.RPiDataClient)
                 assert data_client.mock_server.connected
 
             await self.validate_telemetry()
@@ -432,7 +432,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 remote=self.remote, state=salobj.State.DISABLED
             )
             for data_client in self.csc.data_clients:
-                assert data_client.mock_server is None
+                assert not data_client.mock_server.connected
 
     async def test_rpi_data_client_loses_connecton(self) -> None:
         """The CSC should fault when an RPiDataClient loses its connection
@@ -495,7 +495,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     @mock.patch(
-        "lsst.ts.ess.common.data_client.controller_data_client.COMMUNICATE_TIMEOUT",
+        "lsst.ts.ess.csc.controller_data_client.COMMUNICATE_TIMEOUT",
         COMMUNICATE_TIMEOUT,
     )
     async def test_rpi_data_client_timeout(self) -> None:
