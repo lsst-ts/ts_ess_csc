@@ -49,17 +49,20 @@ The ESS CSC uses "data clients" to communicate with environmental data servers a
 Each data client class has its own configuration schema.
 A CSC configuration file primarily contains of a list of sal_index: configuration for a data client.
 
-Most data clients are defined in `ts_ess_common`_.
-A few that use hard-to-install libraries are defined in other packages, sucn as `ts_ess_labjack`_.
+This ts_ess_csc package defines most of our data clients, including:
 
-.. _ts_config_ocs: https://github.com/lsst-ts/ts_config_ocs
-.. _ts_ess_common: https://ts-ess-common.lsst.io
-.. _ts_ess_labjack: https://ts-ess-labjack.lsst.io
+* `RPiDataClient`, which communicates with Raspberry Pi 4 data servers running `ts_ess_controller`_ software.
+* `SiglentSSA3000xSpectrumAnalyzerDataClient`.
+* `Young32400WeatherStationDataClient`.
+
+A few that use hard-to-install libraries are defined in `ts_ess_labjack`_ and possibly other packages.
 
 .. _lsst.ts.ess.csc-developer_guide:
 
 Developer Guide
 ===============
+
+Documentation for sensors is in is in `ts_ess_common`_, along with documentation of the API for the `ts_ess_controller`_ server and instructions for supporting a new kind of sensor.
 
 .. _lsst.ts.ess.csc-api_reference:
 
@@ -83,3 +86,9 @@ Version History
 .. toctree::
     version_history
     :maxdepth: 1
+
+.. _ts_config_ocs: https://github.com/lsst-ts/ts_config_ocs
+.. _ts_ess_common: https://ts-ess-common.lsst.io
+.. _ts_ess_controller: https://ts-ess-controller.lsst.io
+.. _ts_ess_labjack: https://ts-ess-labjack.lsst.io
+
