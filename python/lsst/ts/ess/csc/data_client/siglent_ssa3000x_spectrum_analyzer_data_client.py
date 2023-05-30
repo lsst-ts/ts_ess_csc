@@ -145,7 +145,8 @@ additionalProperties: false
         )
 
     def descr(self) -> str:
-        return f"host={self.config.host}, port={self.config.port}"
+        assert self.client is not None  # keep mypy happy
+        return f"host={self.client.host}, port={self.client.port}"
 
     @property
     def connected(self) -> bool:
@@ -163,16 +164,16 @@ additionalProperties: false
             host = self.config.host
             port = self.config.port
         else:
-            self.log.info(
-                "Simulating output from an SSA3000X Spectrum Analyzer serial interface at "
-                f"host={self.config.host}, port={self.config.port}"
-            )
             self.mock_data_server = MockSiglentSSA3000xDataServer(
                 log=self.log, simulation_interval=self.simulation_interval
             )
             await self.mock_data_server.start_task
             host = tcpip.LOCALHOST_IPV4
             port = self.mock_data_server.port
+            self.log.info(
+                "Simulating output from an SSA3000X Spectrum Analyzer serial interface at "
+                f"host={host}, port={port}."
+            )
 
         self.client = tcpip.Client(host=host, port=port, log=self.log)
         await asyncio.wait_for(self.client.start_task, self.config.connect_timeout)
@@ -292,4 +293,4 @@ class MockSiglentSSA3000xDataServer(tcpip.OneClientServer):
                 data_string = ", ".join(f"{d:0.3f}" for d in data)
                 await self.write(data_string.encode() + TERMINATOR)
         except Exception as e:
-            self.log.exception(f"write loop failed: {e!r}")
+            self.log.exception(f"write_loop failed: {e!r}")
