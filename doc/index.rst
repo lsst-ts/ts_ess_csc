@@ -21,16 +21,18 @@ Overview
 The ESS Commandable SAL Component (CSC) reads various environmental sensors at the Vera C. Rubin Observatory, and publishes the resulting data in ESS telemetry topics.
 There will be at least one, and likely several, ESS CSC(s) running at Rubin Observatory.
 
+ESS stands for Environmental Sensors Suite.
+
 .. _lsst.ts.ess.csc-user_guide:
 
 User Guide
 ==========
 
-To run the ESS CSC::
+To run an instance of the ESS CSC::
 
     run_ess_csc.py sal_index
 
-Each ``sal_index`` you specify must have a matching entry in the configuration you specify in the ``start`` command, else the command will fail.
+The ``sal_index`` you specify must have a matching entry in the configuration you specify in the ``start`` command, else the command will fail.
 
 This command-line script supports ``--help``.
 
@@ -43,39 +45,24 @@ There should be one standard configuration file for each site.
 Each configuration file specifies configuration for all ESS SAL indices supported at that site.
 To run all ESS CSCs appropriate for a site, examine the configuration file and run one ESS CSC for each entry in it.
 
-The ESS CSC uses "data clients" to communicate with environmental data servers and publish the telemetry, in order to flexibly handle different kinds of servers.
+The ESS CSC uses "data clients" to communicate with environmental data servers and publish the telemetry, in order to flexibly handle different kinds of data servers.
 Each data client class has its own configuration schema.
-
 A CSC configuration file primarily contains of a list of sal_index: configuration for a data client.
 
-There is presently one data client: `RPiDataClient`.
-More are planned, including a LabJack data client in ``ts_ess_labjack``.
+This ts_ess_csc package defines most of our data clients, including:
 
-.. _ts_config_ocs: https://github.com/lsst-ts/ts_config_ocs
+* `RPiDataClient`, which communicates with Raspberry Pi 4 data servers running `ts_ess_controller`_ software.
+* `SiglentSSA3000xSpectrumAnalyzerDataClient`.
+* `Young32400WeatherStationDataClient`.
+
+A few that use hard-to-install libraries are defined in `ts_ess_labjack`_ and possibly other packages.
 
 .. _lsst.ts.ess.csc-developer_guide:
 
 Developer Guide
 ===============
 
-Data clients do most of the work for the CSC: reading and publishing environmental data.
-The CSC constructs the clients specified in the config file and runs them.
-
-This package defines one data client: `RPiDataClient`, which uses TCP/IP to communicate with Raspberry Pi 4 data servers.
-The environmental sensors are connected to the Raspberry Pi 4 servers, and the servers are scattered around the observatory.
-The Raspberry Pi 4 servers use code from `ts_ess_controller`_.
-
-The protocol used to communicate with Raspberry Pi 4 servers is described in :doc:`rpi_protocol`:
-
-.. toctree::
-   :maxdepth: 2
-
-   rpi_protocol.rst
-
-This package and `ts_ess_controller`_ share common code in `ts_ess_common`_.
-
-.. _ts_ess_controller: https://ts-ess-controller.lsst.io
-.. _ts_ess_common: https://ts-ess-common.lsst.io
+Documentation for sensors is in is in `ts_ess_common`_, along with documentation of the API for the `ts_ess_controller`_ server and instructions for supporting a new kind of sensor.
 
 .. _lsst.ts.ess.csc-api_reference:
 
@@ -99,3 +86,9 @@ Version History
 .. toctree::
     version_history
     :maxdepth: 1
+
+.. _ts_config_ocs: https://github.com/lsst-ts/ts_config_ocs
+.. _ts_ess_common: https://ts-ess-common.lsst.io
+.. _ts_ess_controller: https://ts-ess-controller.lsst.io
+.. _ts_ess_labjack: https://ts-ess-labjack.lsst.io
+
