@@ -458,7 +458,8 @@ additionalProperties: false
         await asyncio.wait_for(self.client.start_task, self.config.connect_timeout)
 
     def descr(self) -> str:
-        return f"host={self.config.host}, port={self.config.port}"
+        assert self.client is not None  # keep mypy happy
+        return f"host={self.client.host}, port={self.client.port}"
 
     async def disconnect(self) -> None:
         self.run_task.cancel()
