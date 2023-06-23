@@ -6,6 +6,20 @@
 Version History
 ###############
 
+v0.16.8
+=======
+
+* Make sure that MockSiglentSSA3000xDataServer reads a command before sending data to avoid filling up of the write buffer.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 16
+* ts_ess_common 0.16
+* ts_tcpip 1.1
+* ts_utils 1.0
+
 v0.16.7
 =======
 
