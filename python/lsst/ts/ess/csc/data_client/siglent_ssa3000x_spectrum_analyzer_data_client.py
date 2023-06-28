@@ -38,6 +38,10 @@ TERMINATOR = b"\n"
 # the fixed start and stop frequency.
 EXPECTED_NUMBER_OF_DATA_POINTS = 751
 
+QUERY_TRACE_DATA_CMD = ":trace:data? 1"
+SET_FREQ_START_CMD = ":frequency:start 0.0 GHz"
+SET_FREQ_STOP_CMD = ":frequency:stop 3.0 GHz"
+
 
 class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseReadLoopDataClient):
     """Get data from a Siglent SSA3000X Spectrum analyzer.
@@ -203,16 +207,14 @@ additionalProperties: false
 
     async def setup_reading(self) -> None:
         self._have_seen_data = False
-        if self.connected and self.simulation_mode == 0:
-            # Make sure that the correct frequency range is used by the
-            # spectrum analyzer.
-            await self.write(self.set_freq_start_cmd)
-            await self.write(self.set_freq_stop_cmd)
+        if self.connected:
+            await self.write(SET_FREQ_START_CMD)
+            await self.write(SET_FREQ_STOP_CMD)
 
     async def read_data(self) -> None:
         """Read raw data from the SSA3000X Spectrum Analyzer."""
         timestamp = utils.current_tai()
-        await self.write(self.query_trace_data_cmd)
+        await self.write(QUERY_TRACE_DATA_CMD)
         assert self.client is not None  # make mypy happy
         try:
             read_bytes = await asyncio.wait_for(
@@ -254,7 +256,7 @@ additionalProperties: false
         await asyncio.sleep(self.config.poll_interval)
 
 
-class MockSiglentSSA3000xDataServer(tcpip.OneClientServer):
+class MockSiglentSSA3000xDataServer(tcpip.OneClientReadLoopServer):
     """Mock Siglent SSA3000x data server.
 
     Parameters
@@ -274,23 +276,15 @@ class MockSiglentSSA3000xDataServer(tcpip.OneClientServer):
             host=tcpip.LOCALHOST_IPV4,
             port=0,
             log=log,
-            connect_callback=self.connect_callback,
         )
         self.simulation_interval = simulation_interval
         self.write_loop_task = utils.make_done_future()
 
-    async def connect_callback(self, server: tcpip.OneClientServer) -> None:
-        self.write_loop_task.cancel()
-        if server.connected:
-            self.write_loop_task = asyncio.create_task(self.write_loop())
-
-    async def write_loop(self) -> None:
-        try:
-            while self.connected:
-                await asyncio.sleep(self.simulation_interval)
-                rng = np.random.default_rng(10)
-                data = -100.0 * rng.random(EXPECTED_NUMBER_OF_DATA_POINTS)
-                data_string = ", ".join(f"{d:0.3f}" for d in data)
-                await self.write(data_string.encode() + TERMINATOR)
-        except Exception as e:
-            self.log.exception(f"write_loop failed: {e!r}")
+    async def read_and_dispatch(self) -> None:
+        command = await self.read_str()
+        if command == QUERY_TRACE_DATA_CMD:
+            await asyncio.sleep(self.simulation_interval)
+            rng = np.random.default_rng(10)
+            data = -100.0 * rng.random(EXPECTED_NUMBER_OF_DATA_POINTS)
+            data_string = ", ".join(f"{d:0.3f}" for d in data)
+            await self.write_str(data_string)
