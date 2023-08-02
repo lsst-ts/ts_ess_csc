@@ -37,7 +37,11 @@ logging.basicConfig(
 
 class SiglentSSA3000xDataClientTestCase(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        salobj.set_random_lsst_dds_partition_prefix()
+        # Prepare for Kafka.
+        if hasattr(salobj, "set_random_topic_subname"):
+            salobj.set_random_topic_subname()
+        else:
+            salobj.set_random_lsst_dds_partition_prefix()
         config_schema = (
             csc.SiglentSSA3000xSpectrumAnalyzerDataClient.get_config_schema()
         )

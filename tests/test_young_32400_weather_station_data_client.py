@@ -49,7 +49,11 @@ LONG_TIMEOUT = 30
 
 class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        salobj.set_random_lsst_dds_partition_prefix()
+        # Prepare for Kafka.
+        if hasattr(salobj, "set_random_topic_subname"):
+            salobj.set_random_topic_subname()
+        else:
+            salobj.set_random_lsst_dds_partition_prefix()
         config_schema = csc.Young32400WeatherStationDataClient.get_config_schema()
         self.validator = salobj.DefaultingValidator(config_schema)
         self.index_generator = utils.index_generator()
