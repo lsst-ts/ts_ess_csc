@@ -47,9 +47,6 @@ from lsst.ts.utils import current_tai, make_done_future
 
 from ..accumulator import AirFlowAccumulator
 
-# Terminator for data from the Young 32400 serial device.
-YOUNG_TERMINATOR = b"\r\n"
-
 # Maximum reported rain tip count before the value wraps around.
 MAX_RAIN_TIP_COUNT = 9999
 
@@ -197,8 +194,17 @@ class Young32400WeatherStationDataClient(common.BaseReadLoopDataClient):
                 f"{config.sensor_name_humidity=} and "
                 f"{config.sensor_name_temperature=} are specified"
             )
+
+        # The MOXA serial-to-ethernet adapter connected to the Young weather
+        # station requires disconnecting and reconnecting again when the
+        # connection times out. This is achieved by setting the auto_reconnect
+        # constructor argument to True.
         super().__init__(
-            config=config, topics=topics, log=log, simulation_mode=simulation_mode
+            config=config,
+            topics=topics,
+            log=log,
+            simulation_mode=simulation_mode,
+            auto_reconnect=True,
         )
 
         self.topics.tel_airFlow.set(
@@ -272,6 +278,9 @@ class Young32400WeatherStationDataClient(common.BaseReadLoopDataClient):
         self.client: tcpip.Client | None = None
 
         self.rain_stopped_timer_task = make_done_future()
+
+        # For mocking timeouts, set this to True.
+        self.do_timeout = False
 
     @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
@@ -439,13 +448,16 @@ additionalProperties: false
         return self.client is not None and self.client.connected
 
     async def connect(self) -> None:
-        await self.disconnect()
+        self.log.warning("WOUTER connect.")
+        if self.connected:
+            await self.disconnect()
 
         if self.simulation_mode > 0:
             self.mock_data_server = MockYoung32400DataServer(
                 log=self.log,
                 simulated_raw_data=self.simulated_raw_data,
                 simulation_interval=self.simulation_interval,
+                do_timeout=self.do_timeout,
             )
             await self.mock_data_server.start_task
             host = tcpip.LOCALHOST_IPV4
@@ -462,6 +474,7 @@ additionalProperties: false
         return f"host={self.client.host}, port={self.client.port}"
 
     async def disconnect(self) -> None:
+        self.log.warning("WOUTER disconnect.")
         self.run_task.cancel()
         self.rain_stopped_timer_task.cancel()
         self.last_rain_tip_timestamp = 0
@@ -636,7 +649,7 @@ additionalProperties: false
         """
         assert self.client is not None  # make mypy happy
         read_bytes = await asyncio.wait_for(
-            self.client.readuntil(YOUNG_TERMINATOR),
+            self.client.readuntil(tcpip.DEFAULT_TERMINATOR),
             timeout=self.config.read_timeout,
         )
         data = read_bytes.decode().strip()
@@ -796,6 +809,7 @@ class MockYoung32400DataServer(tcpip.OneClientServer):
         log: logging.Logger,
         simulated_raw_data: collections.abc.Iterable[str],
         simulation_interval: float,
+        do_timeout: bool = False,
     ) -> None:
         self.simulated_raw_data = simulated_raw_data
         self.simulation_interval = simulation_interval
@@ -806,6 +820,7 @@ class MockYoung32400DataServer(tcpip.OneClientServer):
             connect_callback=self.connect_callback,
         )
         self.write_loop_task = make_done_future()
+        self.do_timeout = do_timeout
 
     async def connect_callback(self, server: tcpip.OneClientServer) -> None:
         self.write_loop_task.cancel()
@@ -815,10 +830,12 @@ class MockYoung32400DataServer(tcpip.OneClientServer):
     async def write_loop(self) -> None:
         data: str | None = None
         try:
+            if self.do_timeout:
+                raise asyncio.TimeoutError
             for data in self.simulated_raw_data:
                 if not self.connected:
                     return
-                await self.write(data.encode() + YOUNG_TERMINATOR)
+                await self.write(data.encode() + tcpip.DEFAULT_TERMINATOR)
                 await asyncio.sleep(self.simulation_interval)
             if data is None:
                 raise RuntimeError("no simulated data")
@@ -827,7 +844,7 @@ class MockYoung32400DataServer(tcpip.OneClientServer):
                 "Mock server ran out of simulated data; repeating the final value"
             )
             while self.connected:
-                await self.write(data.encode() + YOUNG_TERMINATOR)
+                await self.write(data.encode() + tcpip.DEFAULT_TERMINATOR)
                 await asyncio.sleep(self.simulation_interval)
         except Exception as e:
             self.log.exception(f"write loop failed: {e!r}")

@@ -714,12 +714,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 sensorName="EssElectricField",
             )
 
-    async def test_weather_station_data_client_loses_connection(self) -> None:
+    async def test_weather_station_data_client_timeout(self) -> None:
         """Test timeouts of connections from the DataClient to the server.
 
-        The CSC should fault when the DataClient loses its connection to the
-        server and the DataClient should reconnect when the CSC is set to
-        ENABLED again.
+        The DataClient should reconnect automatically.
         """
         # Start the CSC in DISABLED mode for manual control of the DataClient.
         async with self.make_csc(
@@ -731,26 +729,36 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_summary_state(
                 salobj.State.DISABLED, timeout=STATE_TIMEOUT
             )
-            assert len(self.csc.data_clients) == 1
-            assert self.csc.data_clients[0] is not None
-            assert self.csc.data_clients[0].mock_data_server is None
-            self.csc.data_clients[0].simulation_interval = LONG_WAIT_TIME
+            # Patch the "connect" method so we can count how often it was
+            # called.
+            with mock.patch.object(
+                csc.Young32400WeatherStationDataClient,
+                "connect",
+                wraps=self.csc.data_clients[0].connect,
+            ) as connect_mock:
+                assert len(self.csc.data_clients) == 1
+                assert self.csc.data_clients[0] is not None
+                assert self.csc.data_clients[0].mock_data_server is None
+                self.csc.data_clients[0].do_timeout = True
+                # Not started yet so "connect" wasn't called yet.
+                connect_mock.assert_not_called()
 
-            await salobj.set_summary_state(
-                remote=self.remote, state=salobj.State.ENABLED
-            )
-            await self.assert_next_summary_state(
-                salobj.State.ENABLED, timeout=STATE_TIMEOUT
-            )
-            assert len(self.csc.data_clients) == 1
-            assert self.csc.data_clients[0].mock_data_server is not None
-            assert self.csc.data_clients[0].mock_data_server.connected
+                await salobj.set_summary_state(
+                    remote=self.remote, state=salobj.State.ENABLED
+                )
+                await self.assert_next_summary_state(
+                    salobj.State.ENABLED, timeout=STATE_TIMEOUT
+                )
+                assert len(self.csc.data_clients) == 1
+                assert self.csc.data_clients[0].mock_data_server is not None
+                assert self.csc.data_clients[0].mock_data_server.connected
+                # Started so "connect" was called once.
+                connect_mock.assert_called_once()
 
-            # The CSC should go to FAULT state because of the long interval
-            # between reading consecutive data.
-            await self.assert_next_summary_state(
-                salobj.State.FAULT, timeout=STATE_TIMEOUT
-            )
+                # Give the client time to recover from the timeout.
+                await asyncio.sleep(2.0)
+                # Recovered from the timeout so "connect" was called twice.
+                assert len(connect_mock.call_args_list) == 2
 
     async def test_spectrum_analyzer_data_client_loses_connection(self) -> None:
         """Test timeouts of connections from the DataClient to the server.

@@ -19,6 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import asyncio
 import collections.abc
 import contextlib
 import logging
@@ -27,6 +28,7 @@ import pathlib
 import types
 import unittest
 from typing import TypeAlias
+from unittest import mock
 
 import numpy as np
 import pytest
@@ -203,8 +205,9 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             config = self.default_config
             config.rain_stopped_interval = 2  # very short
             data_client = self.create_data_client(config)
-            read_interval = 0.1
+
             # Make the test run quickly
+            read_interval = 0.1
             data_client.simulation_interval = read_interval
 
             # Use an unrealistically large rain rate (50 mm/hr is heavy),
@@ -370,3 +373,33 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
     def check_data(self, data: salobj.BaseMsgType, **kwargs: str | int) -> None:
         for field_name, expected_value in kwargs.items():
             assert getattr(data, field_name) == expected_value
+
+    async def mock_connect(self) -> None:
+        pass
+
+    async def test_read_timeout(self) -> None:
+        async with self.create_controller():
+            config = self.default_config
+            config.rain_stopped_interval = 2  # very short
+            data_client = self.create_data_client(config)
+
+            # Patch the "connect" method so we can count how often it was
+            # called.
+            with mock.patch.object(
+                csc.Young32400WeatherStationDataClient,
+                "connect",
+                wraps=data_client.connect,
+            ) as connect_mock:
+                # Not started yet so "connect" wasn't called yet.
+                connect_mock.assert_not_called()
+                data_client.do_timeout = True
+                await data_client.start()
+                # Started so "connect" was called once.
+                connect_mock.assert_called_once()
+                try:
+                    # Give the client time to recover from the timeout.
+                    await asyncio.sleep(2.0)
+                    # Recovered from the timeout so "connect" was called twice.
+                    assert len(connect_mock.call_args_list) == 2
+                finally:
+                    await data_client.stop()
