@@ -28,7 +28,6 @@ import pathlib
 import types
 import unittest
 from typing import TypeAlias
-from unittest import mock
 
 import numpy as np
 import pytest
@@ -383,23 +382,30 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             config.rain_stopped_interval = 2  # very short
             data_client = self.create_data_client(config)
 
-            # Patch the "connect" method so we can count how often it was
-            # called.
-            with mock.patch.object(
-                csc.Young32400WeatherStationDataClient,
-                "connect",
-                wraps=data_client.connect,
-            ) as connect_mock:
-                # Not started yet so "connect" wasn't called yet.
-                connect_mock.assert_not_called()
-                data_client.do_timeout = True
-                await data_client.start()
-                # Started so "connect" was called once.
-                connect_mock.assert_called_once()
-                try:
-                    # Give the client time to recover from the timeout.
-                    await asyncio.sleep(2.0)
-                    # Recovered from the timeout so "connect" was called twice.
-                    assert len(connect_mock.call_args_list) == 2
-                finally:
-                    await data_client.stop()
+            # Make the test run quickly
+            read_interval = 0.1
+            data_client.simulation_interval = read_interval
+
+            # Use an unrealistically large rain rate (50 mm/hr is heavy),
+            # so we don't have to wait as long to get rain reported.
+            data_gen = csc.Young32400RawDataGenerator(
+                read_interval=read_interval,
+                mean_rain_rate=360,  # about 1 tip/second
+            )
+            num_checks_per_topic = 2
+            # Need enough items to report rain rate num_checks_per_topic times,
+            # plus margin.
+            num_items = int(
+                (num_checks_per_topic + 1)
+                * config.rain_stopped_interval
+                / read_interval
+            )
+            data_client.simulated_raw_data = data_gen.create_raw_data_list(
+                config=config, num_items=num_items
+            )
+            data_client.do_timeout = True
+            assert data_client.num_reconnects == 0
+            await data_client.start()
+            await asyncio.sleep(1.0)
+            assert data_client.num_reconnects == 5
+            await data_client.stop()

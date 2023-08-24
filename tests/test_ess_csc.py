@@ -752,13 +752,16 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 assert len(self.csc.data_clients) == 1
                 assert self.csc.data_clients[0].mock_data_server is not None
                 assert self.csc.data_clients[0].mock_data_server.connected
-                # Started so "connect" was called once.
-                connect_mock.assert_called_once()
+                # Started with a short timeout so "connect" was called several
+                # times.
+                connect_mock.assert_called()
 
                 # Give the client time to recover from the timeout.
                 await asyncio.sleep(2.0)
-                # Recovered from the timeout so "connect" was called twice.
-                assert len(connect_mock.call_args_list) == 2
+                # Recovered from the timeout such that "connect" should be
+                # called at least 5 times, since the data client will attempt
+                # to reconnect 5 times in case of a timeout.
+                assert len(connect_mock.call_args_list) >= 5
 
     async def test_spectrum_analyzer_data_client_loses_connection(self) -> None:
         """Test timeouts of connections from the DataClient to the server.
