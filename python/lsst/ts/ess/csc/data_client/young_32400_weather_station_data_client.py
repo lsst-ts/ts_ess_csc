@@ -448,7 +448,6 @@ additionalProperties: false
         return self.client is not None and self.client.connected
 
     async def connect(self) -> None:
-        self.log.warning("WOUTER connect.")
         if self.connected:
             await self.disconnect()
 
@@ -474,7 +473,6 @@ additionalProperties: false
         return f"host={self.client.host}, port={self.client.port}"
 
     async def disconnect(self) -> None:
-        self.log.warning("WOUTER disconnect.")
         self.run_task.cancel()
         self.rain_stopped_timer_task.cancel()
         self.last_rain_tip_timestamp = 0
