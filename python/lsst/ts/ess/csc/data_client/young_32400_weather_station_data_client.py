@@ -216,22 +216,22 @@ class Young32400WeatherStationDataClient(common.BaseReadLoopDataClient):
         self.topics.tel_relativeHumidity.set(
             sensorName=self.config.sensor_name_humidity, location=self.config.location
         )
-        num_pressures = len(self.topics.tel_pressure.DataType().pressure)
+        num_pressures = len(self.topics.tel_pressure.DataType().pressureItem)
         self.topics.tel_pressure.set(
             sensorName=self.config.sensor_name_pressure,
             location=self.config.location,
-            pressure=[math.nan] * num_pressures,
+            pressureItem=[math.nan] * num_pressures,
             numChannels=1,
         )
         self.topics.tel_rainRate.set(
             sensorName=self.config.sensor_name_rain,
             location=self.config.location,
         )
-        num_temperatures = len(self.topics.tel_temperature.DataType().temperature)
+        num_temperatures = len(self.topics.tel_temperature.DataType().temperatureItem)
         self.topics.tel_temperature.set(
             sensorName=self.config.sensor_name_temperature,
             location=self.config.location,
-            temperature=[math.nan] * num_temperatures,
+            temperatureItem=[math.nan] * num_temperatures,
             numChannels=1,
         )
 
@@ -537,7 +537,7 @@ additionalProperties: false
             if raw_median is not None:
                 report_humidity = True
                 await self.topics.tel_relativeHumidity.set_write(
-                    relativeHumidity=scaled_from_raw(
+                    relativeHumidityItem=scaled_from_raw(
                         raw=raw_median,
                         scale=self.config.scale_offset_humidity[0],
                         offset=self.config.scale_offset_humidity[1],
@@ -548,7 +548,7 @@ additionalProperties: false
         if self.config.sensor_name_pressure:
             raw_median = self.pressure_accumulator.add_sample(pressure)
             if raw_median is not None:
-                self.topics.tel_pressure.data.pressure[0] = scaled_from_raw(
+                self.topics.tel_pressure.data.pressureItem[0] = scaled_from_raw(
                     raw=raw_median,
                     scale=self.config.scale_offset_pressure[0],
                     offset=self.config.scale_offset_pressure[1],
@@ -560,7 +560,7 @@ additionalProperties: false
             raw_median = self.temperature_accumulator.add_sample(temperature)
             if raw_median is not None:
                 report_temperature = True
-                self.topics.tel_temperature.data.temperature[0] = scaled_from_raw(
+                self.topics.tel_temperature.data.temperatureItem[0] = scaled_from_raw(
                     raw=raw_median,
                     scale=self.config.scale_offset_temperature[0],
                     offset=self.config.scale_offset_temperature[1],
@@ -570,14 +570,16 @@ additionalProperties: false
         if self.config.sensor_name_dew_point and (
             report_humidity or report_temperature
         ):
-            relative_humidity = self.topics.tel_relativeHumidity.data.relativeHumidity
-            temperature = self.topics.tel_temperature.data.temperature[0]
+            relative_humidity = (
+                self.topics.tel_relativeHumidity.data.relativeHumidityItem
+            )
+            temperature = self.topics.tel_temperature.data.temperatureItem[0]
             if not math.isnan(relative_humidity) and not math.isnan(temperature):
                 dew_point = compute_dew_point_magnus(
                     relative_humidity=relative_humidity, temperature=temperature
                 )
                 await self.topics.tel_dewPoint.set_write(
-                    dewPoint=dew_point, timestamp=timestamp
+                    dewPointItem=dew_point, timestamp=timestamp
                 )
 
         if self.config.sensor_name_rain:
@@ -627,7 +629,7 @@ additionalProperties: false
                     / rain_tip_dt
                 )
                 await self.topics.tel_rainRate.set_write(
-                    rainRate=round(rain_rate_mm_per_hr)
+                    rainRateItem=round(rain_rate_mm_per_hr)
                 )
 
     def restart_rain_stopped_timer(self) -> None:

@@ -255,10 +255,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
         # First make sure that the temperature data contain the
         # expected number of NaN values.
-        expected_num_nans = len(data.temperature) - device_config.num_channels
+        expected_num_nans = len(data.temperatureItem) - device_config.num_channels
         nan_array = [np.nan] * expected_num_nans
         np.testing.assert_array_equal(
-            nan_array, data.temperature[device_config.num_channels :]
+            nan_array, data.temperatureItem[device_config.num_channels :]
         )
 
         # Next validate the rest of the data.
@@ -266,7 +266,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         assert data.location == device_config.location
         reply = create_reply_dict(
             sensor_name=data.sensorName,
-            additional_data=data.temperature[: device_config.num_channels],
+            additional_data=data.temperatureItem[: device_config.num_channels],
         )
         mtt = MockTestTools()
         mtt.check_temperature_reply(
@@ -287,9 +287,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         reply = create_reply_dict(
             sensor_name=sensor_name,
             additional_data=[
-                topics_data["tel_relativeHumidity"].relativeHumidity,
-                topics_data["tel_temperature"].temperature[0],
-                topics_data["tel_dewPoint"].dewPoint,
+                topics_data["tel_relativeHumidity"].relativeHumidityItem,
+                topics_data["tel_temperature"].temperatureItem[0],
+                topics_data["tel_dewPoint"].dewPointItem,
             ],
         )
         mtt = MockTestTools()
@@ -312,10 +312,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         reply = create_reply_dict(
             sensor_name=sensor_name,
             additional_data=[
-                topics_data["tel_relativeHumidity"].relativeHumidity,
-                topics_data["tel_temperature"].temperature[0],
-                topics_data["tel_pressure"].pressure[0] / csc.PASCALS_PER_MILLIBAR,
-                topics_data["tel_dewPoint"].dewPoint,
+                topics_data["tel_relativeHumidity"].relativeHumidityItem,
+                topics_data["tel_temperature"].temperatureItem[0],
+                topics_data["tel_pressure"].pressureItem[0] / csc.PASCALS_PER_MILLIBAR,
+                topics_data["tel_dewPoint"].dewPointItem,
             ],
         )
         mtt = MockTestTools()
