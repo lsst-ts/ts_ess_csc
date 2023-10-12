@@ -63,7 +63,7 @@ class RPiDataClient(ControllerDataClient):
         simulation_mode: int = 0,
     ) -> None:
         # Array of NaNs used to initialize reported temperatures.
-        num_temperatures = len(topics.tel_temperature.DataType().temperature)
+        num_temperatures = len(topics.tel_temperature.DataType().temperatureItem)
         self.temperature_nans = [np.nan] * num_temperatures
 
         # Cache of data maintained by process_windsonic_telemetry.
@@ -206,7 +206,7 @@ additionalProperties: false
             sensorName=sensor_name,
             timestamp=timestamp,
             numChannels=device_configuration.num_channels,
-            temperature=temperature,
+            temperatureItem=temperature,
             location=device_configuration.location,
         )
         await self.topics.evt_sensorStatus.set_write(
@@ -376,18 +376,18 @@ additionalProperties: false
             await self.topics.tel_dewPoint.set_write(
                 sensorName=sensor_name,
                 timestamp=timestamp,
-                dewPoint=dew_point if isok else np.nan,
+                dewPointItem=dew_point if isok else np.nan,
                 location=device_configuration.location,
             )
         if pressure is not None:
-            nelts = len(self.topics.tel_pressure.DataType().pressure)
+            nelts = len(self.topics.tel_pressure.DataType().pressureItem)
             pressure_array = [np.nan] * nelts
             if isok:
                 pressure_array[0] = pressure
             await self.topics.tel_pressure.set_write(
                 sensorName=sensor_name,
                 timestamp=timestamp,
-                pressure=pressure_array,
+                pressureItem=pressure_array,
                 numChannels=1,
                 location=device_configuration.location,
             )
@@ -395,18 +395,18 @@ additionalProperties: false
             await self.topics.tel_relativeHumidity.set_write(
                 sensorName=sensor_name,
                 timestamp=timestamp,
-                relativeHumidity=relative_humidity if isok else np.nan,
+                relativeHumidityItem=relative_humidity if isok else np.nan,
                 location=device_configuration.location,
             )
         if temperature is not None:
-            nelts = len(self.topics.tel_temperature.DataType().temperature)
+            nelts = len(self.topics.tel_temperature.DataType().temperatureItem)
             temperature_array = [np.nan] * nelts
             if isok:
                 temperature_array[0] = temperature
             await self.topics.tel_temperature.set_write(
                 sensorName=sensor_name,
                 timestamp=timestamp,
-                temperature=temperature_array,
+                temperatureItem=temperature_array,
                 numChannels=1,
                 location=device_configuration.location,
             )

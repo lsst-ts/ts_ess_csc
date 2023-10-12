@@ -306,7 +306,7 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             sensorName=config.sensor_name_humidity,
             location=config.location,
         )
-        read_humidity = data.relativeHumidity
+        read_humidity = data.relativeHumidityItem
         assert read_humidity == pytest.approx(
             data_gen.mean_humidity, abs=data_gen.std_humidity
         )
@@ -318,11 +318,11 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             location=config.location,
             numChannels=1,
         )
-        read_temperature = data.temperature[0]
+        read_temperature = data.temperatureItem[0]
         assert read_temperature == pytest.approx(
             data_gen.mean_temperature, abs=data_gen.std_temperature
         )
-        assert all(math.isnan(value) for value in data.temperature[1:])
+        assert all(math.isnan(value) for value in data.temperatureItem[1:])
 
         data = await self.remote.tel_pressure.next(flush=False, timeout=STD_TIMEOUT)
         self.check_data(
@@ -331,10 +331,10 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             location=config.location,
             numChannels=1,
         )
-        assert data.pressure[0] == pytest.approx(
+        assert data.pressureItem[0] == pytest.approx(
             data_gen.mean_pressure, abs=data_gen.std_pressure
         )
-        assert all(math.isnan(value) for value in data.pressure[1:])
+        assert all(math.isnan(value) for value in data.pressureItem[1:])
 
         expected_dew_point = compute_dew_point_magnus(
             relative_humidity=read_humidity,
@@ -344,7 +344,7 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
         self.check_data(
             data, sensorName=config.sensor_name_dew_point, location=config.location
         )
-        assert data.dewPoint == pytest.approx(expected_dew_point)
+        assert data.dewPointItem == pytest.approx(expected_dew_point)
 
     async def check_rain_rate(
         self, config: types.SimpleNamespace, data_gen: csc.Young32400RawDataGenerator
@@ -365,9 +365,9 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
             location=config.location,
         )
         print(
-            f"{data.rainRate=}; {data_gen.mean_rain_rate=}; {data_gen.std_rain_rate=}"
+            f"{data.rainRateItem=}; {data_gen.mean_rain_rate=}; {data_gen.std_rain_rate=}"
         )
-        assert data.rainRate == pytest.approx(data_gen.mean_rain_rate, rel=0.1)
+        assert data.rainRateItem == pytest.approx(data_gen.mean_rain_rate, rel=0.1)
 
     def check_data(self, data: salobj.BaseMsgType, **kwargs: str | int) -> None:
         for field_name, expected_value in kwargs.items():
