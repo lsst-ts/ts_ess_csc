@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["RPiDataClient", "PASCALS_PER_MILLIBAR"]
+__all__ = ["RPiDataClient"]
 
 import logging
 import types
@@ -33,8 +33,7 @@ from lsst.ts.ess import common
 
 from ..accumulator import AirFlowAccumulator, AirTurbulenceAccumulator
 from .controller_data_client import ControllerDataClient
-
-PASCALS_PER_MILLIBAR = 100
+from .utils import mbar_to_pa
 
 
 class RPiDataClient(ControllerDataClient):
@@ -279,7 +278,7 @@ additionalProperties: false
             sensor_name=sensor_name,
             timestamp=timestamp,
             dew_point=sensor_data[3],
-            pressure=sensor_data[2] * PASCALS_PER_MILLIBAR,
+            pressure=mbar_to_pa(sensor_data[2]),
             relative_humidity=sensor_data[0],
             temperature=sensor_data[1],
             isok=response_code == 0,
