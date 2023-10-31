@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.17.1
+=======
+
+* Convert HX85BA barometric pressure to Pa using astropy units.
+* Convert weather station barometric pressure to Pa using the correct scale factor.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 20
+* ts_ess_common 0.16
+* ts_tcpip 1.1
+* ts_utils 1.0
+
 v0.17.0
 =======
 
