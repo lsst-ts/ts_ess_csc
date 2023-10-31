@@ -59,7 +59,7 @@ SECONDS_PER_HOUR = 60 * 60
 # * wind_direction: relative angle in 10ths of a degree
 # * temperature: 0-4000 = 0-1V
 # * humidity: 0-4000 = 0-1V = 0-100% humidity
-# * pressure: 0-4000 = 0-1V; scale and offset are configurable in the sensor
+# * pressure: 0-5000 = 0-1V; scale and offset are configurable in the sensor
 # * rain: 0-9999 (=MAX_RAIN_TIP_COUNT) tipping bucket tip count
 DATA_REGEX = re.compile(
     r"(. )?(?P<wind_speed>\d\d\d\d) "

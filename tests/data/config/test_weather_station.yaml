@@ -17,7 +17,7 @@ instances:
           sensor_name_rain: ""
           sensor_name_temperature: "Weather tower air temperature"
           scale_offset_humidity: [0.025, 0]
-          scale_offset_pressure: [48, 500]
+          scale_offset_pressure: [15, 500]
           scale_offset_temperature: [0.025, -50]
           scale_offset_wind_direction: [0.1, 0]
           scale_offset_wind_speed: [0.0834, 0]

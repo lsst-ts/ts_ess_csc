@@ -27,8 +27,10 @@ import types
 import unittest
 from unittest import mock
 
+import astropy.units as u
 import numpy as np
 import yaml
+from astropy.units import misc
 from lsst.ts import salobj, tcpip, utils
 from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.test_utils import MockTestTools
@@ -54,6 +56,9 @@ NUM_ALL_SENSORS = 5
 # set to a sufficiently high number so the timeout tests don't fail.
 STATE_TIMEOUT = 60
 
+# Config override string to avoid duplication.
+ALL_SENSORS_YAML = "test_all_sensors.yaml"
+
 
 def create_reply_dict(
     sensor_name: str, additional_data: list[float | int]
@@ -78,6 +83,34 @@ def create_reply_dict(
         common.Key.RESPONSE_CODE: common.ResponseCode.OK,
         common.Key.SENSOR_TELEMETRY: additional_data,
     }
+
+
+def pa_to_mbar(value: float) -> float:
+    """Convert a value in PA to a value in millibar.
+
+    Parameters
+    ----------
+    value: `float`
+        The value in Pa.
+
+    Returns
+    -------
+    float
+        The value in millibar.
+
+    Notes
+    -----
+    All astropy S.I. units support prefixes like 'milli-'. Since 'bar' is a
+    'misc' unit, it doesn't support prefixes. For millibar an exception was
+    made and 'mbar' was added. See
+
+    https://github.com/astropy/astropy/pull/7863
+
+    This is not documented in the astropy documentation!
+    """
+    quantity_in_pa = value * u.Pa
+    quantity_in_mbar = quantity_in_pa.to(misc.mbar)
+    return quantity_in_mbar.value
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
@@ -182,7 +215,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     ) -> dict[str, salobj.BaseMsgType]:
         """Implementation of next_data, without the timeout."""
         topics_data: dict[str, salobj.BaseMsgType] = dict()
-        timestamp = None
         is_first = True
         while True:
             if len(topics_data) == len(topics):
@@ -193,30 +225,39 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 self.data_event.clear()
                 await self.data_event.wait()
 
-            for topic in topics:
-                attr_data = self.data_dict.get(topic.attr_name, dict())
-                if attr_data is None:
-                    # No data seen for this topic yet
+            await self._loop_ver_topics(topics, sensor_name, topics_data)
+
+    async def _loop_ver_topics(
+        self,
+        topics: list[salobj.topics.ReadTopic],
+        sensor_name: str,
+        topics_data: dict[str, salobj.BaseMsgType],
+    ) -> None:
+        timestamp = None
+        for topic in topics:
+            attr_data = self.data_dict.get(topic.attr_name, dict())
+            if attr_data is None:
+                # No data seen for this topic yet
+                continue
+            sensor_data = attr_data.get(sensor_name)
+            if sensor_data is None:
+                # No data seen for this sensor yet
+                continue
+            if timestamp is None:
+                # This is the first topic read;
+                # set timestamp to the timestamp of the
+                # most recent data
+                data = list(sensor_data.values())[-1]
+                timestamp = data.timestamp
+                topics_data[topic.attr_name] = data
+            else:
+                # Find data with the same timestamp
+                # as the first topic read
+                data = sensor_data.get(timestamp)
+                if data is None:
+                    # No data seen for this topic at the timestamp
                     continue
-                sensor_data = attr_data.get(sensor_name)
-                if sensor_data is None:
-                    # No data seen for this sensor yet
-                    continue
-                if timestamp is None:
-                    # This is the first topic read;
-                    # set timestamp to the timestamp of the
-                    # most recent data
-                    data = list(sensor_data.values())[-1]
-                    timestamp = data.timestamp
-                    topics_data[topic.attr_name] = data
-                else:
-                    # Find data with the same timestamp
-                    # as the first topic read
-                    data = sensor_data.get(timestamp)
-                    if data is None:
-                        # No data seen for this topic at the timestamp
-                        continue
-                    topics_data[topic.attr_name] = data
+                topics_data[topic.attr_name] = data
 
     async def test_standard_state_transitions(self) -> None:
         logging.info("test_standard_state_transitions")
@@ -309,12 +350,15 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         )
         for attr_name in ("tel_temperature", "tel_pressure"):
             assert topics_data[attr_name].numChannels == 1
+
+        # Convert the barometric pressure to a value in mbar because that is
+        # what the check_hx85ba_reply method expects.
         reply = create_reply_dict(
             sensor_name=sensor_name,
             additional_data=[
                 topics_data["tel_relativeHumidity"].relativeHumidityItem,
                 topics_data["tel_temperature"].temperatureItem[0],
-                topics_data["tel_pressure"].pressureItem[0] / csc.PASCALS_PER_MILLIBAR,
+                pa_to_mbar(topics_data["tel_pressure"].pressureItem[0]),
                 topics_data["tel_dewPoint"].dewPointItem,
             ],
         )
@@ -328,11 +372,11 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             flush=False, timeout=STD_TIMEOUT
         )
         assert data.location == device_config.location
-        recordCounter = 1  # arbitrary value in range [0, 63]
+        record_counter = 1  # arbitrary value in range [0, 63]
         status = 0
         input_str = (
             f"{data.speed[0]}{data.speed[1]}{data.speed[2]},"
-            f"{data.sonicTemperature},{status},{recordCounter}"
+            f"{data.sonicTemperature},{status},{record_counter}"
         )
         signature = common.sensor.compute_signature(input_str, ",")
         reply = create_reply_dict(
@@ -414,7 +458,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.ENABLED,
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
-            override="test_all_sensors.yaml",
+            override=ALL_SENSORS_YAML,
         ):
             await self.assert_next_summary_state(
                 salobj.State.ENABLED, timeout=STATE_TIMEOUT
@@ -442,7 +486,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.ENABLED,
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
-            override="test_all_sensors.yaml",
+            override=ALL_SENSORS_YAML,
         ):
             await self.assert_next_summary_state(
                 salobj.State.ENABLED, timeout=STATE_TIMEOUT
@@ -472,7 +516,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             initial_state=salobj.State.DISABLED,
             config_dir=TEST_CONFIG_DIR,
             simulation_mode=1,
-            override="test_all_sensors.yaml",
+            override=ALL_SENSORS_YAML,
         ):
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
             await self.assert_next_summary_state(
