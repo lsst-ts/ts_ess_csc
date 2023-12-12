@@ -32,7 +32,7 @@ from typing import TypeAlias
 import numpy as np
 import pytest
 from lsst.ts import salobj, utils
-from lsst.ts.ess import csc
+from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.sensor import compute_dew_point_magnus
 
 logging.basicConfig(
@@ -177,7 +177,9 @@ class Young32400DataClientTestCase(unittest.IsolatedAsyncioTestCase):
                 # Use circular statistics.
                 scale, offset = config.scale_offset_wind_direction
                 wind_direction_deg = values[:, field_index] * scale + offset
-                mean, std = csc.get_circular_mean_and_std_dev(wind_direction_deg)
+                mean, std = common.accumulator.get_circular_mean_and_std_dev(
+                    wind_direction_deg
+                )
                 mean_diff = utils.angle_diff(mean, expected_mean).deg
                 # Be generous in these comparisons; this is a sanity check
                 # that should pass for essentially all random seeds.
