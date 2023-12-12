@@ -34,7 +34,7 @@ from astropy.units import misc
 from lsst.ts import salobj, tcpip, utils
 from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.test_utils import MockTestTools
-from lsst.ts.idl.enums.ESS import ErrorCode
+from lsst.ts.xml.enums.ESS import ErrorCode
 
 logging.basicConfig(
     format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",

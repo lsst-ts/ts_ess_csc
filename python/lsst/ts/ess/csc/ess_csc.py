@@ -29,7 +29,7 @@ from collections.abc import Sequence
 import jsonschema
 from lsst.ts import salobj, utils
 from lsst.ts.ess import common
-from lsst.ts.idl.enums.ESS import ErrorCode
+from lsst.ts.xml.enums.ESS import ErrorCode
 
 from . import __version__
 from .config_schema import CONFIG_SCHEMA
