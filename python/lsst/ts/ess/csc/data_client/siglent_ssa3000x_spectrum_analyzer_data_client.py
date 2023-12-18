@@ -19,17 +19,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 __all__ = ["SiglentSSA3000xSpectrumAnalyzerDataClient"]
 
 import asyncio
 import logging
 import types
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import yaml
-from lsst.ts import salobj, tcpip, utils
+from lsst.ts import tcpip, utils
 from lsst.ts.ess import common
+
+if TYPE_CHECKING:
+    from lsst.ts import salobj
 
 # The standard TCP/IP line terminator (bytes).
 TERMINATOR = b"\n"
@@ -43,7 +48,9 @@ SET_FREQ_START_CMD = ":frequency:start 0.0 GHz"
 SET_FREQ_STOP_CMD = ":frequency:stop 3.0 GHz"
 
 
-class SiglentSSA3000xSpectrumAnalyzerDataClient(common.BaseReadLoopDataClient):
+class SiglentSSA3000xSpectrumAnalyzerDataClient(
+    common.data_client.BaseReadLoopDataClient
+):
     """Get data from a Siglent SSA3000X Spectrum analyzer.
 
     Parameters

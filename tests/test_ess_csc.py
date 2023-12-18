@@ -34,7 +34,7 @@ from astropy.units import misc
 from lsst.ts import salobj, tcpip, utils
 from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.test_utils import MockTestTools
-from lsst.ts.idl.enums.ESS import ErrorCode
+from lsst.ts.xml.enums.ESS import ErrorCode
 
 logging.basicConfig(
     format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
@@ -465,7 +465,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
-                assert isinstance(data_client, csc.RPiDataClient)
+                assert isinstance(data_client, common.data_client.RPiDataClient)
                 assert data_client.mock_server.connected
 
             await self.validate_telemetry()
@@ -539,7 +539,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     @mock.patch(
-        "lsst.ts.ess.csc.controller_data_client.COMMUNICATE_TIMEOUT",
+        "lsst.ts.ess.common.data_client.controller_data_client.COMMUNICATE_TIMEOUT",
         COMMUNICATE_TIMEOUT,
     )
     async def test_rpi_data_client_timeout(self) -> None:

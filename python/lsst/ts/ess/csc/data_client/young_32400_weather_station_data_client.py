@@ -19,6 +19,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 __all__ = [
     "Young32400RawDataGenerator",
     "Young32400WeatherStationDataClient",
@@ -33,19 +35,20 @@ import logging
 import math
 import re
 import types
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import astropy.units as u
 import numpy as np
 import numpy.random
 import yaml
 from astropy.coordinates import Angle
-from lsst.ts import salobj, tcpip
+from lsst.ts import tcpip
 from lsst.ts.ess import common
 from lsst.ts.ess.common.sensor import compute_dew_point_magnus
 from lsst.ts.utils import current_tai, make_done_future
 
-from ..accumulator import AirFlowAccumulator
+if TYPE_CHECKING:
+    from lsst.ts import salobj
 
 # Maximum reported rain tip count before the value wraps around.
 MAX_RAIN_TIP_COUNT = 9999
@@ -142,7 +145,7 @@ def scaled_from_raw(raw: float, scale: float, offset: float) -> float:
     return raw * scale + offset
 
 
-class Young32400WeatherStationDataClient(common.BaseReadLoopDataClient):
+class Young32400WeatherStationDataClient(common.data_client.BaseReadLoopDataClient):
     """Get environmental data from Young 32400 weather station
     serial interface.
 
@@ -235,7 +238,7 @@ class Young32400WeatherStationDataClient(common.BaseReadLoopDataClient):
             numChannels=1,
         )
 
-        self.air_flow_accumulator = AirFlowAccumulator(
+        self.air_flow_accumulator = common.accumulator.AirFlowAccumulator(
             log=self.log, num_samples=self.config.num_samples_airflow
         )
 
