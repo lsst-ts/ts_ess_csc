@@ -29,7 +29,7 @@ from collections.abc import Sequence
 import jsonschema
 from lsst.ts import salobj, utils
 from lsst.ts.ess import common
-from lsst.ts.idl.enums.ESS import ErrorCode
+from lsst.ts.xml.enums.ESS import ErrorCode
 
 from . import __version__
 from .config_schema import CONFIG_SCHEMA
@@ -249,7 +249,9 @@ class EssCsc(salobj.ConfigurableCsc):
         else:
             raise RuntimeError(f"No config found for sal_index={self.salinfo.index}")
         for client_index, client_data in enumerate(instance["data_clients"]):
-            client_class = common.get_data_client_class(client_data["client_class"])
+            client_class = common.data_client.get_data_client_class(
+                client_data["client_class"]
+            )
             config_schema = client_class.get_config_schema()
             validator = salobj.DefaultingValidator(config_schema)
             client_config_dict = client_data["config"]
