@@ -1,7 +1,7 @@
 instances:
   - sal_index: 1
     data_clients:
-      - client_class: RPiDataClient
+      - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
           devices:

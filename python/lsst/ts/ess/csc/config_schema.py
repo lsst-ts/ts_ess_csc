@@ -51,7 +51,7 @@ properties:
             type: object
             properties:
               client_class:
-                description: Data client class name, e.g. RPiDataClient.
+                description: Data client class name, e.g. ControllerDataClient.
                 type: string
               config:
                 description: Configuration for the data client.
