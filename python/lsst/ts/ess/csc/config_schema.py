@@ -28,7 +28,7 @@ CONFIG_SCHEMA = yaml.safe_load(
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_ess/blob/main/python/lsst/ts/ess/csc/config_schema.py
 # title must end with one or more spaces followed by the schema version, which must begin with "v"
-title: ESS v5
+title: ESS v6
 description: Schema for ESS configuration.
 type: object
 properties:
@@ -51,7 +51,7 @@ properties:
             type: object
             properties:
               client_class:
-                description: Data client class name, e.g. RPiDataClient.
+                description: Data client class name, e.g. ControllerDataClient.
                 type: string
               config:
                 description: Configuration for the data client.

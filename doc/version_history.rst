@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.18.1
+=======
+
+* Increase config version.
+* Consolidate Lightning and RPi data clients into one class.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 20
+* ts_ess_common 0.17
+* ts_tcpip 2
+* ts_utils 1.0
+
 v0.18.0
 =======
 

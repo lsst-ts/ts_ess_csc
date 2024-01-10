@@ -36,15 +36,10 @@ from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.test_utils import MockTestTools
 from lsst.ts.xml.enums.ESS import ErrorCode
 
-logging.basicConfig(
-    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
-    level=logging.DEBUG,
-)
-
 STD_TIMEOUT = 10  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parents[1].joinpath("tests", "data", "config")
 
-# The communicate timeout to use in the RpiDataClient timeout test (second).
+# The communicate timeout to use in the ControllerDataClient timeout test (s).
 COMMUNICATE_TIMEOUT = 2
 # Long wait time for timeout tests (second).
 LONG_WAIT_TIME = 8
@@ -465,7 +460,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
-                assert isinstance(data_client, common.data_client.RPiDataClient)
+                assert isinstance(data_client, common.data_client.ControllerDataClient)
                 assert data_client.mock_server.connected
 
             await self.validate_telemetry()
@@ -479,8 +474,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 assert not data_client.mock_server.connected
 
     async def test_rpi_data_client_loses_connecton(self) -> None:
-        """The CSC should fault when an RPiDataClient loses its connection
-        to the server.
+        """The CSC should fault when a ControllerDataClient loses its
+        connection to the server.
         """
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
@@ -507,7 +502,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_rpi_data_client_cannot_connect(self) -> None:
-        """The CSC should fault if an RPiDataClient cannot connect
+        """The CSC should fault if a ControllerDataClient cannot connect
         to the server.
         """
         # Start in DISABLED state so the data clients have been constructed,
@@ -710,8 +705,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         return dict()
 
     async def test_lightning_data_client_nominal(self) -> None:
-        """The CSC should fault when an RPiDataClient loses its connection
-        to the server.
+        """The CSC should fault when a ControllerDataClient loses its
+        connection to the server.
         """
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
