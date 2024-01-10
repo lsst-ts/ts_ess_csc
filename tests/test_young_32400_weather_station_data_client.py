@@ -22,7 +22,6 @@
 import asyncio
 import collections.abc
 import contextlib
-import logging
 import math
 import pathlib
 import types
@@ -34,10 +33,6 @@ import pytest
 from lsst.ts import salobj, utils
 from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.sensor import compute_dew_point_magnus
-
-logging.basicConfig(
-    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.DEBUG
-)
 
 PathT: TypeAlias = str | pathlib.Path
 

@@ -36,11 +36,6 @@ from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.test_utils import MockTestTools
 from lsst.ts.xml.enums.ESS import ErrorCode
 
-logging.basicConfig(
-    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s",
-    level=logging.DEBUG,
-)
-
 STD_TIMEOUT = 10  # standard command timeout (sec)
 TEST_CONFIG_DIR = pathlib.Path(__file__).parents[1].joinpath("tests", "data", "config")
 
