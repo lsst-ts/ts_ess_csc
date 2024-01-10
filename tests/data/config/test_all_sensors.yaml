@@ -1,7 +1,7 @@
 instances:
   - sal_index: 1
     data_clients:
-      - client_class: RPiDataClient
+      - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
           devices:
@@ -11,7 +11,7 @@ instances:
               ftdi_id: ABC
               sensor_type: Temperature
               location: Test1
-      - client_class: RPiDataClient
+      - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
           devices:
@@ -20,7 +20,7 @@ instances:
               ftdi_id: ABC
               sensor_type: HX85A
               location: Test2
-      - client_class: RPiDataClient
+      - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
           devices:
@@ -29,7 +29,7 @@ instances:
               ftdi_id: ABC
               sensor_type: HX85BA
               location: Test3
-      - client_class: RPiDataClient
+      - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
           devices:
@@ -42,7 +42,7 @@ instances:
               # 4 samples is enough to compute standard deviation and to
               # disambiguate the number of axes (3) from the number of samples
               num_samples: 4
-      - client_class: RPiDataClient
+      - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
           devices:

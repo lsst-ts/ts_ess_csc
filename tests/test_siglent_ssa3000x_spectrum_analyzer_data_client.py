@@ -21,7 +21,6 @@
 
 import collections
 import contextlib
-import logging
 import types
 import unittest
 
@@ -29,10 +28,6 @@ import numpy as np
 import pytest
 from lsst.ts import salobj, utils
 from lsst.ts.ess import csc
-
-logging.basicConfig(
-    format="%(asctime)s:%(levelname)s:%(name)s:%(message)s", level=logging.DEBUG
-)
 
 
 class SiglentSSA3000xDataClientTestCase(unittest.IsolatedAsyncioTestCase):
