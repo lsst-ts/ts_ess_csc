@@ -1,0 +1,15 @@
+instances:
+  - sal_index: 1
+    data_clients:
+      - client_class: TcpipDataClient
+        config:
+          host: 127.0.0.1
+          port: 5000
+          connect_timeout: 5
+          read_timeout: 5
+          max_read_timeouts: 2
+          name: TcpipTemperature
+          sensor_type: Temperature
+          channels: 4
+          baud_rate: 19200
+          location: Test1
