@@ -97,6 +97,8 @@ class EssCsc(salobj.ConfigurableCsc):
         initial_state: salobj.State = salobj.State.STANDBY,
         simulation_mode: int = 0,
         override: str = "",
+        name: str = "ESS",
+        config_schema: dict = CONFIG_SCHEMA,
     ) -> None:
         self.config: types.SimpleNamespace | None = None
         self.data_clients: list[common.BaseDataClient] = list()
@@ -105,9 +107,9 @@ class EssCsc(salobj.ConfigurableCsc):
         self.stop_data_clients_tasks: list[asyncio.Task] = []
 
         super().__init__(
-            name="ESS",
+            name=name,
             index=index,
-            config_schema=CONFIG_SCHEMA,
+            config_schema=config_schema,
             config_dir=config_dir,
             initial_state=initial_state,
             simulation_mode=simulation_mode,
