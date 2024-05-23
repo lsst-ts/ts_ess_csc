@@ -461,7 +461,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
                 assert isinstance(data_client, common.data_client.ControllerDataClient)
-                assert data_client.mock_controller.connected
+                assert data_client.socket_server.connected
 
             await self.validate_telemetry()
 
@@ -471,7 +471,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 remote=self.remote, state=salobj.State.DISABLED
             )
             for data_client in self.csc.data_clients:
-                assert not data_client.mock_controller.connected
+                assert not data_client.socket_server.connected
 
     async def test_rpi_data_client_loses_connecton(self) -> None:
         """The CSC should fault when a ControllerDataClient loses its
@@ -489,10 +489,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
             assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
-                assert data_client.mock_controller.connected
+                assert data_client.socket_server.connected
 
             # Disconnect one of the mock servers
-            await self.csc.data_clients[1].mock_controller.close()
+            await self.csc.data_clients[1].socket_server.close()
 
             await self.assert_next_summary_state(
                 salobj.State.FAULT, timeout=STATE_TIMEOUT
@@ -522,8 +522,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # then try to enable the CSC.
             assert len(self.csc.data_clients) == NUM_ALL_SENSORS
             for data_client in self.csc.data_clients:
-                assert data_client.enable_mock_controller
-            self.csc.data_clients[1].enable_mock_controller = False
+                assert data_client.enable_socket_server
+            self.csc.data_clients[1].enable_socket_server = False
             with salobj.assertRaisesAckError():
                 await self.remote.cmd_enable.start(timeout=STD_TIMEOUT)
             await self.assert_next_summary_state(
@@ -549,7 +549,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
             assert len(self.csc.data_clients) == 1
             for data_client in self.csc.data_clients:
-                assert data_client.mock_controller.connected
+                assert data_client.socket_server.connected
 
             await self.validate_telemetry()
 
@@ -585,7 +585,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ENABLED again..
         """
         # Start the MockServer for manual control.
-        await self.start_mock_controller()
+        await self.start_socket_server()
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             config_dir=TEST_CONFIG_DIR,
@@ -620,7 +620,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
         # Stop the MockServer to clean up after ourselves.
-        await self.stop_mock_controller()
+        await self.stop_socket_server()
 
     async def test_rpi_data_client_loses_connection(self) -> None:
         """Test timeouts of connections from the DataClient to the server.
@@ -630,7 +630,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         ENABLED again.
         """
         # Start the MockServer for manual control.
-        await self.start_mock_controller()
+        await self.start_socket_server()
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             config_dir=TEST_CONFIG_DIR,
@@ -645,7 +645,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             assert len(self.csc.data_clients) == 1
 
             # Stop the MockServer.
-            await self.stop_mock_controller()
+            await self.stop_socket_server()
             await self.assert_next_summary_state(
                 salobj.State.FAULT, timeout=STATE_TIMEOUT
             )
@@ -658,7 +658,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
             # Start the MockServer again.
-            await self.start_mock_controller()
+            await self.start_socket_server()
 
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.ENABLED
@@ -671,25 +671,25 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
 
         # Stop the MockServer to clean up after ourselves.
-        await self.stop_mock_controller()
+        await self.stop_socket_server()
 
-    async def start_mock_controller(self) -> None:
-        self.mock_controller = common.MockController(
-            name="MockController",
+    async def start_socket_server(self) -> None:
+        self.socket_server = common.SocketServer(
+            name="SocketServer",
             host=tcpip.LOCAL_HOST,
             port=5000,
-            log=logging.getLogger("MockController"),
+            log=logging.getLogger("SocketServer"),
             simulation_mode=1,
         )
         mock_command_handler = common.MockCommandHandler(
-            callback=self.mock_controller.write_json,
+            callback=self.socket_server.write_json,
             simulation_mode=1,
         )
-        self.mock_controller.set_command_handler(mock_command_handler)
-        await asyncio.wait_for(self.mock_controller.start_task, timeout=STD_TIMEOUT)
+        self.socket_server.set_command_handler(mock_command_handler)
+        await asyncio.wait_for(self.socket_server.start_task, timeout=STD_TIMEOUT)
 
-    async def stop_mock_controller(self) -> None:
-        await self.mock_controller.close()
+    async def stop_socket_server(self) -> None:
+        await self.socket_server.close()
 
     async def get_config_for_device(self, name: str) -> dict:
         config_file = TEST_CONFIG_DIR / "test_lightning_sensors.yaml"
