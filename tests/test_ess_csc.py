@@ -844,7 +844,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             config_dir=TEST_CONFIG_DIR,
-            simulation_mode=0,
+            simulation_mode=1,
             override="tcpip_temperature_sensor.yaml",
         ):
             await self.assert_next_summary_state(
