@@ -615,14 +615,6 @@ additionalProperties: false
                 rain_tip_dcount = rain_tip_count - last_rain_tip_count
                 if rain_tip_dcount < 0:
                     rain_tip_dcount += MAX_RAIN_TIP_COUNT
-                if rain_tip_dcount != 1:
-                    self.log.warning(
-                        "Will not report rainRate due to an unexpected jump "
-                        "in the rain tip counter: "
-                        f"{last_rain_tip_count=}; {rain_tip_count=}. "
-                        "The expected difference is 1, or 9999 to 1"
-                    )
-                    return
 
                 rain_tip_dt = timestamp - last_rain_tip_timestamp
                 rain_rate_mm_per_hr = (
