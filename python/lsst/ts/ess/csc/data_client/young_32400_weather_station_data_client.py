@@ -272,8 +272,8 @@ class Young32400WeatherStationDataClient(common.data_client.BaseReadLoopDataClie
 
         # Most recent new value of rain tip counter,
         # and the time it was recorded (0 until a change is seen).
-        self.last_rain_tip_count = 0
-        self.last_rain_tip_timestamp = 0
+        self.last_rain_tip_count = 0.0
+        self.last_rain_tip_timestamp = 0.0
 
         # Has a rain tip transition been seen?
         self.rain_tip_transition_seen = False
@@ -478,7 +478,7 @@ additionalProperties: false
     async def disconnect(self) -> None:
         self.run_task.cancel()
         self.rain_stopped_timer_task.cancel()
-        self.last_rain_tip_timestamp = 0
+        self.last_rain_tip_timestamp = 0.0
         self.air_flow_accumulator.clear()
         self.humidity_accumulator.clear()
         self.temperature_accumulator.clear()
@@ -560,72 +560,83 @@ additionalProperties: false
 
         report_temperature = False
         if self.config.sensor_name_temperature:
-            raw_median = self.temperature_accumulator.add_sample(temperature)
-            if raw_median is not None:
-                report_temperature = True
-                self.topics.tel_temperature.data.temperatureItem[0] = scaled_from_raw(
-                    raw=raw_median,
-                    scale=self.config.scale_offset_temperature[0],
-                    offset=self.config.scale_offset_temperature[1],
-                )
-                await self.topics.tel_temperature.set_write(timestamp=timestamp)
+            report_temperature = await self._handle_temperature(temperature, timestamp)
 
         if self.config.sensor_name_dew_point and (
             report_humidity or report_temperature
         ):
-            relative_humidity = (
-                self.topics.tel_relativeHumidity.data.relativeHumidityItem
-            )
-            temperature = self.topics.tel_temperature.data.temperatureItem[0]
-            if not math.isnan(relative_humidity) and not math.isnan(temperature):
-                dew_point = compute_dew_point_magnus(
-                    relative_humidity=relative_humidity, temperature=temperature
-                )
-                await self.topics.tel_dewPoint.set_write(
-                    dewPointItem=dew_point, timestamp=timestamp
-                )
+            await self._handle_dew_point(timestamp)
 
         if self.config.sensor_name_rain:
-            if self.last_rain_tip_timestamp == 0:
-                # Start recording rain data.
-                self.last_rain_tip_count = rain_tip_count
-                self.last_rain_tip_timestamp = timestamp
-            else:
-                if rain_tip_count == self.last_rain_tip_count:
-                    # No change, nothing to do
-                    return
+            await self._handle_rain_tip_count(rain_tip_count, timestamp)
 
-                # Update the saved values, after making local copies.
-                last_rain_tip_count = self.last_rain_tip_count
-                last_rain_tip_timestamp = self.last_rain_tip_timestamp
-                self.last_rain_tip_count = rain_tip_count
-                self.last_rain_tip_timestamp = timestamp
+    async def _handle_temperature(self, temperature: int, timestamp: float) -> bool:
+        report_temperature = False
+        raw_median = self.temperature_accumulator.add_sample(temperature)
+        if raw_median is not None:
+            report_temperature = True
+            self.topics.tel_temperature.data.temperatureItem[0] = scaled_from_raw(
+                raw=raw_median,
+                scale=self.config.scale_offset_temperature[0],
+                offset=self.config.scale_offset_temperature[1],
+            )
+            await self.topics.tel_temperature.set_write(timestamp=timestamp)
+        return report_temperature
 
-                # Report that it is raining and start the rain stopped timer.
-                await self.topics.evt_precipitation.set_write(raining=True)
-                self.restart_rain_stopped_timer()
+    async def _handle_dew_point(self, timestamp: float) -> None:
+        relative_humidity = self.topics.tel_relativeHumidity.data.relativeHumidityItem
+        temperature = self.topics.tel_temperature.data.temperatureItem[0]
+        if not math.isnan(relative_humidity) and not math.isnan(temperature):
+            dew_point = compute_dew_point_magnus(
+                relative_humidity=relative_humidity, temperature=temperature
+            )
+            await self.topics.tel_dewPoint.set_write(
+                dewPointItem=dew_point, timestamp=timestamp
+            )
 
-                if not self.rain_tip_transition_seen:
-                    # We cannot report the rain rate because this is
-                    # the first rain tip counter that we have seen.
-                    self.rain_tip_transition_seen = True
-                    return
+    async def _handle_rain_tip_count(
+        self, rain_tip_count: int, timestamp: float
+    ) -> None:
+        if self.last_rain_tip_timestamp == 0:
+            # Start recording rain data.
+            self.last_rain_tip_count = rain_tip_count
+            self.last_rain_tip_timestamp = timestamp
+        else:
+            if rain_tip_count == self.last_rain_tip_count:
+                # No change, nothing to do
+                return
 
-                # Report rain rate.
-                rain_tip_dcount = rain_tip_count - last_rain_tip_count
-                if rain_tip_dcount < 0:
-                    rain_tip_dcount += MAX_RAIN_TIP_COUNT
+            # Update the saved values, after making local copies.
+            last_rain_tip_count = self.last_rain_tip_count
+            last_rain_tip_timestamp = self.last_rain_tip_timestamp
+            self.last_rain_tip_count = rain_tip_count
+            self.last_rain_tip_timestamp = timestamp
 
-                rain_tip_dt = timestamp - last_rain_tip_timestamp
-                rain_rate_mm_per_hr = (
-                    rain_tip_dcount
-                    * self.config.scale_rain_rate
-                    * SECONDS_PER_HOUR
-                    / rain_tip_dt
-                )
-                await self.topics.tel_rainRate.set_write(
-                    rainRateItem=round(rain_rate_mm_per_hr)
-                )
+            # Report that it is raining and start the rain stopped timer.
+            await self.topics.evt_precipitation.set_write(raining=True)
+            self.restart_rain_stopped_timer()
+
+            if not self.rain_tip_transition_seen:
+                # We cannot report the rain rate because this is
+                # the first rain tip counter that we have seen.
+                self.rain_tip_transition_seen = True
+                return
+
+            # Report rain rate.
+            rain_tip_dcount = rain_tip_count - last_rain_tip_count
+            if rain_tip_dcount < 0:
+                rain_tip_dcount += MAX_RAIN_TIP_COUNT
+
+            rain_tip_dt = timestamp - last_rain_tip_timestamp
+            rain_rate_mm_per_hr = (
+                rain_tip_dcount
+                * self.config.scale_rain_rate
+                * SECONDS_PER_HOUR
+                / rain_tip_dt
+            )
+            await self.topics.tel_rainRate.set_write(
+                rainRateItem=round(rain_rate_mm_per_hr)
+            )
 
     def restart_rain_stopped_timer(self) -> None:
         """Start or restart the "rain stopped" timer."""
