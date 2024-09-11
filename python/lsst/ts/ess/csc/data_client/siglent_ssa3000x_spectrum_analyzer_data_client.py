@@ -24,12 +24,14 @@ from __future__ import annotations
 __all__ = ["SiglentSSA3000xSpectrumAnalyzerDataClient"]
 
 import asyncio
+import enum
 import logging
 import types
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import yaml
+from astropy import units
 from lsst.ts import tcpip, utils
 from lsst.ts.ess import common
 
@@ -46,6 +48,13 @@ EXPECTED_NUMBER_OF_DATA_POINTS = 751
 QUERY_TRACE_DATA_CMD = ":trace:data? 1"
 SET_FREQ_START_CMD = ":frequency:start 0.0 GHz"
 SET_FREQ_STOP_CMD = ":frequency:stop 3.0 GHz"
+
+
+class FreqUnit(enum.Enum):
+    GHz = enum.auto()
+    MHz = enum.auto()
+    kHz = enum.auto()
+    Hz = enum.auto()
 
 
 class SiglentSSA3000xSpectrumAnalyzerDataClient(
@@ -106,7 +115,7 @@ class SiglentSSA3000xSpectrumAnalyzerDataClient(
     @classmethod
     def get_config_schema(cls) -> dict[str, Any]:
         return yaml.safe_load(
-            """
+            f"""
 $schema: http://json-schema.org/draft-07/schema#
 description: Schema for SiglentSSA3000xSpectrumAnalyzerDataClient
 type: object
@@ -142,6 +151,24 @@ properties:
     description: The poll interval between requests for the scan telemetry (sec).
     type: number
     default: 1.0
+  freq_start_value:
+    description: Frequency to start scanning.
+    type: number
+    default: 0.0
+  freq_start_unit:
+    description: Units of the freq_start_value.
+    type: string
+    enum: {[e.name for e in FreqUnit]}
+    default: GHz
+  freq_end_value:
+    description: Frequency to end scanning.
+    type: number
+    default: 3.0
+  freq_end_unit:
+    description: Units of the freq_end_value.
+    type: string
+    enum: {[e.name for e in FreqUnit]}
+    default: GHz
 required:
   - host
   - port
@@ -158,6 +185,50 @@ additionalProperties: false
     def descr(self) -> str:
         assert self.client is not None  # keep mypy happy
         return f"host={self.client.host}, port={self.client.port}"
+
+    def get_set_freq_start_cmd(
+        self, start_freq: float, unit: FreqUnit = FreqUnit.GHz
+    ) -> str:
+        """Get the set start frequence command string for a given start
+        frequency.
+
+        Parameters
+        ----------
+        start_freq : `float`
+            The scan start frequency. Unit will depend on the value of "unit"
+            parameter.
+        unit : `str`, optional
+            Unit of the frequency parameter (GHz by default).
+
+        Returns
+        -------
+        `str`
+            String to be sent to the spectrum analyzer to select the start
+            frequency.
+        """
+        return f":frequency:start {start_freq:.1f} {unit.name}"
+
+    def get_set_freq_stop_cmd(
+        self, stop_freq: float, unit: FreqUnit = FreqUnit.GHz
+    ) -> str:
+        """Get the set stop frequence command string for a given stop
+        frequency.
+
+        Parameters
+        ----------
+        stop_freq : `float`
+            The scan start frequency. Unit will depend on the value of "unit"
+            parameter.
+        unit : `str`, optional
+            Unit of the frequency parameter (GHz by default).
+
+        Returns
+        -------
+        `str`
+            String to be sent to the spectrum analyzer to select the stop
+            frequency.
+        """
+        return f":frequency:stop {stop_freq:.1f} {unit.name}"
 
     @property
     def connected(self) -> bool:
@@ -252,8 +323,18 @@ additionalProperties: false
         else:
             try:
                 await self.topics.tel_spectrumAnalyzer.set_write(
-                    startFrequency=self.start_frequency,
-                    stopFrequency=self.stop_frequency,
+                    startFrequency=(
+                        self.config.freq_start_value
+                        * getattr(units, self.config.freq_start_unit)
+                    )
+                    .to(units.Hz)
+                    .value,
+                    stopFrequency=(
+                        self.config.freq_end_value
+                        * getattr(units, self.config.freq_end_unit)
+                    )
+                    .to(units.Hz)
+                    .value,
                     spectrum=data,
                     timestamp=timestamp,
                 )
