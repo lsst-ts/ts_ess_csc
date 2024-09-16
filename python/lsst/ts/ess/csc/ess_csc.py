@@ -37,7 +37,7 @@ from .config_schema import CONFIG_SCHEMA
 
 def get_task_index_exception(
     tasks: Sequence[asyncio.Future],
-) -> tuple[int, Exception] | tuple[None, None]:
+) -> tuple[int | None, BaseException | None]:
     """Return (index, exception) of the first task with an exception.
 
     Parameters
@@ -53,10 +53,8 @@ def get_task_index_exception(
     """
     for index, task in enumerate(tasks):
         if task.done() and not task.cancelled() and task.exception() is not None:
-            # Mypy thinks task.exception() could be None,
-            # so block type checking
-            return (index, task.exception())  # type: ignore
-    return (None, None)
+            return index, task.exception()
+    return None, None
 
 
 def run_ess_csc() -> None:
@@ -138,6 +136,18 @@ class EssCsc(salobj.ConfigurableCsc):
 
     async def start_data_clients(self) -> None:
         """Start the data clients."""
+        # TODO DM-46349 Remove this as soon as the next XML after 22.1 is
+        #  released.
+        for client in self.data_clients:
+            if isinstance(client, common.data_client.SnmpDataClient) and not hasattr(
+                self, "tel_pdu"
+            ):
+                await self.fault(
+                    code=ErrorCode.StartFailed,
+                    report="SnmpDataClient is not supported in this XML version.",
+                    traceback=traceback.format_exc(),
+                )
+
         tasks = [asyncio.create_task(client.start()) for client in self.data_clients]
         try:
             self.start_data_clients_task = asyncio.gather(*tasks)
