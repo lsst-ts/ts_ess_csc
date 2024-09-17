@@ -6,6 +6,20 @@
 Version History
 ###############
 
+v0.19.0
+========
+
+* Incorporate code for electrical power management and other SNMP operations.
+
+Requires:
+
+* ts_salobj 7
+* ts_idl 3.7
+* IDL file for ESS from ts_xml 22.2
+* ts_ess_common 0.20
+* ts_tcpip 2
+* ts_utils 1
+
 v0.18.10
 ========
 
