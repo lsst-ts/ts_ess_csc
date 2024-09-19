@@ -7,7 +7,7 @@ instances:
           port: 161
           max_read_timeouts: 5
           device_name: TestDevice
-          device_type: pdu
+          device_type: netbooter
           snmp_community: rubinobs
           poll_interval: 0.1
       - client_class: SnmpDataClient

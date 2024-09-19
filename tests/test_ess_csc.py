@@ -56,7 +56,7 @@ NUM_ALL_SENSORS = 5
 # set to a sufficiently high number so the timeout tests don't fail.
 STATE_TIMEOUT = 60
 # The available SNMP device types.
-SNMP_DEVICE_TYPES = ["pdu", "schneiderPm5xxx", "xups"]
+SNMP_DEVICE_TYPES = ["netbooter", "schneiderPm5xxx", "xups"]
 
 # Config override string to avoid duplication.
 ALL_SENSORS_YAML = "test_all_sensors.yaml"
@@ -879,6 +879,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
 
             system_description = getattr(data, "systemDescription")
             assert system_description == common.SIMULATED_SYS_DESCR
+            sensor_name = getattr(data, "sensorName")
+            assert sensor_name == "localhost"
 
             for array_field_name in device_info.array_fields:
                 field_data = getattr(data, array_field_name)
@@ -893,7 +895,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         # TODO DM-46349 Remove this as soon as the next XML after 22.1 is
         #  released.
         component_info = ComponentInfo("ESS", "")
-        if "tel_pdu" not in component_info.topics:
+        if "tel_netbooter" not in component_info.topics:
             # No suitable XML version.
             return
 
@@ -913,7 +915,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         # TODO DM-46349 Remove this as soon as the next XML after 22.1 is
         #  released.
         component_info = ComponentInfo("ESS", "")
-        if "tel_pdu" not in component_info.topics:
+        if "tel_netbooter" not in component_info.topics:
             # No suitable XML version.
             return
 
@@ -931,13 +933,10 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         # Patch functions so always the values read from file are returned.
         with (
             mock.patch.object(
-                common.SnmpServerSimulator, "generate_integer", self.get_snmp_value
+                common.SnmpServerSimulator, "_generate_float", self.get_snmp_value
             ),
             mock.patch.object(
-                common.SnmpServerSimulator, "generate_float", self.get_snmp_value
-            ),
-            mock.patch.object(
-                common.SnmpServerSimulator, "generate_string", self.get_snmp_value
+                common.SnmpServerSimulator, "_generate_string", self.get_snmp_value
             ),
         ):
             async with self.make_csc(

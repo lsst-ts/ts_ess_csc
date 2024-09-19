@@ -140,12 +140,10 @@ class EssCsc(salobj.ConfigurableCsc):
         #  released.
         for client in self.data_clients:
             if isinstance(client, common.data_client.SnmpDataClient) and not hasattr(
-                self, "tel_pdu"
+                self, "tel_netbooter"
             ):
-                await self.fault(
-                    code=ErrorCode.StartFailed,
-                    report="SnmpDataClient is not supported in this XML version.",
-                    traceback=traceback.format_exc(),
+                raise RuntimeError(
+                    "SnmpDataClient is not supported in this XML version."
                 )
 
         tasks = [asyncio.create_task(client.start()) for client in self.data_clients]
