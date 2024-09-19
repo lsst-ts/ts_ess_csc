@@ -99,7 +99,7 @@ class EssCsc(salobj.ConfigurableCsc):
         config_schema: dict = CONFIG_SCHEMA,
     ) -> None:
         self.config: types.SimpleNamespace | None = None
-        self.data_clients: list[common.BaseDataClient] = list()
+        self.data_clients: list[common.data_client.BaseDataClient] = list()
         self.start_data_clients_task = utils.make_done_future()
         self.run_data_clients_task = utils.make_done_future()
         self.stop_data_clients_tasks: list[asyncio.Task] = []

@@ -16,6 +16,15 @@ instances:
           port: 161
           max_read_timeouts: 5
           device_name: TestDevice
+          device_type: raritan
+          snmp_community: public
+          poll_interval: 0.1
+      - client_class: SnmpDataClient
+        config:
+          host: localhost
+          port: 161
+          max_read_timeouts: 5
+          device_name: TestDevice
           device_type: schneiderPm5xxx
           snmp_community: public
           poll_interval: 0.1
