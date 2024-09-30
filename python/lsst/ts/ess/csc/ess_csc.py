@@ -99,7 +99,7 @@ class EssCsc(salobj.ConfigurableCsc):
         config_schema: dict = CONFIG_SCHEMA,
     ) -> None:
         self.config: types.SimpleNamespace | None = None
-        self.data_clients: list[common.BaseDataClient] = list()
+        self.data_clients: list[common.data_client.BaseDataClient] = list()
         self.start_data_clients_task = utils.make_done_future()
         self.run_data_clients_task = utils.make_done_future()
         self.stop_data_clients_tasks: list[asyncio.Task] = []
@@ -140,12 +140,10 @@ class EssCsc(salobj.ConfigurableCsc):
         #  released.
         for client in self.data_clients:
             if isinstance(client, common.data_client.SnmpDataClient) and not hasattr(
-                self, "tel_pdu"
+                self, "tel_netbooter"
             ):
-                await self.fault(
-                    code=ErrorCode.StartFailed,
-                    report="SnmpDataClient is not supported in this XML version.",
-                    traceback=traceback.format_exc(),
+                raise RuntimeError(
+                    "SnmpDataClient is not supported in this XML version."
                 )
 
         tasks = [asyncio.create_task(client.start()) for client in self.data_clients]
