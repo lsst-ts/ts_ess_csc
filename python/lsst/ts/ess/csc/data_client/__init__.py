@@ -19,5 +19,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from .gec_thermalscanner_client import *
 from .siglent_ssa3000x_spectrum_analyzer_data_client import *
 from .young_32400_weather_station_data_client import *
