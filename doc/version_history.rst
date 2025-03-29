@@ -10,6 +10,7 @@ v0.19.0
 ========
 
 * Incorporate code for electrical power management and other SNMP operations.
+* Cleanup and fix conda recipe.
 
 Requires:
 
