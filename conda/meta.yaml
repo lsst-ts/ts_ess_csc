@@ -7,27 +7,21 @@ source:
   path: ../
 
 build:
-  noarch: generic
+  noarch: python
   script: {{ PYTHON }} -m pip install --no-deps --ignore-installed .
 
 test:
   requires:
     - ts-conda-build =0.4
-    - ts-idl {{ idl_version }}
+    - ts-xml {{ xml_version }}
     - ts-salobj {{ salobj_version }}
-    - ts-tcpip
-    - ts-utils
-    - ts-ess-common
-    - ts-dds
-    - pyserial
-    - pyftdi
   source_files:
     - python
     - bin
     - tests
     - pyproject.toml
   commands:
-    - pytest
+    - pytest -v
 
 requirements:
   host:
@@ -39,11 +33,12 @@ requirements:
     - python {{ python }}
     - setuptools_scm
     - setuptools
+    - ts-conda-build =0.4
   run:
     - python {{ python }}
     - setuptools
     - setuptools_scm
-    - ts-idl
+    - ts-xml
     - ts-salobj
     - ts-tcpip
     - ts-ess-common
