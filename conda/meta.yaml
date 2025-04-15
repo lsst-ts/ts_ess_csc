@@ -21,7 +21,7 @@ test:
     - tests
     - pyproject.toml
   commands:
-    - pytest
+    - pytest -v
 
 requirements:
   host:
@@ -38,7 +38,7 @@ requirements:
     - python {{ python }}
     - setuptools
     - setuptools_scm
-    - ts-idl
+    - ts-xml
     - ts-salobj
     - ts-tcpip
     - ts-ess-common
