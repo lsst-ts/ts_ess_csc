@@ -616,6 +616,9 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 salobj.State.STANDBY, timeout=STATE_TIMEOUT
             )
 
+            while self.socket_server.command_handler._started:
+                await asyncio.sleep(0.01)
+
             await salobj.set_summary_state(
                 remote=self.remote, state=salobj.State.ENABLED
             )
