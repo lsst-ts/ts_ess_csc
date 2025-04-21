@@ -1,20 +1,20 @@
 [build-system]
-requires = [ "setuptools", "setuptools_scm" ]
+requires = ["setuptools", "setuptools_scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ts_ess_csc"
 description = "Rubin Observatory Environment Sensors Support CSC."
 license = { text = "GPL" }
-classifiers = [ "Programming Language :: Python :: 3" ]
+classifiers = ["Programming Language :: Python :: 3"]
 urls = { documentation = "https://ts-ess-csc.lsst.io", repository = "https://github.com/lsst-ts/ts_ess_csc" }
-dynamic = [ "version" ]
+dynamic = ["version"]
 
 [tool.setuptools.dynamic]
 version = { attr = "setuptools_scm.get_version" }
 
 [tool.setuptools.packages.find]
-where = [ "python" ]
+where = ["python"]
 
 [project.scripts]
 run_ess_csc = "lsst.ts.ess.csc.ess_csc:run_ess_csc"
@@ -30,6 +30,7 @@ __version__ = "{version}"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [project.optional-dependencies]
-dev = [ "documenteer[pipelines]" ]
+dev = ["documenteer[pipelines]"]
