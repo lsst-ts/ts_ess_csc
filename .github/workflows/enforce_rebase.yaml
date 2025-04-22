@@ -1,0 +1,20 @@
+name: enforce_rebase 
+
+on:
+  workflow_call:
+
+jobs:
+  rebase_job:
+    runs-on: ubuntu-latest
+    name: Enforce rebasing
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Is Rebased on develop?
+      uses: cyberark/enforce-rebase@v2
+      with:
+        default-branch: develop
+
