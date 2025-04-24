@@ -8,12 +8,12 @@ They can be written restructured text format or plain text.
 Each file should be named like ``<JIRA TICKET>.<TYPE>.<EXT>`` with a file extension defining the markup format (``rst|md``).
 The ``<TYPE>`` should be one of:
 
-* ``feature``: A new feature
+* ``feature``: A new feature.
 * ``bugfix``: A bug fix.
 * ``perf``: A performance enhancement.
 * ``doc``: A documentation improvement.
 * ``removal``: A deprecation or removal of API.
-* ``misc``: Other minor changes and/or additions
+* ``misc``: Other minor changes and/or additions.
 
 An example file name would therefore look like ``DM-40534.doc.rst``.
 
