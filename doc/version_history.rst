@@ -22,8 +22,16 @@ Bug Fixes
 - Fixed failing unit test. (`DM-50329 <https://rubinobs.atlassian.net//browse/DM-50329>`_)
 - Fixed package version file generation. (`DM-50329 <https://rubinobs.atlassian.net//browse/DM-50329>`_)
 
-
 .. towncrier release notes start
+
+v0.19.3 (2025-04-24)
+====================
+
+Bug Fixes
+---------
+
+- Fixed version module import. (`DM-50480 <https://rubinobs.atlassian.net//browse/DM-50480>`_)
+
 
 v0.19.1
 ========
