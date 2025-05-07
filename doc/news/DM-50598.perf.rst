@@ -1,1 +1,0 @@
-Set a low rate limit for the Weather Station.
