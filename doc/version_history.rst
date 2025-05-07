@@ -24,6 +24,21 @@ Bug Fixes
 
 .. towncrier release notes start
 
+v0.19.4 (2025-05-07)
+====================
+
+Performance Enhancement
+-----------------------
+
+- Set a low rate limit for the Weather Station. (`DM-50598 <https://rubinobs.atlassian.net//browse/DM-50598>`_)
+
+
+Other Changes and Additions
+---------------------------
+
+- Improved logger configuration for run script. (`DM-50598 <https://rubinobs.atlassian.net//browse/DM-50598>`_)
+
+
 v0.19.3 (2025-04-24)
 ====================
 
