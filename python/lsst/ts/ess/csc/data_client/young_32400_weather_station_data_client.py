@@ -417,6 +417,9 @@ properties:
         Scale of tipping bucket rain gauge: rainfall in mm = scale * number of tips.
         For model 52202 specify 0.1.
     type: number
+  rate_limit:
+    type: number
+    default: 0
   location:
     description: Sensor location (used for all telemetry topics).
     type: string
@@ -441,6 +444,7 @@ required:
   - scale_offset_wind_direction
   - scale_offset_wind_speed
   - scale_rain_rate
+  - rate_limit
   - location
 additionalProperties: false
 """
