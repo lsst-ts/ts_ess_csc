@@ -781,7 +781,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             # Patch the "connect" method so we can count how often it was
             # called.
             with mock.patch.object(
-                csc.Young32400WeatherStationDataClient,
+                common.data_client.Young32400WeatherStationDataClient,
                 "connect",
                 wraps=self.csc.data_clients[0].connect,
             ) as connect_mock:
