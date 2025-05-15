@@ -25,5 +25,4 @@ except ImportError:
     __version__ = "?"
 
 from .config_schema import *
-from .data_client import *
 from .ess_csc import *

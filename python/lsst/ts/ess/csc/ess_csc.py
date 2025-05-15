@@ -138,14 +138,6 @@ class EssCsc(salobj.ConfigurableCsc):
         """Start the data clients."""
         # TODO DM-46349 Remove this as soon as the next XML after 22.1 is
         #  released.
-        for client in self.data_clients:
-            if isinstance(client, common.data_client.SnmpDataClient) and not hasattr(
-                self, "tel_netbooter"
-            ):
-                raise RuntimeError(
-                    "SnmpDataClient is not supported in this XML version."
-                )
-
         tasks = [asyncio.create_task(client.start()) for client in self.data_clients]
         try:
             self.start_data_clients_task = asyncio.gather(*tasks)
