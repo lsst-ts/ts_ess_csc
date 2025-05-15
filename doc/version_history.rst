@@ -24,6 +24,16 @@ Bug Fixes
 
 .. towncrier release notes start
 
+v0.20.0 (2025-05-15)
+====================
+
+API Removal or Deprecation
+--------------------------
+
+- Removed all SNMP-related code. (`DM-50822 <https://rubinobs.atlassian.net//browse/DM-50822>`_)
+- Moved all DataClients to ts_ess_common. (`DM-50822 <https://rubinobs.atlassian.net//browse/DM-50822>`_)
+
+
 v0.19.4 (2025-05-07)
 ====================
 
