@@ -1,20 +1,7 @@
-name: enforce_rebase 
+name: enforce_rebase
 
-on:
-  workflow_call:
+on: push
 
 jobs:
-  rebase_job:
-    runs-on: ubuntu-latest
-    name: Enforce rebasing
-
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    - name: Is Rebased on develop?
-      uses: cyberark/enforce-rebase@v2
-      with:
-        default-branch: develop
-
+  call-workflow:
+    uses: lsst-ts/tssw_workflows/.github/workflows/enforce_rebase.yaml@main
