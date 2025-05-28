@@ -99,7 +99,7 @@ class EssCsc(salobj.ConfigurableCsc):
         config_schema: dict = CONFIG_SCHEMA,
     ) -> None:
         self.config: types.SimpleNamespace | None = None
-        self.data_clients: list[common.data_client.BaseDataClient] = list()
+        self.data_clients: list[common.data_client.BaseReadLoopDataClient] = list()
         self.start_data_clients_task = utils.make_done_future()
         self.run_data_clients_task = utils.make_done_future()
         self.stop_data_clients_tasks: list[asyncio.Task] = []
@@ -136,8 +136,6 @@ class EssCsc(salobj.ConfigurableCsc):
 
     async def start_data_clients(self) -> None:
         """Start the data clients."""
-        # TODO DM-46349 Remove this as soon as the next XML after 22.1 is
-        #  released.
         tasks = [asyncio.create_task(client.start()) for client in self.data_clients]
         try:
             self.start_data_clients_task = asyncio.gather(*tasks)
@@ -209,10 +207,6 @@ class EssCsc(salobj.ConfigurableCsc):
     async def stop_data_clients(self) -> None:
         """Stop the data clients."""
         self.start_data_clients_task.cancel()
-        self.run_data_clients_task.cancel()
-        for task in self.stop_data_clients_tasks:
-            task.cancel()
-
         self.stop_data_clients_tasks = [
             asyncio.create_task(client.stop()) for client in self.data_clients
         ]
