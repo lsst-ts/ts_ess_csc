@@ -28,7 +28,7 @@ CONFIG_SCHEMA = yaml.safe_load(
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_ess/blob/main/python/lsst/ts/ess/csc/config_schema.py
 # title must end with one or more spaces followed by the schema version, which must begin with "v"
-title: ESS v7
+title: ESS v8
 description: Schema for ESS configuration.
 type: object
 properties:
@@ -39,6 +39,9 @@ properties:
     items:
       type: object
       properties:
+        csc_name:
+          type: string
+          description: Descriptive name of the CSC.
         sal_index:
           type: integer
           description: SAL index of ESS instance.
@@ -61,6 +64,7 @@ properties:
               - config
             additionalProperties: false
       required:
+        - csc_name
         - sal_index
         - data_clients
       additionalProperties: false
