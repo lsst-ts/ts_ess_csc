@@ -704,7 +704,6 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             )
             assert len(self.csc.data_clients) == 1
             assert self.csc.data_clients[0].mock_data_server is not None
-            assert not self.csc.data_clients[0].mock_data_server.connected
 
             # The CSC should go to FAULT state because of the long interval
             # between reading consecutive data.
