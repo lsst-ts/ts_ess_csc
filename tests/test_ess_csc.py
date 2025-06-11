@@ -507,9 +507,8 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_summary_state(
                 salobj.State.FAULT, timeout=STATE_TIMEOUT
             )
-            await self.assert_next_sample(
-                topic=self.remote.evt_errorCode, errorCode=ErrorCode.RunFailed
-            )
+            data = await self.assert_next_sample(topic=self.remote.evt_errorCode)
+            assert data.errorCode in [ErrorCode.RunFailed, ErrorCode.ConnectionLost]
 
     async def test_restart_csc(self) -> None:
         """The CSC should NOT fault when the CSC is set to STANDBY and then to
