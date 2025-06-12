@@ -6,23 +6,23 @@
 Version History
 ###############
 
-v0.19.2 (2025-04-22)
+.. towncrier release notes start
+
+v0.21.0 (2025-06-12)
 ====================
 
 New Features
 ------------
 
-- Switched to towncrier. (`DM-50329 <https://rubinobs.atlassian.net//browse/DM-50329>`_)
-- Avoided `asyncio_default_fixture_loop_scope` pytest warning. (`DM-50329 <https://rubinobs.atlassian.net//browse/DM-50329>`_)
+- Added descriptive CSC name to configuration schema. (`DM-50895 <https://rubinobs.atlassian.net//browse/DM-50895>`_)
 
 
 Bug Fixes
 ---------
 
-- Fixed failing unit test. (`DM-50329 <https://rubinobs.atlassian.net//browse/DM-50329>`_)
-- Fixed package version file generation. (`DM-50329 <https://rubinobs.atlassian.net//browse/DM-50329>`_)
+- Fixed importing of the version module. (`DM-50895 <https://rubinobs.atlassian.net//browse/DM-50895>`_)
+- Started using rewritten DataClient lifecycle. (`DM-50895 <https://rubinobs.atlassian.net//browse/DM-50895>`_)
 
-.. towncrier release notes start
 
 v0.20.0 (2025-05-15)
 ====================
@@ -56,6 +56,23 @@ Bug Fixes
 ---------
 
 - Fixed version module import. (`DM-50480 <https://rubinobs.atlassian.net//browse/DM-50480>`_)
+
+
+v0.19.2 (2025-04-22)
+====================
+
+New Features
+------------
+
+- Switched to towncrier. (`DM-50329 <https://rubinobs.atlassian.net//browse/DM-50329>`_)
+- Avoided `asyncio_default_fixture_loop_scope` pytest warning. (`DM-50329 <https://rubinobs.atlassian.net//browse/DM-50329>`_)
+
+
+Bug Fixes
+---------
+
+- Fixed failing unit test. (`DM-50329 <https://rubinobs.atlassian.net//browse/DM-50329>`_)
+- Fixed package version file generation. (`DM-50329 <https://rubinobs.atlassian.net//browse/DM-50329>`_)
 
 
 v0.19.1
