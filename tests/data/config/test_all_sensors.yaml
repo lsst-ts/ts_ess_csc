@@ -1,9 +1,11 @@
 instances:
-  - sal_index: 1
+  - csc_name: Test
+    sal_index: 1
     data_clients:
       - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
+          connect_timeout: 1.0
           devices:
             - name: EssTemperature4Ch
               channels: 4
@@ -14,6 +16,7 @@ instances:
       - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
+          connect_timeout: 1.0
           devices:
             - name: HX85A
               device_type: FTDI
@@ -23,6 +26,7 @@ instances:
       - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
+          connect_timeout: 1.0
           devices:
             - name: HX85BA
               device_type: FTDI
@@ -32,6 +36,7 @@ instances:
       - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
+          connect_timeout: 1.0
           devices:
             - name: CSAT3B
               device_type: FTDI
@@ -45,6 +50,7 @@ instances:
       - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
+          connect_timeout: 1.0
           devices:
             - name: EssWindsonic
               device_type: FTDI

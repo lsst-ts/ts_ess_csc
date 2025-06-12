@@ -99,7 +99,7 @@ class EssCsc(salobj.ConfigurableCsc):
         config_schema: dict = CONFIG_SCHEMA,
     ) -> None:
         self.config: types.SimpleNamespace | None = None
-        self.data_clients: list[common.data_client.BaseDataClient] = list()
+        self.data_clients: list[common.data_client.BaseReadLoopDataClient] = list()
         self.start_data_clients_task = utils.make_done_future()
         self.run_data_clients_task = utils.make_done_future()
         self.stop_data_clients_tasks: list[asyncio.Task] = []
@@ -127,23 +127,19 @@ class EssCsc(salobj.ConfigurableCsc):
         """
         await super().begin_enable(data)
         await self.cmd_enable.ack_in_progress(data, timeout=60)
+        await self.start_data_clients()
 
-    async def handle_summary_state(self) -> None:
-        if self.summary_state == salobj.State.ENABLED:
-            await self.start_data_clients()
-        else:
-            await self.stop_data_clients()
+    async def begin_disable(self, data: salobj.BaseDdsDataType) -> None:
+        await self.stop_data_clients()
 
     async def start_data_clients(self) -> None:
         """Start the data clients."""
-        # TODO DM-46349 Remove this as soon as the next XML after 22.1 is
-        #  released.
         tasks = [asyncio.create_task(client.start()) for client in self.data_clients]
         try:
             self.start_data_clients_task = asyncio.gather(*tasks)
             await self.start_data_clients_task
             self.run_data_clients_task = asyncio.create_task(self.run_data_clients())
-        except Exception as main_exception:
+        except BaseException as main_exception:
             index, task_exception = get_task_index_exception(tasks)
             traceback_arg = None
             if index is None:
@@ -155,9 +151,9 @@ class EssCsc(salobj.ConfigurableCsc):
                 traceback_arg = traceback.format_exc()
             else:
                 client = self.data_clients[index]
-                if any(
-                    isinstance(task_exception, etype)
-                    for etype in (ConnectionError, asyncio.IncompleteReadError, OSError)
+                if isinstance(
+                    task_exception,
+                    (ConnectionError | asyncio.IncompleteReadError | OSError),
                 ):
                     code = ErrorCode.ConnectionFailed
                     report = f"{client} could not connect to its data server: {task_exception}"
@@ -168,15 +164,14 @@ class EssCsc(salobj.ConfigurableCsc):
                     code = ErrorCode.StartFailed
                     report = f"{client} failed to start: {task_exception!r}"
             await self.fault(code=code, report=report, traceback=traceback_arg)
-            raise
 
     async def run_data_clients(self) -> None:
         """Run the data clients, to read and publish environmental data."""
         tasks = [client.run_task for client in self.data_clients]
         try:
-            self.run_data_clients_task = asyncio.gather(*tasks)
-            await self.run_data_clients_task
-        except Exception as main_exception:
+            run_data_clients_task = asyncio.gather(*tasks)
+            await run_data_clients_task
+        except (Exception, asyncio.CancelledError) as main_exception:
             self.log.exception(f"run_data_clients failed: {main_exception!r}")
             index, task_exception = get_task_index_exception(tasks)
             traceback_arg = None
@@ -204,15 +199,11 @@ class EssCsc(salobj.ConfigurableCsc):
                     code = ErrorCode.RunFailed
                     report = f"{client} failed while running: {task_exception!r}"
             await self.fault(code=code, report=report, traceback=traceback_arg)
-            raise
 
     async def stop_data_clients(self) -> None:
         """Stop the data clients."""
+        self.log.debug("Stopping all DataClients.")
         self.start_data_clients_task.cancel()
-        self.run_data_clients_task.cancel()
-        for task in self.stop_data_clients_tasks:
-            task.cancel()
-
         self.stop_data_clients_tasks = [
             asyncio.create_task(client.stop()) for client in self.data_clients
         ]
