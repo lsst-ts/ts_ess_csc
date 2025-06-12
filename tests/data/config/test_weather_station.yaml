@@ -1,5 +1,6 @@
 instances:
-  - sal_index: 1
+  - csc_name: Test
+    sal_index: 1
     data_clients:
       - client_class: Young32400WeatherStationDataClient
         config:
