@@ -139,7 +139,7 @@ class EssCsc(salobj.ConfigurableCsc):
             self.start_data_clients_task = asyncio.gather(*tasks)
             await self.start_data_clients_task
             self.run_data_clients_task = asyncio.create_task(self.run_data_clients())
-        except (Exception, asyncio.CancelledError) as main_exception:
+        except BaseException as main_exception:
             index, task_exception = get_task_index_exception(tasks)
             traceback_arg = None
             if index is None:
@@ -151,9 +151,9 @@ class EssCsc(salobj.ConfigurableCsc):
                 traceback_arg = traceback.format_exc()
             else:
                 client = self.data_clients[index]
-                if any(
-                    isinstance(task_exception, etype)
-                    for etype in (ConnectionError, asyncio.IncompleteReadError, OSError)
+                if isinstance(
+                    task_exception,
+                    (ConnectionError | asyncio.IncompleteReadError | OSError),
                 ):
                     code = ErrorCode.ConnectionFailed
                     report = f"{client} could not connect to its data server: {task_exception}"
