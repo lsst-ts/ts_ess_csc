@@ -8,6 +8,28 @@ Version History
 
 .. towncrier release notes start
 
+v0.21.1 (2025-11-11)
+====================
+
+Bug Fixes
+---------
+
+- Fixed the TcpipDataClient unit test. (`OSW-1346 <https://rubinobs.atlassian.net//browse/OSW-1346>`_)
+
+
+Performance Enhancement
+-----------------------
+
+- Set conda build string. (`OSW-982 <https://rubinobs.atlassian.net//browse/OSW-982>`_)
+- Updated ts_conda_build dependency version. (`OSW-982 <https://rubinobs.atlassian.net//browse/OSW-982>`_)
+
+
+Other Changes and Additions
+---------------------------
+
+- Formatted code with ruff. (`OSW-1346 <https://rubinobs.atlassian.net//browse/OSW-1346>`_)
+
+
 v0.21.0 (2025-06-12)
 ====================
 
