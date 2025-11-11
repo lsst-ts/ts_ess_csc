@@ -144,10 +144,7 @@ class EssCsc(salobj.ConfigurableCsc):
             traceback_arg = None
             if index is None:
                 code = ErrorCode.StartFailed
-                report = (
-                    "start failed but no start task failed; "
-                    f"please report as a bug: {main_exception}"
-                )
+                report = f"start failed but no start task failed; please report as a bug: {main_exception}"
                 traceback_arg = traceback.format_exc()
             else:
                 client = self.data_clients[index]
@@ -189,9 +186,7 @@ class EssCsc(salobj.ConfigurableCsc):
                     for etype in (ConnectionError, asyncio.IncompleteReadError)
                 ):
                     code = ErrorCode.ConnectionLost
-                    report = (
-                        f"{client} lost connection to its data server: {task_exception}"
-                    )
+                    report = f"{client} lost connection to its data server: {task_exception}"
                 elif isinstance(task_exception, asyncio.TimeoutError):
                     code = ErrorCode.ConnectionLost
                     report = f"{client} timed out waiting for data"
@@ -204,9 +199,7 @@ class EssCsc(salobj.ConfigurableCsc):
         """Stop the data clients."""
         self.log.debug("Stopping all DataClients.")
         self.start_data_clients_task.cancel()
-        self.stop_data_clients_tasks = [
-            asyncio.create_task(client.stop()) for client in self.data_clients
-        ]
+        self.stop_data_clients_tasks = [asyncio.create_task(client.stop()) for client in self.data_clients]
         await asyncio.gather(*self.stop_data_clients_tasks, return_exceptions=True)
         failed_task_strs = [
             str(client)
@@ -215,9 +208,7 @@ class EssCsc(salobj.ConfigurableCsc):
         ]
         if failed_task_strs:
             failed_summary = ", ".join(failed_task_strs)
-            self.log.warning(
-                f"Failed to stop one or more data clients: {failed_summary}; continuing"
-            )
+            self.log.warning(f"Failed to stop one or more data clients: {failed_summary}; continuing")
 
     async def close_tasks(self) -> None:
         await super().close_tasks()
@@ -242,9 +233,7 @@ class EssCsc(salobj.ConfigurableCsc):
         else:
             raise RuntimeError(f"No config found for sal_index={self.salinfo.index}")
         for client_index, client_data in enumerate(instance["data_clients"]):
-            client_class = common.data_client.get_data_client_class(
-                client_data["client_class"]
-            )
+            client_class = common.data_client.get_data_client_class(client_data["client_class"])
             config_schema = client_class.get_config_schema()
             validator = salobj.DefaultingValidator(config_schema)
             client_config_dict = client_data["config"]
