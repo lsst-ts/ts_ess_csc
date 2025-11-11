@@ -649,11 +649,16 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_summary_state(salobj.State.FAULT, timeout=STATE_TIMEOUT)
 
     async def test_tcpip_data_client(self) -> None:
-        async with self.make_csc(
-            initial_state=salobj.State.ENABLED,
-            config_dir=TEST_CONFIG_DIR,
-            simulation_mode=1,
-            override="tcpip_temperature_sensor.yaml",
+        async with (
+            common.MockTelemetryServer(
+                host="127.0.0.1", port=5000, log=logging.getLogger("test_tcpip_data_client")
+            ),
+            self.make_csc(
+                initial_state=salobj.State.ENABLED,
+                config_dir=TEST_CONFIG_DIR,
+                simulation_mode=1,
+                override="tcpip_temperature_sensor.yaml",
+            ),
         ):
             await self.assert_next_summary_state(salobj.State.ENABLED, timeout=STATE_TIMEOUT)
             assert len(self.csc.data_clients) == 1
