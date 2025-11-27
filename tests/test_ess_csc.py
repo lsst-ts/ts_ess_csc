@@ -25,6 +25,7 @@ import logging
 import pathlib
 import types
 import unittest
+from unittest.mock import patch
 
 import astropy.units as u
 import numpy as np
@@ -542,9 +543,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         return dict()
 
     async def test_lightning_data_client_nominal(self) -> None:
-        """The CSC should fault when a ControllerDataClient loses its
-        connection to the server.
-        """
+        """Test the ControllerDataClient with the lightning sensors."""
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             config_dir=TEST_CONFIG_DIR,
@@ -587,6 +586,27 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 topic=self.remote.evt_sensorStatus,
                 sensorName="EssElectricField",
             )
+
+    async def test_lightning_data_client_error(self) -> None:
+        """Test the ControllerDataClient with a problem in one of the
+        lightning sensors.
+        """
+        with patch.object(common.sensor.Efm100cSensor, "extract_telemetry") as mock_extract_telemetry:
+            mock_extract_telemetry.return_value = []
+            async with self.make_csc(
+                initial_state=salobj.State.ENABLED,
+                config_dir=TEST_CONFIG_DIR,
+                simulation_mode=1,
+                override="test_lightning_sensors.yaml",
+            ):
+                await self.assert_next_summary_state(salobj.State.ENABLED, timeout=STATE_TIMEOUT)
+
+                dc = self.csc.data_clients[0]
+                while dc.num_consecutive_read_timeouts < 2:
+                    await asyncio.sleep(1.0)
+
+                assert dc.num_consecutive_read_timeouts == 2
+                await self.assert_next_summary_state(salobj.State.FAULT, timeout=STATE_TIMEOUT)
 
     async def test_weather_station_data_client_timeout(self) -> None:
         """Test timeouts of connections from the DataClient to the server.
@@ -649,25 +669,38 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
             await self.assert_next_summary_state(salobj.State.FAULT, timeout=STATE_TIMEOUT)
 
     async def test_tcpip_data_client(self) -> None:
-        async with (
-            common.MockTelemetryServer(
-                host="127.0.0.1", port=5000, log=logging.getLogger("test_tcpip_data_client")
-            ),
-            self.make_csc(
-                initial_state=salobj.State.ENABLED,
-                config_dir=TEST_CONFIG_DIR,
-                simulation_mode=1,
-                override="tcpip_temperature_sensor.yaml",
-            ),
-        ):
-            await self.assert_next_summary_state(salobj.State.ENABLED, timeout=STATE_TIMEOUT)
-            assert len(self.csc.data_clients) == 1
+        config_file = TEST_CONFIG_DIR / "tcpip_temperature_sensor.yaml"
+        with open(config_file, "r") as f:
+            config_raw_data = f.read()
+            config = yaml.safe_load(config_raw_data)
+            device_config = config["instances"][0]["data_clients"][0]["config"]
+            device_configuration = {
+                common.Key.NAME.value: device_config["name"],
+                common.Key.SENSOR_TYPE.value: device_config["sensor_type"],
+                common.Key.CHANNELS.value: device_config["channels"],
+            }
+            async with (
+                common.MockTelemetryServer(
+                    host="127.0.0.1",
+                    port=5000,
+                    log=logging.getLogger("test_tcpip_data_client"),
+                    device_configuration=device_configuration,
+                ),
+                self.make_csc(
+                    initial_state=salobj.State.ENABLED,
+                    config_dir=TEST_CONFIG_DIR,
+                    simulation_mode=1,
+                    override="tcpip_temperature_sensor.yaml",
+                ),
+            ):
+                await self.assert_next_summary_state(salobj.State.ENABLED, timeout=STATE_TIMEOUT)
+                assert len(self.csc.data_clients) == 1
 
-            await self.assert_next_sample(
-                topic=self.remote.evt_sensorStatus,
-                sensorName="TcpipTemperature",
-            )
-            await self.assert_next_sample(
-                topic=self.remote.tel_temperature,
-                sensorName="TcpipTemperature",
-            )
+                await self.assert_next_sample(
+                    topic=self.remote.evt_sensorStatus,
+                    sensorName="TcpipTemperature",
+                )
+                await self.assert_next_sample(
+                    topic=self.remote.tel_temperature,
+                    sensorName="TcpipTemperature",
+                )

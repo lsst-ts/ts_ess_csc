@@ -5,6 +5,9 @@ instances:
       - client_class: ControllerDataClient
         config:
           host: 127.0.0.1
+          max_read_timeouts: 2
+          connect_timeout: 1
+          max_error_state_period: 1
           devices:
             - name: EssElectricField
               device_type: FTDI
