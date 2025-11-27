@@ -25,6 +25,7 @@ import logging
 import pathlib
 import types
 import unittest
+from unittest.mock import patch
 
 import astropy.units as u
 import numpy as np
@@ -542,9 +543,7 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
         return dict()
 
     async def test_lightning_data_client_nominal(self) -> None:
-        """The CSC should fault when a ControllerDataClient loses its
-        connection to the server.
-        """
+        """Test the ControllerDataClient with the lightning sensors."""
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             config_dir=TEST_CONFIG_DIR,
@@ -587,6 +586,27 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 topic=self.remote.evt_sensorStatus,
                 sensorName="EssElectricField",
             )
+
+    async def test_lightning_data_client_error(self) -> None:
+        """Test the ControllerDataClient with a problem in one of the
+        lightning sensors.
+        """
+        with patch.object(common.sensor.Efm100cSensor, "extract_telemetry") as mock_extract_telemetry:
+            mock_extract_telemetry.return_value = []
+            async with self.make_csc(
+                initial_state=salobj.State.ENABLED,
+                config_dir=TEST_CONFIG_DIR,
+                simulation_mode=1,
+                override="test_lightning_sensors.yaml",
+            ):
+                await self.assert_next_summary_state(salobj.State.ENABLED, timeout=STATE_TIMEOUT)
+
+                dc = self.csc.data_clients[0]
+                while dc.num_consecutive_read_timeouts < 2:
+                    await asyncio.sleep(1.0)
+
+                assert dc.num_consecutive_read_timeouts == 2
+                await self.assert_next_summary_state(salobj.State.FAULT, timeout=STATE_TIMEOUT)
 
     async def test_weather_station_data_client_timeout(self) -> None:
         """Test timeouts of connections from the DataClient to the server.
