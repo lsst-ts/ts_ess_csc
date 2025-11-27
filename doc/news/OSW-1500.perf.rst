@@ -1,1 +1,0 @@
-Asserted going to FAULT when reading telemetry leads to an exception.

@@ -8,6 +8,21 @@ Version History
 
 .. towncrier release notes start
 
+v0.21.2 (2025-11-27)
+====================
+
+Bug Fixes
+---------
+
+- Fixed the TcpipDataClient unit test case. (`OSW-1427 <https://rubinobs.atlassian.net//browse/OSW-1427>`_)
+
+
+Performance Enhancement
+-----------------------
+
+- Asserted going to FAULT when reading telemetry leads to an exception. (`OSW-1500 <https://rubinobs.atlassian.net//browse/OSW-1500>`_)
+
+
 v0.21.1 (2025-11-11)
 ====================
 
