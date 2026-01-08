@@ -1,0 +1,14 @@
+instances:
+  - csc_name: Test
+    sal_index: 1
+    data_clients:
+      - client_class: ControllerDataClient
+        config:
+          host: 127.0.0.1
+          devices:
+          - name: MTDome-Sensirion-1
+            device_type: Sensirion
+            serial_port: /dev/ttyUSB_upper_right
+            sensor_type: Sps30
+            baud_rate: 0
+            location: MTDome 1

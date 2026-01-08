@@ -31,6 +31,7 @@ import astropy.units as u
 import numpy as np
 import yaml
 from astropy.units import misc
+
 from lsst.ts import salobj, tcpip, utils
 from lsst.ts.ess import common, csc
 from lsst.ts.ess.common.test_utils import MockTestTools
@@ -704,3 +705,52 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                     topic=self.remote.tel_temperature,
                     sensorName="TcpipTemperature",
                 )
+
+    async def test_particle_sensor_dataclient(self) -> None:
+        """Test the ControllerDataClient with a particle sensor."""
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=1,
+            override="test_particle_sensors.yaml",
+        ):
+            await self.assert_next_summary_state(salobj.State.ENABLED, timeout=STATE_TIMEOUT)
+
+            data = await self.assert_next_sample(
+                topic=self.remote.tel_particleMeasurements,
+                sensorName="MTDome-Sensirion-1",
+            )
+
+            # timestamp.
+            assert data.timestamp > 0
+
+            # particle sizes.
+            assert data.particleSizes == common.PARTICLE_SIZES
+
+            # particle concentrations.
+            for i in range(5):
+                assert (
+                    common.device.MockParticleConcentrationConfig.min
+                    <= data.matterConcentration[i]
+                    <= common.device.MockParticleConcentrationConfig.max
+                )
+
+            # particle number concentrations.
+            for i in range(0, 5):
+                assert (
+                    common.device.MockParticleNumberConcentrationConfig.min
+                    <= data.numberConcentration[i]
+                    <= common.device.MockParticleNumberConcentrationConfig.max
+                )
+
+            # typical particle size.
+            assert (
+                common.device.MockParticleSizeConfig.min
+                <= data.typicalParticleSize
+                <= common.device.MockParticleSizeConfig.max
+            )
+
+            await self.assert_next_sample(
+                topic=self.remote.evt_sensorStatus,
+                sensorName="MTDome-Sensirion-1",
+            )

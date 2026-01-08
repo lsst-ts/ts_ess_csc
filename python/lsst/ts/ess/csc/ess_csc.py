@@ -27,6 +27,7 @@ import types
 from collections.abc import Sequence
 
 import jsonschema
+
 from lsst.ts import salobj, utils
 from lsst.ts.ess import common
 from lsst.ts.xml.enums.ESS import ErrorCode
