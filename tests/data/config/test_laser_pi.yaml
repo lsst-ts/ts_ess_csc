@@ -1,0 +1,34 @@
+instances:
+  - sal_index: 1
+    csc_name: Laser Enclosure
+    data_clients:
+      - client_class: ControllerDataClient
+        # Laser Enclosure humidity and temperature sensors
+        config:
+          host: localhost
+          devices:
+          - name: Laser-ESS01
+            device_type: Serial
+            serial_port: /dev/ttyUSB_upper_right
+            sensor_type: HX85BA
+            location: Laser Enclosure
+      - client_class: TcpipDataClient
+        config:
+          name: Laser-ESS02
+          host: localhost
+          port: 15000
+          connect_timeout: 60
+          read_timeout: 60
+          max_read_timeouts: 2
+          channels: 8
+          baud_rate: 19200
+          sensor_type: Temperature
+          location: >-
+            EnclosureFan
+            FCUnit
+            LaserTop
+            LaserBottom
+            LaserFan
+            PowerSupply
+            EnclosureOut
+            EnclosureMid

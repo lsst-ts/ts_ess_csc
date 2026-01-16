@@ -1,0 +1,1 @@
+Made all DataClients disconnect when going to FAULT.

@@ -7,7 +7,7 @@ name = "ts_ess_csc"
 description = "Rubin Observatory Environment Sensors Support CSC."
 license = { text = "GPL" }
 classifiers = ["Programming Language :: Python :: 3"]
-urls = { documentation = "https://ts-ess-csc.lsst.io", repository = "https://github.com/lsst-ts/ts_ess_csc" }
+urls = { documentation = "https://ts-ess-csc.lsst.io", source_code = "https://github.com/lsst-ts/ts_ess_csc" }
 dynamic = ["version"]
 
 [tool.setuptools.dynamic]
