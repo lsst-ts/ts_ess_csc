@@ -754,3 +754,20 @@ class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
                 topic=self.remote.evt_sensorStatus,
                 sensorName="MTDome-Sensirion-1",
             )
+
+    async def test_multiple_dataclients_and_faults(self) -> None:
+        """Test the CSC with multiple dataclients and going to FAULT.."""
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            config_dir=TEST_CONFIG_DIR,
+            simulation_mode=1,
+            override="test_laser_pi.yaml",
+        ):
+            await self.assert_next_summary_state(salobj.State.ENABLED, timeout=STATE_TIMEOUT)
+            # Give time to the DataClients to connect.
+            while not all([dc.connected for dc in self.csc.data_clients]):
+                await asyncio.sleep(0.01)
+
+            await self.csc.fault(code=-1, report="Unit test forcing FAULT.")
+            for dc in self.csc.data_clients:
+                assert not dc.connected

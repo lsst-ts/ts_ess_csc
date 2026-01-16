@@ -133,6 +133,10 @@ class EssCsc(salobj.ConfigurableCsc):
     async def begin_disable(self, data: salobj.BaseDdsDataType) -> None:
         await self.stop_data_clients()
 
+    async def fault(self, code: int | None, report: str, traceback: str = "") -> None:
+        await self.stop_data_clients()
+        await super().fault(code, report, traceback)
+
     async def start_data_clients(self) -> None:
         """Start the data clients."""
         tasks = [asyncio.create_task(client.start()) for client in self.data_clients]
@@ -142,7 +146,8 @@ class EssCsc(salobj.ConfigurableCsc):
             self.run_data_clients_task = asyncio.create_task(self.run_data_clients())
         except BaseException as main_exception:
             index, task_exception = get_task_index_exception(tasks)
-            traceback_arg = None
+            traceback_arg = ""
+            report: str | None = ""
             if index is None:
                 code = ErrorCode.StartFailed
                 report = f"start failed but no start task failed; please report as a bug: {main_exception}"
@@ -172,7 +177,8 @@ class EssCsc(salobj.ConfigurableCsc):
         except (Exception, asyncio.CancelledError) as main_exception:
             self.log.exception(f"run_data_clients failed: {main_exception!r}")
             index, task_exception = get_task_index_exception(tasks)
-            traceback_arg = None
+            traceback_arg = ""
+            report: str | None = ""
             if index is None:
                 code = ErrorCode.RunFailed
                 report = (
