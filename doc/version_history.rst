@@ -8,6 +8,21 @@ Version History
 
 .. towncrier release notes start
 
+v0.22.1 (2026-01-16)
+====================
+
+Bug Fixes
+---------
+
+- Made all DataClients disconnect when going to FAULT. (`OSW-1598 <https://rubinobs.atlassian.net//browse/OSW-1598>`_)
+
+
+Other Changes and Additions
+---------------------------
+
+- Fixed the documentation build. (`OSW-1598 <https://rubinobs.atlassian.net//browse/OSW-1598>`_)
+
+
 v0.22.0 (2026-01-08)
 ====================
 
