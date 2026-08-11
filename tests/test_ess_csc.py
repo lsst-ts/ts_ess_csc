@@ -110,6 +110,8 @@ def pa_to_mbar(value: float) -> float:
 
 
 class CscTestCase(salobj.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
+    _randomize_topic_subname = True
+
     def setUp(self) -> None:
         # Dict of topic attr_name: attr_data, where:
         # * attr_data is a dict of sensor_name: sensor_data
